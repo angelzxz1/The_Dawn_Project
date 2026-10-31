@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Download, FilePlus2, FolderOpen, History, Package, Save, Upload } from "lucide-react";
 import type { RecentProject } from "@/project/projectFiles";
 import { useShortcuts } from "@/ui/shortcuts";
+import { keyLabel } from "@/ui/keyLabel";
 
 /** The project's name (with a dot while there are unsaved changes) and
  * its File menu: New, Open, recent projects, Save, Save As, and a single
@@ -70,7 +71,7 @@ export function ProjectMenu({
     window.addEventListener("mousedown", onDown);
     return () => window.removeEventListener("mousedown", onDown);
   }, [open, folders, listRecent]);
-  useShortcuts("menu", [{ keys: "escape", run: () => setOpen(false), whileTyping: true }], { enabled: open });
+  useShortcuts("menu", [{ keys: "escape", label: "Close", run: () => setOpen(false), whileTyping: true }], { enabled: open });
 
   const item = (label: string, icon: React.ReactNode, onClick: () => void, hint?: string) => (
     <button
@@ -87,7 +88,6 @@ export function ProjectMenu({
       {hint && <span className="text-[10px] text-muted">{hint}</span>}
     </button>
   );
-  const mod = typeof navigator !== "undefined" && /Mac/.test(navigator.platform) ? "⌘" : "Ctrl+";
 
   return (
     <div ref={root} className="relative flex items-center gap-1.5">
@@ -112,7 +112,7 @@ export function ProjectMenu({
       {open && (
         <div role="menu" className="absolute left-0 top-8 z-[60] w-64 rounded-lg border border-border bg-surface-raised p-1 shadow-2xl">
           {item("New Project", <FilePlus2 size={13} />, onNew)}
-          {item(folders ? "Open Project…" : "Open Project File…", <FolderOpen size={13} />, folders ? onOpen : () => fileInput?.click(), `${mod}O`)}
+          {item(folders ? "Open Project…" : "Open Project File…", <FolderOpen size={13} />, folders ? onOpen : () => fileInput?.click(), keyLabel("mod+o"))}
           {folders && recent.length > 0 && (
             <div className="my-1 border-t border-border pt-1">
               <div className="flex items-center gap-1 px-2 pb-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted">
@@ -136,8 +136,8 @@ export function ProjectMenu({
             </div>
           )}
           <div className="my-1 border-t border-border" />
-          {item("Save", <Save size={13} />, onSave, `${mod}S`)}
-          {item("Save As…", <Save size={13} />, () => setAsking(true), `${mod}⇧S`)}
+          {item("Save", <Save size={13} />, onSave, keyLabel("mod+s"))}
+          {item("Save As…", <Save size={13} />, () => setAsking(true), keyLabel("mod+shift+s"))}
           <div className="my-1 border-t border-border" />
           {item("Export Project File…", <Download size={13} />, onExport)}
           {item("Import Project File…", <Upload size={13} />, () => fileInput?.click())}

@@ -34,7 +34,7 @@ export function FeedbackWindow() {
       feedbackListeners.delete(show);
     };
   }, []);
-  useShortcuts("dialog", [{ keys: "escape", run: () => setOpen(false), whileTyping: true }], { enabled: open });
+  useShortcuts("dialog", [{ keys: "escape", label: "Close", run: () => setOpen(false), whileTyping: true }], { enabled: open });
 
   const community = communityLink();
   if (!open || !community) return null;

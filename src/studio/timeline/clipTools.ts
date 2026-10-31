@@ -24,14 +24,6 @@ export const CLIP_TOOLS: ClipToolInfo[] = [
   { id: "slip", label: "Slip", keys: "shift+5", hint: "Drag inside a clip to slide its notes or audio; the clip stays put" },
 ];
 
-/** "Shift+1" for "shift+1". */
-export function shortcutLabel(keys: string): string {
-  return keys
-    .split("+")
-    .map((k) => k[0].toUpperCase() + k.slice(1))
-    .join("+");
-}
-
 /** A cursor drawn from an icon's SVG paths (24×24, lucide's), white with a
  * dark outline so it shows on any clip color. */
 function iconCursor(paths: string, hotX: number, hotY: number, fallback: string): string {

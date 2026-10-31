@@ -87,6 +87,34 @@ export const effectActions = {
     updateEffects(hostId, (list) => list.filter((e) => e.id !== effectId));
   },
 
+  /** Adds a copy of an effect right after it: its settings, preset, file,
+   * sidechain and bypass. */
+  duplicate(hostId: string, effectId: string): void {
+    const index = effectsOf(hostId).findIndex((e) => e.id === effectId);
+    if (index === -1) return;
+    const source = effectsOf(hostId)[index];
+    projectStore.push();
+    const added = audioEngine.addEffect(hostId, source.type, undefined, index + 1);
+    if (!added) return;
+    Object.entries(source.params).forEach(([key, value]) => {
+      if (value !== added.params[key]) audioEngine.setEffectParam(hostId, added.id, key, value);
+    });
+    if (source.bypass) audioEngine.setEffectBypass(hostId, added.id, true);
+    if (source.sidechain) audioEngine.setEffectSidechain(hostId, added.id, source.sidechain);
+    if (source.file) void audioEngine.setEffectFile(hostId, added.id, source.file.id);
+    const copy: EffectInstance = {
+      ...source,
+      id: added.id,
+      params: { ...source.params },
+      ...(source.sidechain ? { sidechain: { ...source.sidechain } } : {}),
+    };
+    updateEffects(hostId, (prev) => {
+      const list = [...prev];
+      list.splice(index + 1, 0, copy);
+      return list;
+    });
+  },
+
   /** Moves an effect to a position in its chain (dragging a card). */
   move(hostId: string, effectId: string, toIndex: number): void {
     projectStore.push();

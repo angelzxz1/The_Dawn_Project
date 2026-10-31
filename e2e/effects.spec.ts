@@ -19,6 +19,30 @@ for (const type of EFFECT_TYPES) {
   });
 }
 
+test("an effect's card menu duplicates it, settings and all, and removes it", async ({ page, studio }) => {
+  await studio.open("Empty Project");
+  await studio.select("Audio 1");
+  await studio.addEffect("Delay");
+  await studio.addEffect("Chorus");
+  const handles = page.getByTitle("Drag to reorder");
+  await expect(handles).toHaveCount(2);
+  await handles.first().click({ button: "right" });
+  await page.getByRole("button", { name: "Bypass", exact: true }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Bypassed" })).toHaveCount(1);
+
+  await handles.first().click({ button: "right" });
+  await page.getByRole("button", { name: "Duplicate", exact: true }).click();
+  await expect(handles).toHaveCount(3);
+  // The copy is right after it, bypassed too.
+  await expect(page.getByRole("status").filter({ hasText: "Bypassed" })).toHaveCount(2);
+
+  await handles.nth(1).click({ button: "right" });
+  await page.getByRole("button", { name: "Remove", exact: true }).click();
+  await expect(handles).toHaveCount(2);
+  await studio.undo();
+  await expect(handles).toHaveCount(3);
+});
+
 test("a preset changes the multiband compressor's curve", async ({ page, studio }) => {
   await studio.open("Empty Project");
   await studio.select("Audio 1");

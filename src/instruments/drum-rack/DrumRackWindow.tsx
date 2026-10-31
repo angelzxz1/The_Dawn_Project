@@ -118,7 +118,7 @@ export function DrumRackWindow({ channelId, channelName, kit, onChange, onClose,
     };
   }, [channelId]);
 
-  useShortcuts("window", [{ keys: "escape", run: onClose }]);
+  useShortcuts("window", [{ keys: "escape", label: "Close", run: onClose }]);
 
   const loadFile = (pad: number, file: File) => {
     if (!file.type.startsWith("audio/") && !/\.(wav|aiff?|mp3|ogg|flac|m4a)$/i.test(file.name)) return;
@@ -277,7 +277,7 @@ function useOutside(ref: React.RefObject<HTMLElement | null>, onClose: () => voi
     window.addEventListener("pointerdown", down, true);
     return () => window.removeEventListener("pointerdown", down, true);
   }, [ref, onClose]);
-  useShortcuts("menu", [{ keys: "escape", run: onClose, whileTyping: true }]);
+  useShortcuts("menu", [{ keys: "escape", label: "Close", run: onClose, whileTyping: true }]);
 }
 
 function KitList({ kits, current, onLoad, onClose }: { kits: DrumKitPreset[]; current?: string; onLoad: (k: DrumKitPreset) => void; onClose: () => void }) {

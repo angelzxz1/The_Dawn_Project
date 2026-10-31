@@ -133,7 +133,7 @@ export class Studio {
   }
 
   async undo(): Promise<void> {
-    await this.page.getByTitle("Undo (Ctrl/Cmd+Z)").click();
+    await this.page.getByTitle("Undo (Ctrl+Z)").click();
   }
 
   /** The clips in the autosaved working copy (on the tracks' lanes, or in

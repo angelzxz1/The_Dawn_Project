@@ -88,7 +88,7 @@ export function StartScreen({
     if (folders) void listRecent().then((r) => setRecent(r.slice(0, 5)));
   }, [folders, listRecent]);
 
-  useShortcuts("dialog", [{ keys: "escape", run: onClose, whileTyping: true }]);
+  useShortcuts("dialog", [{ keys: "escape", label: "Close", run: onClose, whileTyping: true }]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">

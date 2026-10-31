@@ -52,7 +52,7 @@ export function PacksWindow({
   const [info, setInfo] = useState({ name: "My Presets", author: "", license: "Personal use" });
   const fileInput = useRef<HTMLInputElement>(null);
 
-  useShortcuts("dialog", [{ keys: "escape", run: onClose, whileTyping: true }]);
+  useShortcuts("dialog", [{ keys: "escape", label: "Close", run: onClose, whileTyping: true }]);
 
   const install = async (file: File) => {
     setBusy("install");

@@ -172,7 +172,7 @@ export function AboutWindow({
 }) {
   const [tab, setTab] = useState<AboutTab>(initialTab);
 
-  useShortcuts("dialog", [{ keys: "escape", run: onClose, whileTyping: true }]);
+  useShortcuts("dialog", [{ keys: "escape", label: "Close", run: onClose, whileTyping: true }]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>

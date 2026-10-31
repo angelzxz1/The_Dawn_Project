@@ -181,7 +181,7 @@ function Popover({ anchor, onClose, children }: { anchor: React.RefObject<HTMLDi
     return () => window.removeEventListener("mousedown", onDown);
   }, [anchor, onClose]);
   // A menu is above the plugin window: Escape closes just the menu.
-  useShortcuts("menu", [{ keys: "escape", run: onClose, whileTyping: true }]);
+  useShortcuts("menu", [{ keys: "escape", label: "Close", run: onClose, whileTyping: true }]);
   return createPortal(
     <div
       ref={ref}

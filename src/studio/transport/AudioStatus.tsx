@@ -125,7 +125,7 @@ export function AudioStatus() {
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
   }, [open]);
-  useShortcuts("menu", [{ keys: "escape", run: () => setOpen(false), whileTyping: true }], { enabled: open });
+  useShortcuts("menu", [{ keys: "escape", label: "Close", run: () => setOpen(false), whileTyping: true }], { enabled: open });
 
   const runMeasure = async () => {
     setMeasure({ state: "running" });

@@ -97,6 +97,7 @@ export function ExportDialog({
   useShortcuts("dialog", [
     {
       keys: "escape",
+      label: "Cancel the export, or close",
       whileTyping: true,
       run: () => {
         if (busy) cancelRef.current = true;

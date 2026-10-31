@@ -30,7 +30,8 @@ import {
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
-import { CLIP_TOOLS, shortcutLabel, type ClipTool } from "@/studio/timeline/clipTools";
+import { CLIP_TOOLS, type ClipTool } from "@/studio/timeline/clipTools";
+import { keyLabel, withKeys } from "@/ui/keyLabel";
 import { TrackHeader, type TrackHeaderActions } from "@/studio/tracks/TrackHeader";
 import { TrackLane, type TrackLaneActions } from "@/studio/tracks/TrackLane";
 import { useStableActions } from "@/ui/useStableActions";
@@ -1697,6 +1698,16 @@ export function Daw() {
     setAudioImportTarget({ channelId, atSeconds });
   }, []);
 
+  /** The track a .mid file is being picked for (its header's menu). */
+  const [midiImportTarget, setMidiImportTarget] = useState<string | null>(null);
+  const midiImportInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (midiImportTarget) midiImportInputRef.current?.click();
+  }, [midiImportTarget]);
+
+  /** The track whose name is a text field (its header's menu). */
+  const [renamingTrackId, setRenamingTrackId] = useState<string | null>(null);
+
   /** Right-clicking a clip that's already part of the current multi-
    * selection keeps the whole selection (so the menu's actions apply to
    * the group); right-clicking outside it replaces the selection with
@@ -1737,6 +1748,8 @@ export function Daw() {
               selectedClips: selectedClipIds.size,
               trackPicks,
               takeCount: (id) => (takesByChannel[id] ?? NO_TAKES).length,
+              monitored: monitoredChannelIds,
+              automationChannelId,
               tempo,
               beatsPerBar,
             },
@@ -1769,6 +1782,18 @@ export function Daw() {
               clearWarpMarkersSelected: clipEdits.clearWarpMarkers,
               toggleTakes: takeActions.toggleShowTakes,
               deleteAllTakes: takeActions.deleteAllTakes,
+              renameTrack: setRenamingTrackId,
+              recolorTrack: handleRecolorChannel,
+              toggleMute: handleMuteToggle,
+              toggleSolo: handleSoloToggle,
+              toggleArm: handleArmToggle,
+              toggleMonitor: handleMonitorToggle,
+              openFx,
+              toggleAutomation: handleToggleAutomation,
+              moveTrack: handleReorderChannel,
+              importMidi: setMidiImportTarget,
+              exportMidi: handleExportChannelMidi,
+              clearTrack: handleClearTrack,
               time: timeEdits,
             }
           )
@@ -1798,6 +1823,18 @@ export function Daw() {
       tempo,
       beatsPerBar,
       takesByChannel,
+      monitoredChannelIds,
+      automationChannelId,
+      handleRecolorChannel,
+      handleMuteToggle,
+      handleSoloToggle,
+      handleArmToggle,
+      handleMonitorToggle,
+      openFx,
+      handleToggleAutomation,
+      handleReorderChannel,
+      handleExportChannelMidi,
+      handleClearTrack,
     ]
   );
 
@@ -2035,6 +2072,7 @@ export function Daw() {
       openFx(id);
     },
     rename: handleRenameChannel,
+    renameDone: () => setRenamingTrackId(null),
     setVolume: handleVolumeChange,
     setPan: handlePanChange,
     adjustStart: pushHistory,
@@ -2273,7 +2311,7 @@ export function Daw() {
               type="button"
               onClick={undo}
               disabled={!canUndo}
-              title="Undo (Ctrl/Cmd+Z)"
+              title={withKeys("Undo", "mod+z")}
               className="flex h-6 w-6 items-center justify-center rounded border border-border hover:bg-surface-raised disabled:opacity-30"
             >
               <Undo2 size={12} />
@@ -2282,7 +2320,7 @@ export function Daw() {
               type="button"
               onClick={redo}
               disabled={!canRedo}
-              title="Redo (Ctrl/Cmd+Shift+Z)"
+              title={withKeys("Redo", "mod+shift+z")}
               className="flex h-6 w-6 items-center justify-center rounded border border-border hover:bg-surface-raised disabled:opacity-30"
             >
               <Redo2 size={12} />
@@ -2293,7 +2331,7 @@ export function Daw() {
               type="button"
               onClick={() => zoomBy(1 / ZOOM_STEP)}
               disabled={pxPerSecond <= MIN_PX_PER_SECOND}
-              title="Zoom out (-) · Ctrl/Cmd+wheel or pinch zooms around the pointer"
+              title={withKeys("Zoom out", "-", `${keyLabel("mod+wheel")} or pinch zooms around the pointer`)}
               className="flex h-6 w-6 items-center justify-center rounded border border-border hover:bg-surface-raised disabled:opacity-30"
             >
               <ZoomOut size={12} />
@@ -2302,7 +2340,7 @@ export function Daw() {
               type="button"
               onClick={() => zoomBy(ZOOM_STEP)}
               disabled={pxPerSecond >= MAX_PX_PER_SECOND}
-              title="Zoom in (=) · Ctrl/Cmd+wheel or pinch zooms around the pointer"
+              title={withKeys("Zoom in", "=", `${keyLabel("mod+wheel")} or pinch zooms around the pointer`)}
               className="flex h-6 w-6 items-center justify-center rounded border border-border hover:bg-surface-raised disabled:opacity-30"
             >
               <ZoomIn size={12} />
@@ -2310,7 +2348,7 @@ export function Daw() {
             <button
               type="button"
               onClick={zoomToFit}
-              title="Zoom to fit (Shift+Z): the time selection, or the whole song"
+              title={withKeys("Zoom to fit", "shift+z", "the time selection, or the whole song")}
               className="flex h-6 w-6 items-center justify-center rounded border border-border hover:bg-surface-raised"
             >
               <Expand size={12} />
@@ -2326,7 +2364,7 @@ export function Daw() {
                   onClick={() => setClipTool(t.id)}
                   aria-pressed={clipTool === t.id}
                   aria-label={t.label}
-                  title={`${t.label} (${shortcutLabel(t.keys)}): ${t.hint}${t.id === "pointer" ? "" : " · Esc for the pointer"}`}
+                  title={withKeys(t.label, t.keys, `${t.hint}${t.id === "pointer" ? "" : " · Esc for the pointer"}`)}
                   className={`flex h-6 w-7 items-center justify-center border-l border-border first:border-l-0 ${
                     clipTool === t.id ? "bg-accent/20 text-accent" : "text-muted hover:bg-surface-raised hover:text-foreground"
                   }`}
@@ -2354,7 +2392,7 @@ export function Daw() {
             type="button"
             onClick={toggleLoop}
             aria-pressed={loopEnabled}
-            title="Loop the arrangement between the loop brace's ends (Ctrl+L)"
+            title={withKeys("Loop the arrangement between the loop brace's ends", "mod+l")}
             className={`flex h-6 items-center gap-1 rounded border px-1.5 ${
               loopEnabled
                 ? "border-accent bg-accent/20 text-accent"
@@ -2513,6 +2551,7 @@ export function Daw() {
                   inputDevices={inputDevices}
                   monitoring={monitoredChannelIds.has(channel.id)}
                   takeCount={(takesByChannel[channel.id] ?? NO_TAKES).length}
+                  renaming={renamingTrackId === channel.id}
                   actions={headerActions}
                 />
                 {shownTakes(channel).map((lane) => (
@@ -2685,6 +2724,18 @@ export function Daw() {
           e.target.value = "";
         }}
       />
+      <input
+        ref={midiImportInputRef}
+        type="file"
+        accept=".mid,.midi,audio/midi"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file && midiImportTarget) void handleImportMidi(midiImportTarget, file);
+          setMidiImportTarget(null);
+          e.target.value = "";
+        }}
+      />
 
       <MasterBusRow
         limiterThreshold={masterLimiterThreshold}
@@ -2797,6 +2848,7 @@ export function Daw() {
           onAddEffect={(type, atIndex, presetId) => effectActions.add(fxHostId, type, atIndex, presetId)}
           onRemoveEffect={(effectId) => effectActions.remove(fxHostId, effectId)}
           onMoveEffect={(effectId, toIndex) => effectActions.move(fxHostId, effectId, toIndex)}
+          onDuplicateEffect={(effectId) => effectActions.duplicate(fxHostId, effectId)}
           onBypassToggle={(effectId) => effectActions.toggleBypass(fxHostId, effectId)}
           onParamDragStart={pushHistory}
           onParamChange={(effectId, key, value) => effectActions.setParam(fxHostId, effectId, key, value)}

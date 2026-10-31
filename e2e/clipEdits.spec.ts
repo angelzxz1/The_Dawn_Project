@@ -34,7 +34,7 @@ test.describe("in the Beat template", () => {
     const clip = studio.clipsOn("Bass").first();
     const shown = (await clip.textContent())!;
     await openMenu(clip);
-    await menuItem(page, "Rename… (F2)").click();
+    await menuItem(page, "Rename…").click();
     const field = clip.getByRole("textbox", { name: "Clip name" });
     await expect(field).toBeFocused();
     await field.fill("Bassline");
@@ -183,7 +183,7 @@ test.describe("an audio clip", () => {
     await expect(clips).toHaveCount(2);
     await clips.nth(0).click({ position: { x: 30, y: 50 }, modifiers: ["ControlOrMeta"] });
     await openMenu(clips.nth(0));
-    await menuItem(page, "Consolidate (Ctrl+J)").click();
+    await menuItem(page, "Consolidate").click();
     await expect(clips).toHaveCount(1);
     await expect(clips.first()).toContainText("tone consolidated.wav");
 

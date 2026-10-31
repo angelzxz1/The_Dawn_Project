@@ -74,6 +74,8 @@ function MuteSolo({ channel, onMuteToggle, onSoloToggle }: { channel: ChannelCon
 export interface TrackHeaderActions {
   select(id: string): void;
   rename(id: string, name: string): void;
+  /** Renaming asked for elsewhere (`renaming`, from its menu) is over. */
+  renameDone(): void;
   setVolume(id: string, db: number): void;
   setPan(id: string, pan: number): void;
   /** Fired once at the start of a vol/pan drag or edit gesture - lets the
@@ -163,6 +165,37 @@ interface TrackHeaderProps {
   silent?: { label: string; detail: string } | null;
   /** How many of its effects are bypassed. */
   bypassedCount?: number;
+  /** Its name is a text field, as asked from its menu (until renameDone). */
+  renaming?: boolean;
+}
+
+/** A track's name being typed: Enter or leaving it keeps it, Esc lets go
+ * of it (null). */
+function NameField({ name, onDone }: { name: string; onDone: (name: string | null) => void }) {
+  const [draft, setDraft] = useState(name);
+  // Enter, then the blur it causes: only the first counts.
+  const done = useRef(false);
+  const finish = (value: string | null) => {
+    if (done.current) return;
+    done.current = true;
+    onDone(value);
+  };
+  return (
+    <input
+      autoFocus
+      aria-label="Track name"
+      value={draft}
+      onFocus={(e) => e.target.select()}
+      onChange={(e) => setDraft(e.target.value)}
+      onClick={(e) => e.stopPropagation()}
+      onBlur={() => finish(draft)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") finish(draft);
+        else if (e.key === "Escape") finish(null);
+      }}
+      className="min-w-0 flex-1 rounded border border-accent bg-surface px-1 text-sm font-medium outline-none"
+    />
+  );
 }
 
 /** A note that a track is silent, beside its name. */
@@ -249,6 +282,7 @@ export const TrackHeader = memo(function TrackHeader({
   inputName,
   silent = null,
   bypassedCount = 0,
+  renaming = false,
 }: TrackHeaderProps) {
   const id = channel.id;
   const onSelect = () => actions.select(id);
@@ -281,7 +315,6 @@ export const TrackHeader = memo(function TrackHeader({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
   const [editingName, setEditingName] = useState(false);
-  const [draftName, setDraftName] = useState(channel.name);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const isMidi = channel.type === "midi";
   const isGroup = channel.type === "group";
@@ -294,10 +327,11 @@ export const TrackHeader = memo(function TrackHeader({
   const showMix = rowHeight >= MIX_ROW_FROM;
   const showFiles = rowHeight >= TRACK_ROW_HEIGHT;
 
-  const commitRename = () => {
-    const trimmed = draftName.trim();
+  const finishRename = (name: string | null) => {
+    const trimmed = name?.trim();
     if (trimmed && trimmed !== channel.name) onRename(trimmed);
     setEditingName(false);
+    if (renaming) actions.renameDone();
   };
 
   return (
@@ -386,29 +420,13 @@ export const TrackHeader = memo(function TrackHeader({
             </div>
           </>
         )}
-        {editingName ? (
-          <input
-            autoFocus
-            value={draftName}
-            onFocus={(e) => e.target.select()}
-            onChange={(e) => setDraftName(e.target.value)}
-            onClick={(e) => e.stopPropagation()}
-            onBlur={commitRename}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") commitRename();
-              else if (e.key === "Escape") {
-                setDraftName(channel.name);
-                setEditingName(false);
-              }
-            }}
-            className="min-w-0 flex-1 rounded border border-accent bg-surface px-1 text-sm font-medium outline-none"
-          />
+        {editingName || renaming ? (
+          <NameField name={channel.name} onDone={finishRename} />
         ) : (
           <span
             title="Double-click to rename"
             onDoubleClick={(e) => {
               e.stopPropagation();
-              setDraftName(channel.name);
               setEditingName(true);
             }}
             className="min-w-0 flex-1 truncate text-sm font-medium"

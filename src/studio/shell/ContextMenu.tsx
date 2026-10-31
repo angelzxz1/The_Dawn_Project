@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { useShortcuts } from "@/ui/shortcuts";
+import { keyLabel } from "@/ui/keyLabel";
 
 export interface ContextMenuItem {
   label: string;
@@ -9,6 +10,8 @@ export interface ContextMenuItem {
   icon?: React.ReactNode;
   disabled?: boolean;
   danger?: boolean;
+  /** Its keyboard shortcut (shortcuts.ts keys: "mod+j"), shown after it. */
+  shortcut?: string;
 }
 
 /** A label and a row of small choices after it: color swatches (a choice
@@ -40,7 +43,7 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
     window.addEventListener("pointerdown", onPointerDown, true);
     return () => window.removeEventListener("pointerdown", onPointerDown, true);
   }, [onClose]);
-  useShortcuts("menu", [{ keys: "escape", run: onClose, whileTyping: true }]);
+  useShortcuts("menu", [{ keys: "escape", label: "Close", run: onClose, whileTyping: true }]);
 
   // Keep the menu on-screen near the edges.
   const style: React.CSSProperties = {
@@ -88,6 +91,8 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
           <button
             key={item.label}
             type="button"
+            // Named without its shortcut, which shows after it.
+            aria-label={item.label}
             disabled={item.disabled}
             onClick={() => {
               item.onSelect();
@@ -98,7 +103,8 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
             }`}
           >
             {item.icon}
-            {item.label}
+            <span className="flex-1">{item.label}</span>
+            {item.shortcut && <kbd className="ml-4 font-sans text-[11px] text-muted">{keyLabel(item.shortcut)}</kbd>}
           </button>
         )
       )}

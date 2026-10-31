@@ -26,7 +26,7 @@ beforeEach(() => {
 });
 
 const ACTIONS = [
-  "select", "rename", "setVolume", "setPan", "adjustStart", "toggleMute", "toggleSolo", "toggleArm",
+  "select", "rename", "renameDone", "setVolume", "setPan", "adjustStart", "toggleMute", "toggleSolo", "toggleArm",
   "toggleMonitor", "openFx", "importMidi", "exportMidi", "importAudio", "clear", "remove", "contextMenu",
   "recolor", "move", "toggleAutomation", "setInputDevice", "requestInputDevices", "toggleFold", "pick", "resizeHeight",
 ] as const satisfies readonly (keyof TrackHeaderActions)[];
@@ -136,6 +136,15 @@ describe("a MIDI track", () => {
     await userEvent.keyboard("{Escape}");
     expect(actions.rename).toHaveBeenCalledOnce();
     await expect.element(screen.getByTitle("Double-click to rename")).toHaveTextContent("Bass");
+  });
+
+  test("renaming asked from its menu: the name is a field until it's done", async () => {
+    const { screen, actions } = renderHeader({ renaming: true });
+    await expect.element(screen.getByRole("textbox", { name: "Track name" })).toHaveValue("Bass");
+    await userEvent.fill(screen.getByRole("textbox"), "Sub Bass");
+    await userEvent.keyboard("{Enter}");
+    expect(actions.rename).toHaveBeenCalledWith("bass", "Sub Bass");
+    expect(actions.renameDone).toHaveBeenCalledOnce();
   });
 
   test("the color dot opens the palette; a swatch recolors the track", async () => {

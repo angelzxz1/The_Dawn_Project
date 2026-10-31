@@ -18,7 +18,7 @@ export function HelpMenu({ onTour, onFeedback }: { onTour: () => void; onFeedbac
     window.addEventListener("pointerdown", onDown);
     return () => window.removeEventListener("pointerdown", onDown);
   }, [open]);
-  useShortcuts("menu", [{ keys: "escape", run: () => setOpen(false), whileTyping: true }], { enabled: open });
+  useShortcuts("menu", [{ keys: "escape", label: "Close", run: () => setOpen(false), whileTyping: true }], { enabled: open });
 
   const item = "flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12.5px] hover:bg-surface";
   const links: [string, string, typeof BookOpen][] = [

@@ -14,6 +14,7 @@ import { ScaleSelector } from "./ScaleSelector";
 import { ClipOverview } from "./ClipOverview";
 import { velocityLine, type CurvePoint } from "@/project/curveEdits";
 import { useShortcuts } from "@/ui/shortcuts";
+import { keyLabel, withKeys } from "@/ui/keyLabel";
 
 interface PianoRollEditorProps {
   channelName: string;
@@ -280,10 +281,10 @@ export function PianoRollEditor({
     { keys: "b", label: "Switch between Draw and Select", run: () => setMode((m) => (m === "draw" ? "select" : "draw")) },
     { keys: "q", label: "Quantize", run: () => handleQuantize() },
     { keys: "space", label: "Play / stop", run: () => (isPlaying ? onPause() : onPlay()) },
-    { keys: "arrowup", label: "Nudge the selected notes", run: () => nudge(1, 0) },
-    { keys: "arrowdown", run: () => nudge(-1, 0) },
-    { keys: "arrowright", run: () => nudge(0, secondsPer16th) },
-    { keys: "arrowleft", run: () => nudge(0, -secondsPer16th) },
+    { keys: "arrowup", label: "Nudge the selected notes up a semitone", run: () => nudge(1, 0) },
+    { keys: "arrowdown", label: "Nudge the selected notes down a semitone", run: () => nudge(-1, 0) },
+    { keys: "arrowright", label: "Nudge the selected notes a 16th later", run: () => nudge(0, secondsPer16th) },
+    { keys: "arrowleft", label: "Nudge the selected notes a 16th earlier", run: () => nudge(0, -secondsPer16th) },
     {
       keys: "mod+c",
       label: "Copy notes",
@@ -920,7 +921,7 @@ export function PianoRollEditor({
                   type="button"
                   onClick={() => setMode(m)}
                   aria-pressed={mode === m}
-                  title={`${m === "draw" ? "Draw notes" : "Select notes"} (B switches)`}
+                  title={`${m === "draw" ? "Draw notes" : "Select notes"} (${keyLabel("b")} switches)`}
                   className={`flex h-7 items-center gap-1 px-2 text-[11px] capitalize ${
                     mode === m ? "bg-accent/20 text-accent" : "text-muted hover:bg-surface"
                   }`}
@@ -935,7 +936,7 @@ export function PianoRollEditor({
             <button
               type="button"
               onClick={isPlaying ? onPause : onPlay}
-              title={isPlaying ? "Pause (Space)" : "Play (Space)"}
+              title={withKeys(isPlaying ? "Pause" : "Play", "space")}
               className={`flex h-7 w-7 items-center justify-center rounded-full border transition-colors ${
                 isPlaying
                   ? "border-accent bg-accent/20 text-accent"
@@ -993,11 +994,7 @@ export function PianoRollEditor({
               <button
                 type="button"
                 onClick={handleQuantize}
-                title={
-                  selectedIds.size > 0
-                    ? "Quantize the selected notes to this grid"
-                    : "Quantize every note to this grid"
-                }
+                title={withKeys(selectedIds.size > 0 ? "Quantize the selected notes to this grid" : "Quantize every note to this grid", "q")}
                 className="flex h-7 items-center gap-1 rounded border border-border px-2 text-[11px] text-muted hover:bg-surface hover:text-accent"
               >
                 <AlignHorizontalJustifyStart size={13} />
@@ -1063,7 +1060,7 @@ export function PianoRollEditor({
                 className="relative cursor-pointer"
                 style={{ width: contentWidth, height: RULER_H }}
                 onPointerDown={handleRulerPointerDown}
-                title="Click to place the insert marker: Ctrl/Cmd+V pastes there"
+                title={`Click to place the insert marker: ${keyLabel("mod+v")} pastes there`}
               >
                 {insertAt !== null && (
                   <div className="pointer-events-none absolute bottom-0 z-10 -ml-[4px] h-0 w-0 border-x-[4px] border-t-[6px] border-x-transparent border-t-foreground" style={{ left: insertAt * pxPerSecond }} />

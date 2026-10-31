@@ -4,6 +4,8 @@ import { useState } from "react";
 import { ChevronDown, ChevronUp, GripVertical, SlashSquare } from "lucide-react";
 import { ValueBar } from "@/studio/tracks/ValueBar";
 import { EFFECT_DRAG_MIME, PRESET_DRAG_MIME } from "./EffectBrowser";
+import { effectMenuItems } from "./effectMenu";
+import { ContextMenu } from "@/studio/shell/ContextMenu";
 import { PresetMenu, type PresetChange } from "@/effects/ui/PresetMenu";
 import { sidechainSourceName, type SidechainSource } from "@/effects/sidechain/SidechainPanel";
 import { SIDECHAIN_TAPS, SIDECHAIN_TAP_LABELS, type SidechainTap } from "@/effects/sidechain/sidechainModel";
@@ -44,6 +46,8 @@ interface FxRackProps {
   onAddEffect: (type: EffectType, atIndex?: number, presetId?: string) => void;
   onRemoveEffect: (effectId: string) => void;
   onMoveEffect: (effectId: string, toIndex: number) => void;
+  /** Adds a copy of an effect right after it (its menu's Duplicate). */
+  onDuplicateEffect?: (effectId: string) => void;
   onBypassToggle: (effectId: string) => void;
   onParamChange: (effectId: string, key: string, value: number) => void;
   /** Fired once at the start of a param drag/edit gesture - lets the caller
@@ -147,6 +151,7 @@ export function FxRack({
   onAddEffect,
   onRemoveEffect,
   onMoveEffect,
+  onDuplicateEffect,
   onBypassToggle,
   onParamChange,
   onParamDragStart,
@@ -165,6 +170,8 @@ export function FxRack({
 }: FxRackProps) {
   const [dragOverGap, setDragOverGap] = useState<number | null>(null);
   const [collapsed, setCollapsed] = useState(false);
+  /** The effect whose right-click menu is open, and where. */
+  const [menu, setMenu] = useState<{ effectId: string; x: number; y: number } | null>(null);
   const isBus = channelType === undefined;
 
   const handleDropAt = (index: number, e: React.DragEvent) => {
@@ -306,7 +313,15 @@ export function FxRack({
 
         {effects.map((fx, i) => (
           <div key={fx.id} className="flex items-stretch">
-            <div className="relative flex shrink-0">
+            <div
+              className="relative flex shrink-0"
+              onContextMenu={(e) => {
+                // A knob's own right-click (typing a value) comes first.
+                if (e.defaultPrevented) return;
+                e.preventDefault();
+                setMenu({ effectId: fx.id, x: e.clientX, y: e.clientY });
+              }}
+            >
               <div
                 className={`flex shrink-0 rounded-xl ${EFFECT_UI[fx.type].cardWidth} ${fx.bypass ? "opacity-50" : ""}`}
                 style={{ background: "#1B1C22", border: "1px solid #2E2F37" }}
@@ -381,6 +396,22 @@ export function FxRack({
           >
             Drag effects here
           </div>
+        )}
+
+        {menu && (
+          <ContextMenu
+            x={menu.x}
+            y={menu.y}
+            onClose={() => setMenu(null)}
+            items={effectMenuItems(effects, menu.effectId, {
+              open: (id) => onOpenEffectWindow?.(id),
+              toggleBypass: onBypassToggle,
+              move: onMoveEffect,
+              duplicate: (id) => onDuplicateEffect?.(id),
+              reset: onPresetChange ? (id, params) => onPresetChange(id, { params, preset: undefined }) : undefined,
+              remove: onRemoveEffect,
+            })}
+          />
         )}
 
         {!isBus && buses.length > 0 && onSendChange && (

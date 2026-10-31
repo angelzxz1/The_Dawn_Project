@@ -1,11 +1,15 @@
 // The arrangement's right-click menus: on a clip, on an empty spot of a
-// track's lane, in the time selection, and on a track's header. Each is built from where it was
-// opened and what the studio can do there (MenuActions).
+// track's lane, in the time selection, and on a track's header. Each is
+// built from where it was opened and what the studio can do there
+// (MenuActions); an item with a keyboard shortcut shows it.
 
 import {
   AlignHorizontalJustifyStart,
+  ArrowDown,
+  ArrowUp,
   AudioLines,
   ChevronsDownUp,
+  Circle,
   Clipboard,
   Combine,
   Copy,
@@ -20,21 +24,27 @@ import {
   FolderOutput,
   FolderPlus,
   Gauge,
+  Headphones,
   Layers,
   Pencil,
   Repeat,
   ScanSearch,
   Scissors,
+  Sliders,
+  Spline,
   TextCursorInput,
   Trash2,
+  Upload,
   UnfoldHorizontal,
+  VolumeX,
   X,
 } from "lucide-react";
+import { canMoveTrack } from "@/engine/routing";
 import { audioEngine } from "@/engine/audioEngine";
 import { getCopiedClip, getCopiedRange } from "@/state/clipboard";
 import { FADE_PRESETS, presetFades, type FadePreset } from "@/project/clipEdits";
 import { bpmAtSeconds, type TempoMap } from "@/project/tempoMap";
-import { TRACK_COLOR_PALETTE, trackColorOf } from "@/project/colors";
+import { TRACK_COLOR_PALETTE, trackColorOf, type TrackColorPick } from "@/project/colors";
 import type { AudioClipInstance, AudioWarp, ChannelConfig, ClipInstance } from "@/project/types";
 import type { ContextMenuEntry, ContextMenuItem } from "@/studio/shell/ContextMenu";
 
@@ -86,6 +96,21 @@ export interface MenuActions {
   toggleTakes: (id: string) => void;
   /** Deletes a track's takes, keeping what it plays. */
   deleteAllTakes: (id: string) => void;
+  /** Makes a track's name a text field. */
+  renameTrack: (id: string) => void;
+  recolorTrack: (id: string, pick: TrackColorPick) => void;
+  toggleMute: (id: string) => void;
+  toggleSolo: (id: string) => void;
+  toggleArm: (id: string) => void;
+  toggleMonitor: (id: string) => void;
+  openFx: (id: string) => void;
+  toggleAutomation: (id: string) => void;
+  moveTrack: (id: string, direction: -1 | 1) => void;
+  /** Asks for a .mid file and adds it to the track. */
+  importMidi: (id: string) => void;
+  exportMidi: (id: string) => void;
+  /** Deletes every clip on a track. */
+  clearTrack: (id: string) => void;
   /** What's done to the time selection (rangeActions.ts). */
   time: TimeSelectionActions;
 }
@@ -111,6 +136,10 @@ export interface MenuContext {
   trackPicks: ReadonlySet<string>;
   /** How many takes a track has (takes.ts). */
   takeCount: (channelId: string) => number;
+  /** Audio tracks monitoring their input. */
+  monitored: ReadonlySet<string>;
+  /** The track whose automation lane shows. */
+  automationChannelId: string | null;
   /** For the fade presets: a beat and a bar (at the clip). */
   tempo: TempoMap;
   beatsPerBar: number;
@@ -135,7 +164,7 @@ function clipMenu(channelId: string, clipId: string, ctx: MenuContext, actions: 
   const many = ctx.selectedClips > 1;
   const channel = ctx.channels.find((c) => c.id === channelId);
   const label: MenuItems = [
-    { label: "Rename… (F2)", icon: <TextCursorInput size={13} />, onSelect: () => actions.renameClip(channelId, clipId) },
+    { label: "Rename…", shortcut: "f2", icon: <TextCursorInput size={13} />, onSelect: () => actions.renameClip(channelId, clipId) },
     {
       row: "Color",
       options: [
@@ -151,7 +180,7 @@ function clipMenu(channelId: string, clipId: string, ctx: MenuContext, actions: 
     "separator",
   ];
   const process: MenuItems = [
-    { label: "Consolidate (Ctrl+J)", icon: <Combine size={13} />, onSelect: actions.consolidateSelected },
+    { label: "Consolidate", shortcut: "mod+j", icon: <Combine size={13} />, onSelect: actions.consolidateSelected },
     { label: many ? `Reverse ${ctx.selectedClips} clips` : "Reverse", icon: <FlipHorizontal2 size={13} />, onSelect: actions.reverseSelected },
     ...(clip.kind === "audio" ? audioProcess(clip, ctx, actions, many) : []),
   ];
@@ -162,11 +191,11 @@ function clipMenu(channelId: string, clipId: string, ctx: MenuContext, actions: 
   ];
   const tail: MenuItems = [
     { label: "Split at playhead", icon: <Scissors size={13} />, disabled: !canSplit, onSelect: () => actions.splitAtPlayhead(channelId, clipId) },
-    { label: many ? `Duplicate ${ctx.selectedClips} clips` : "Duplicate clip", icon: <CopyPlus size={13} />, onSelect: actions.duplicateSelected },
+    { label: many ? `Duplicate ${ctx.selectedClips} clips` : "Duplicate clip", shortcut: "mod+d", icon: <CopyPlus size={13} />, onSelect: actions.duplicateSelected },
     { label: clip.loopLength ? "Stop looping clip" : "Loop clip", icon: <Repeat size={13} />, onSelect: () => actions.toggleLoop(channelId, clipId) },
     ...process,
     "separator",
-    { label: many ? `Delete ${ctx.selectedClips} clips` : "Delete clip", icon: <Trash2 size={13} />, danger: true, onSelect: actions.deleteSelected },
+    { label: many ? `Delete ${ctx.selectedClips} clips` : "Delete clip", shortcut: "delete", icon: <Trash2 size={13} />, danger: true, onSelect: actions.deleteSelected },
   ];
   if (clip.kind === "audio") return [...label, ...copyPaste, ...tail];
   return [
@@ -240,16 +269,16 @@ function laneMenu(channelId: string, atSeconds: number, type: ChannelConfig["typ
 
 function rangeMenu(time: TimeSelectionActions): MenuItems {
   return [
-    { label: "Cut (Ctrl+X)", icon: <Scissors size={13} />, onSelect: time.cut },
-    { label: "Copy (Ctrl+C)", icon: <Copy size={13} />, onSelect: time.copy },
-    { label: "Paste copied time here (Ctrl+V)", icon: <Clipboard size={13} />, disabled: !getCopiedRange(), onSelect: time.paste },
-    { label: "Duplicate (Ctrl+D)", icon: <CopyPlus size={13} />, onSelect: time.duplicate },
-    { label: "Consolidate (Ctrl+J)", icon: <Combine size={13} />, onSelect: time.consolidate },
-    { label: "Loop the selection (Ctrl+L)", icon: <Repeat size={13} />, onSelect: time.loop },
+    { label: "Cut", shortcut: "mod+x", icon: <Scissors size={13} />, onSelect: time.cut },
+    { label: "Copy", shortcut: "mod+c", icon: <Copy size={13} />, onSelect: time.copy },
+    { label: "Paste copied time here", shortcut: "mod+v", icon: <Clipboard size={13} />, disabled: !getCopiedRange(), onSelect: time.paste },
+    { label: "Duplicate", shortcut: "mod+d", icon: <CopyPlus size={13} />, onSelect: time.duplicate },
+    { label: "Consolidate", shortcut: "mod+j", icon: <Combine size={13} />, onSelect: time.consolidate },
+    { label: "Loop the selection", shortcut: "mod+l", icon: <Repeat size={13} />, onSelect: time.loop },
     "separator",
-    { label: "Insert silence (Ctrl+I)", icon: <UnfoldHorizontal size={13} />, onSelect: time.insertSilence },
-    { label: "Delete time (Shift+Delete)", icon: <FoldHorizontal size={13} />, onSelect: time.deleteTime },
-    { label: "Empty the selection (Delete)", icon: <Eraser size={13} />, danger: true, onSelect: time.clear },
+    { label: "Insert silence", shortcut: "mod+i", icon: <UnfoldHorizontal size={13} />, onSelect: time.insertSilence },
+    { label: "Delete time", shortcut: "shift+delete", icon: <FoldHorizontal size={13} />, onSelect: time.deleteTime },
+    { label: "Empty the selection", shortcut: "delete", icon: <Eraser size={13} />, danger: true, onSelect: time.clear },
   ];
 }
 
@@ -258,12 +287,51 @@ function headerMenu(id: string, ctx: MenuContext, actions: MenuActions): MenuIte
   const channel = channels.find((c) => c.id === id);
   if (!channel) return [];
   const isGroup = channel.type === "group";
+  const clips = ctx.clipsOf(id);
+  const name: MenuItems = [
+    { label: "Rename…", icon: <TextCursorInput size={13} />, onSelect: () => actions.renameTrack(id) },
+    {
+      row: "Color",
+      options: TRACK_COLOR_PALETTE.map((c, i) => ({
+        label: `Color ${i + 1}`,
+        swatch: c.accent,
+        selected: trackColorOf(channel).accent === c.accent,
+        onSelect: () => actions.recolorTrack(id, { colorIndex: i }),
+      })),
+    },
+    "separator",
+  ];
+  const states: ContextMenuItem[] = [
+    { label: channel.muted ? "Unmute" : "Mute", icon: <VolumeX size={13} />, onSelect: () => actions.toggleMute(id) },
+    { label: channel.solo ? "Unsolo" : "Solo", icon: <Headphones size={13} />, onSelect: () => actions.toggleSolo(id) },
+    ...(isGroup ? [] : [{ label: channel.armed ? "Disarm" : "Arm for recording", icon: <Circle size={13} />, onSelect: () => actions.toggleArm(id) }]),
+    ...(channel.type === "audio"
+      ? [{ label: ctx.monitored.has(id) ? "Stop monitoring" : "Monitor the input", icon: <Headphones size={13} />, onSelect: () => actions.toggleMonitor(id) }]
+      : []),
+  ];
+  const views: ContextMenuItem[] = [
+    { label: channel.type === "midi" ? "Instrument and effects" : "Effects", icon: <Sliders size={13} />, onSelect: () => actions.openFx(id) },
+    {
+      label: ctx.automationChannelId === id ? "Hide automation" : "Show automation",
+      icon: <Spline size={13} />,
+      onSelect: () => actions.toggleAutomation(id),
+    },
+  ];
   // New clips go after what's already on the track.
-  const end = ctx.clipsOf(id).reduce((max, c) => Math.max(max, c.offset + c.length), 0);
+  const end = clips.reduce((max, c) => Math.max(max, c.offset + c.length), 0);
   const clipItems: ContextMenuItem[] = isGroup
     ? []
     : channel.type === "midi"
-      ? [{ label: "Add empty MIDI clip", icon: <FilePlus2 size={13} />, onSelect: () => actions.addEmptyClip(id, end) }]
+      ? [
+          { label: "Add empty MIDI clip", icon: <FilePlus2 size={13} />, onSelect: () => actions.addEmptyClip(id, end) },
+          { label: "Import .mid…", icon: <Upload size={13} />, onSelect: () => actions.importMidi(id) },
+          {
+            label: "Export .mid",
+            icon: <Download size={13} />,
+            disabled: !clips.some((c) => c.kind === "midi" && c.notes.length > 0),
+            onSelect: () => actions.exportMidi(id),
+          },
+        ]
       : [{ label: "Import audio clip…", icon: <FileAudio size={13} />, onSelect: () => actions.importAudio(id, end) }];
   // Grouping: the Ctrl/Cmd-clicked tracks (with this one), or this one.
   const picked = trackPicks.has(id) ? [...trackPicks] : [id];
@@ -272,7 +340,8 @@ function headerMenu(id: string, ctx: MenuContext, actions: MenuActions): MenuIte
     ? [{ label: "Ungroup (keep the tracks)", icon: <FolderOutput size={13} />, onSelect: () => actions.removeTrack(id) }]
     : [
         {
-          label: picked.length > 1 ? `Group ${picked.length} tracks (Ctrl+G)` : "Group this track (Ctrl+G)",
+          label: picked.length > 1 ? `Group ${picked.length} tracks` : "Group this track",
+          shortcut: "mod+g",
           icon: <FolderPlus size={13} />,
           onSelect: () => actions.groupTracks(picked),
         },
@@ -287,22 +356,28 @@ function headerMenu(id: string, ctx: MenuContext, actions: MenuActions): MenuIte
           { label: "Delete all takes (keep what plays)", icon: <Trash2 size={13} />, onSelect: () => actions.deleteAllTakes(id) },
         ]
       : [];
-  const foldItem: ContextMenuItem = {
-    label: channel.folded ? (isGroup ? "Unfold the group" : "Unfold track") : isGroup ? "Fold the group (hide its tracks)" : "Fold track",
-    icon: <ChevronsDownUp size={13} />,
-    onSelect: () => actions.toggleFold(id),
-  };
-  const removeItems: MenuItems =
-    channels.length > 1 && !isGroup
-      ? ["separator", { label: "Remove track", icon: <X size={13} />, danger: true, onSelect: () => actions.removeTrack(id) }]
-      : [];
-  return [
-    ...clipItems,
-    ...(clipItems.length ? ["separator" as const] : []),
-    ...takeItems,
-    ...(takeItems.length ? ["separator" as const] : []),
-    ...groupItems,
-    foldItem,
+  const arrange: ContextMenuItem[] = [
+    {
+      label: channel.folded ? (isGroup ? "Unfold the group" : "Unfold track") : isGroup ? "Fold the group (hide its tracks)" : "Fold track",
+      icon: <ChevronsDownUp size={13} />,
+      onSelect: () => actions.toggleFold(id),
+    },
+    { label: "Move up", icon: <ArrowUp size={13} />, disabled: !canMoveTrack(channels, id, -1), onSelect: () => actions.moveTrack(id, -1) },
+    { label: "Move down", icon: <ArrowDown size={13} />, disabled: !canMoveTrack(channels, id, 1), onSelect: () => actions.moveTrack(id, 1) },
+  ];
+  const removeItems: ContextMenuItem[] = [
+    ...(isGroup ? [] : [{ label: "Clear all clips", icon: <Eraser size={13} />, disabled: clips.length === 0, danger: true, onSelect: () => actions.clearTrack(id) }]),
+    ...(channels.length > 1 && !isGroup ? [{ label: "Remove track", icon: <X size={13} />, danger: true, onSelect: () => actions.removeTrack(id) }] : []),
+  ];
+  const section = (items: ContextMenuItem[]): MenuItems => (items.length ? [...items, "separator"] : []);
+  const menu: MenuItems = [
+    ...name,
+    ...section(states),
+    ...section(views),
+    ...section(clipItems),
+    ...section(takeItems),
+    ...section([...groupItems, ...arrange]),
     ...removeItems,
   ];
+  return menu[menu.length - 1] === "separator" ? menu.slice(0, -1) : menu;
 }

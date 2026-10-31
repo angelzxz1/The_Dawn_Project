@@ -470,8 +470,17 @@ Temporary, never committed:
     `23dbe29`. The next release's "What's new" (`src/content/whatsNew.ts`)
     should mention it.
   - Item 21 (2026-10-31): a Podcast template (`templates.ts` `podcast`).
-  - Items 10–15, 17–20 and 23–28 are open; 12, 20 and 25 are partly
-    there. Next in `nextSteps.md` is Phase 4 (19, menus and tooltips).
+  - Item 19 (2026-10-31): a track's header menu does everything its
+    header does (rename, color, mute, solo, arm, monitor, effects,
+    automation, .mid in and out, move, clear); an effect card has a menu
+    (`rack/effectMenu.tsx`: open, bypass, move, duplicate, reset, remove;
+    `effectActions.duplicate`). Menu items show their shortcut beside them
+    (`ContextMenuItem.shortcut`), and tooltips name theirs through
+    `ui/keyLabel.ts` (`withKeys`, "⌘" on a Mac). Every shortcut in the
+    registry has a label, for the coming command palette and cheat sheet.
+  - Items 10–15, 17, 18, 20 and 23–28 are open; 12, 20 and 25 are partly
+    there. Next in `nextSteps.md` is Phase 4's step 13 (18, the command
+    palette and the `?` cheat sheet).
   - Fixed 2026-10-31 (the user found it): changing one audio track's
     Input changed every audio track's, as the studio kept one device for
     all and the engine one stream. Each audio track now keeps its own
@@ -501,6 +510,7 @@ Temporary, never committed:
   (editing) has begun: steps 7-11 (Part 2 #8, snapping; #9,
   drawing tools; #22, silent states; #16, the count-in and click sounds;
   #21, the podcast template) were done on 2026-10-31, so Phase 3 is done;
-  next is Phase 4, step 12 (Part 2 #19). Phase 1 (housekeeping) was done on 2026-10-30: the slow tests got longer limits, a flaky ClipBlock
+  Phase 4 has begun: step 12 (Part 2 #19, menus and tooltips) was done
+  on 2026-10-31; next is step 13 (#18). Phase 1 (housekeeping) was done on 2026-10-30: the slow tests got longer limits, a flaky ClipBlock
   double-click test clicks twice in one go, and the JS multiband kernels
   read the band count and their key per sample, as the Rust ports do.

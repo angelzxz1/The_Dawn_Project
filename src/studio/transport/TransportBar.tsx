@@ -6,6 +6,7 @@ import { TransportClock } from "./TransportClock";
 import type { TimeSignature } from "@/project/types";
 import { ClickLevel } from "./ClickLevel";
 import { CountIn } from "./CountIn";
+import { withKeys } from "@/ui/keyLabel";
 
 const DENOMINATORS = [1, 2, 4, 8, 16, 32];
 const COUNT_IN_OPTIONS = [0, 1, 2, 4];
@@ -100,8 +101,9 @@ export function TransportBar({
             !canRecord
               ? "Arm a track (click its Record button) before you can record"
               : recordingMode === "audio"
-                ? `Record microphone input onto ${armedChannelName}`
-                : `Record MIDI onto ${armedChannelName}`
+                ? withKeys(`Record microphone input onto ${armedChannelName}`, "r")
+                : // R plays a note on a MIDI track.
+                  withKeys(`Record MIDI onto ${armedChannelName}`, "shift+r")
           }
           className={`flex h-9 w-9 items-center justify-center rounded-full border transition-colors disabled:opacity-30 ${
             isRecording
@@ -115,7 +117,7 @@ export function TransportBar({
           type="button"
           onClick={isPlaying ? onPause : onPlay}
           disabled={isRecording}
-          title={isPlaying ? "Pause (Space)" : "Play (Space)"}
+          title={withKeys(isPlaying ? "Pause" : "Play", "space")}
           className={`flex h-9 w-9 items-center justify-center rounded-full border transition-colors disabled:opacity-30 ${
             isPlaying
               ? "border-accent bg-accent/20 text-accent"

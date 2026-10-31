@@ -113,6 +113,50 @@ describe("the effect cards", () => {
     expect(onAddEffect).toHaveBeenCalledWith("delay", 0, undefined);
   });
 
+  test("right-clicking a card opens what can be done to that effect", async () => {
+    const onDuplicateEffect = vi.fn();
+    const onPresetChange = vi.fn();
+    const { screen, onMoveEffect, onBypassToggle, onRemoveEffect, onOpenEffectWindow } = renderRack({
+      effects: [effect("a", "reverb"), effect("b", "delay")],
+      onDuplicateEffect,
+      onPresetChange,
+    });
+    const menuOn = async (card: number) => {
+      await screen.getByTitle("Drag to reorder").nth(card).click({ button: "right" });
+    };
+    const item = (name: string | RegExp) => screen.getByRole("button", { name, exact: typeof name === "string" });
+
+    await menuOn(1);
+    await expect.element(item("Move right")).toBeDisabled();
+    await item("Move left").click();
+    expect(onMoveEffect).toHaveBeenCalledWith("b", 0);
+    await expect.element(item("Move left")).not.toBeInTheDocument();
+
+    await menuOn(0);
+    await expect.element(item("Move left")).toBeDisabled();
+    await item("Move right").click();
+    expect(onMoveEffect).toHaveBeenLastCalledWith("a", 1);
+
+    const steps: [string | RegExp, () => void][] = [
+      [/^Open /, () => expect(onOpenEffectWindow).toHaveBeenCalledWith("b")],
+      ["Bypass", () => expect(onBypassToggle).toHaveBeenCalledWith("b")],
+      ["Duplicate", () => expect(onDuplicateEffect).toHaveBeenCalledWith("b")],
+      ["Reset to the defaults", () => expect(onPresetChange).toHaveBeenCalledWith("b", { params: defaultParams("delay"), preset: undefined })],
+      ["Remove", () => expect(onRemoveEffect).toHaveBeenCalledWith("b")],
+    ];
+    for (const [name, check] of steps) {
+      await menuOn(1);
+      await item(name).click();
+      check();
+    }
+  });
+
+  test("right-clicking a knob types its value, without the card's menu", async () => {
+    const { screen } = renderRack({ effects: [effect("a", "reverb")] });
+    await screen.getByTitle(/^Drag or scroll to change/).first().click({ button: "right" });
+    await expect.element(screen.getByRole("button", { name: "Duplicate" })).not.toBeInTheDocument();
+  });
+
   test("a card dragged by its handle moves to where it's dropped", async () => {
     const { screen, onMoveEffect, onAddEffect } = renderRack({ effects: [effect("a", "reverb"), effect("b", "delay")] });
     const data = new DataTransfer();

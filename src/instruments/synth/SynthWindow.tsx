@@ -116,7 +116,7 @@ export function SynthWindow({ channelId, channelName, params, onChange, onClose,
     [params, update, begin, onFrame, dragging, focus]
   );
 
-  useShortcuts("window", [{ keys: "escape", run: onClose }]);
+  useShortcuts("window", [{ keys: "escape", label: "Close", run: onClose }]);
 
   const scale = useFitScale();
 
@@ -295,7 +295,7 @@ function useOutside(ref: React.RefObject<HTMLElement | null>, onClose: () => voi
     window.addEventListener("pointerdown", down, true);
     return () => window.removeEventListener("pointerdown", down, true);
   }, [ref, onClose]);
-  useShortcuts("menu", [{ keys: "escape", run: onClose, whileTyping: true }]);
+  useShortcuts("menu", [{ keys: "escape", label: "Close", run: onClose, whileTyping: true }]);
 }
 
 function PresetBrowser({ presets, current, onLoad, onClose }: { presets: SynthPreset[]; current?: string; onLoad: (p: SynthPreset) => void; onClose: () => void }) {

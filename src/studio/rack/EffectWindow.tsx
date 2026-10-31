@@ -36,7 +36,7 @@ export function EffectWindow({
 }) {
   // Escape closes any effect's window (not while typing in one of its
   // fields; a menu open in it closes first).
-  useShortcuts("window", [{ keys: "escape", run: onClose }]);
+  useShortcuts("window", [{ keys: "escape", label: "Close", run: onClose }]);
   const { Window } = EFFECT_UI[effect.type];
   return (
     <EffectPresetContext.Provider value={{ effect, bpm, onChange: (change) => effectActions.changePreset(hostId, effect.id, change) }}>

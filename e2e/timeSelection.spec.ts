@@ -137,12 +137,12 @@ test("right-clicking in the selection, on a clip or not, opens what can be done 
   const bass = (await studio.lane("Bass").boundingBox())!;
   // On the Bass clip, inside the selection.
   await page.mouse.click(g.left + 2.5 * g.bar, bass.y + bass.height / 2, { button: "right" });
-  await expect(page.getByRole("button", { name: "Delete time (Shift+Delete)" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Delete time" })).toBeVisible();
   await page.keyboard.press("Escape");
 
   await page.mouse.click(g.left + 1.5 * g.bar, bass.y + bass.height / 2, { button: "right" });
-  await expect(page.getByRole("button", { name: "Paste copied time here (Ctrl+V)" })).toBeDisabled();
-  await page.getByRole("button", { name: "Insert silence (Ctrl+I)" }).click();
+  await expect(page.getByRole("button", { name: "Paste copied time here" })).toBeDisabled();
+  await page.getByRole("button", { name: "Insert silence" }).click();
   await expect.poll(starts(studio, g, "Bass")).toEqual([5]);
   await expect.poll(starts(studio, g, "Pad")).toEqual([5]);
   await expect.poll(starts(studio, g, "Lead")).toEqual([11]);

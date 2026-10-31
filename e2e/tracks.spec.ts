@@ -22,6 +22,19 @@ test("rename a track, and undo it", async ({ studio }) => {
   await expect(studio.header("Pad")).toBeVisible();
 });
 
+test("rename and mute a track from its right-click menu", async ({ page, studio }) => {
+  await studio.name("Pad").click({ button: "right" });
+  await page.getByRole("button", { name: "Rename…", exact: true }).click();
+  const input = studio.header("Pad").getByRole("textbox", { name: "Track name" });
+  await input.fill("Pads");
+  await input.press("Enter");
+  await expect(studio.header("Pads")).toBeVisible();
+
+  await studio.name("Pads").click({ button: "right" });
+  await page.getByRole("button", { name: "Mute", exact: true }).click();
+  await expect(studio.header("Pads").getByTitle("Unmute")).toHaveAttribute("aria-pressed", "true");
+});
+
 test("recolor a track", async ({ page, studio }) => {
   const dot = studio.header("Lead").getByTitle("Change track color");
   const color = () => dot.evaluate((el) => getComputedStyle(el).backgroundColor);

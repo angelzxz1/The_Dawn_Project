@@ -1,11 +1,11 @@
 # Improvements
 
-Checked against the code and the commit history on 2026-10-29; item 7 of Part 2 was added on 2026-10-30, items 8, 9, 16, 21 and 22 on 2026-10-31.
+Checked against the code and the commit history on 2026-10-29; item 7 of Part 2 was added on 2026-10-30, items 8, 9, 16, 19, 21 and 22 on 2026-10-31.
 
 - `[x]` is done; the commit that did it is in brackets.
 - `[ ]` is still open; "Partly" says what already exists.
 
-**Summary:** Part 1 is all done. In Part 2, items 1–9, 16, 21 and 22 are done and the rest of 10–28 are open; three of the open items (12, 20, 25) are partly there.
+**Summary:** Part 1 is all done. In Part 2, items 1–9, 16, 19, 21 and 22 are done and the rest of 10–28 are open; three of the open items (12, 20, 25) are partly there.
 
 ## Part 1: Code improvements
 
@@ -68,10 +68,10 @@ That is already ahead of most browser DAWs, such as BandLab or Soundtrap.
   - A Sections lane under the tempo lane. Double-click it to add a marker on the nearest bar, named after a common song form (Intro, Verse, Chorus…). Click a marker to jump there, drag it to move it, double-click it to rename it. Right-click it to loop its section (to the next marker, or the song's end), pick a name or remove it.
   - Shift+M adds a marker on the bar nearest the playhead; Shift+←/→ jump to the previous or next one.
   - Kept in beats (`src/project/markers.ts`), saved with the project, and undoable. Time edits (insert silence, delete time) don't move them, as they don't move the tempo changes or the loop.
-- [x] **8. Snap that adapts to zoom,** plus snapping to other clips' edges. (commit to come)
+- [x] **8. Snap that adapts to zoom,** plus snapping to other clips' edges. (`72ae753`)
   - The Snap menu has **Adaptive**: the grid clips snap to follows the zoom, the finest line drawn (`snapUnitFor`), as the ruler, the loop and the markers already did. The fixed sizes stay; new projects still start on 1 Bar.
   - With the grid on, a moved clip's start or end, or a resized clip's end, snaps to another clip's edge on any track once it comes within 8 px, before the grid (`src/studio/timeline/clipSnap.ts`). Clips moving with the selection aren't snapped to. Alt drags free of both, as on the loop, marker and tempo lanes.
-- [x] **9. Velocity and automation drawing tools:** curves, ramps and line tools, as in FL and Ableton. (commit to come)
+- [x] **9. Velocity and automation drawing tools:** curves, ramps and line tools, as in FL and Ableton. (`06880ac`)
   - Automation: a segment can bend (a point's `curve`, -1..1, `curveShape` in `src/engine/automation.ts`, which the engine, the export and the lane all use). With the pointer tool, Alt-drag a segment to bend it and Shift-drag to draw a straight line (a ramp) over what's there, on the grid (Alt: off it). The draw tool draws freehand, a point per grid line crossed; the erase tool deletes the points it passes over (`src/project/curveEdits.ts`).
   - Velocity: drag on empty space in the piano roll's velocity lane to put the notes it spans on a line (only the selected ones, with a selection); Alt draws freehand.
   - Fixed on the way: a point added before the last one was kept out of time order, which playback assumes, so it played wrong until a reload.
@@ -88,7 +88,7 @@ That is already ahead of most browser DAWs, such as BandLab or Soundtrap.
 
 - [ ] **14. Monitoring modes per track:** In / Auto / Off, as in Ableton, instead of one toggle.
 - [ ] **15. Punch-in/out recording** within the loop region.
-- [x] **16. A visible count-in** in the transport, and a click-volume control with click sound choices. (commit to come)
+- [x] **16. A visible count-in** in the transport, and a click-volume control with click sound choices. (`84d1f02`)
   - The transport shows the count-in as it goes, the beats left (4, 3, 2, 1), the bar's first beat brighter (`CountIn.tsx`, `Transport.countInLeft`).
   - Four click sounds, next to the click level: Classic (the one there was), Beep, Wood block and Cowbell (`metronomeKernel.ts` `makeClick`, and the native engine's port in `metronome.rs`). Like the level, it's a setting of this computer (`audioPrefs.ts`).
 - [ ] **17. Choosing input channels on multi-input interfaces,** for example a mono guitar on input 2.
@@ -96,12 +96,12 @@ That is already ahead of most browser DAWs, such as BandLab or Soundtrap.
 ### Finding things and learning the app
 
 - [ ] **18. A command palette or menu search** ("what do I want to do?") and a shortcut cheat sheet (press `?`).
-- [ ] **19. More right-click menus,** covering everything you can do on a track, clip or effect, plus tooltips with the shortcut on every button.
+- [x] **19. More right-click menus,** covering everything you can do on a track, clip or effect, plus tooltips with the shortcut on every button. (commit to come)
 - [ ] **20. A browser with previews:** hear grooves, samples, presets and amp models before dropping them in, with favorites and recent items.
   - Partly: grooves can be previewed. Samples, presets and amp models can't, and there are no favorites or recent items.
-- [x] **21. More templates:** guitar recording, podcast and beat-making setups with the routing already wired. (commit to come)
+- [x] **21. More templates:** guitar recording, podcast and beat-making setups with the routing already wired. (`6599491`)
   - Guitar Demo, Beat and Voice + Guitar were there; Podcast is new: Host (armed) and Guest mic tracks with the vocal chain, in a Voices group that glues and de-esses them, and a Music track whose compressor ducks it under the Voices group (a sidechain). No metronome or count-in, snap off, and Intro, Interview and Outro sections.
-- [x] **22. Clear warnings for silent states:** "track muted by solo", "monitoring is on but no input", "this effect is bypassed". (commit to come)
+- [x] **22. Clear warnings for silent states:** "track muted by solo", "monitoring is on but no input", "this effect is bypassed". (`06880ac`)
   - A track that can't be heard for a reason other than its own Mute says why beside its name (`src/project/silentStates.ts`): another track is soloed, it plays into a muted group or track, its fader is all the way down, or it's a MIDI track with no instrument. The chip's tooltip tells the whole story.
   - A track monitoring the audio interface says "No input" once nothing has come in for 3 seconds (`useNoInputSignal.ts`), and stops when a signal arrives.
   - A bypassed effect's card is labelled "Bypassed" (not just dimmed), and the track's FX button counts the bypassed effects in its tooltip, with a dot.
