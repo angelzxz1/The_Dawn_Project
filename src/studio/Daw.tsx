@@ -51,7 +51,9 @@ import { automationCurrentValue, automationRange, automationTargetKey, automatio
 import { contextMenuItems, type ContextMenuState } from "./contextMenus";
 import { busActions } from "@/state/busActions";
 import { useProjectFiles } from "./useProjectFiles";
-import { useShortcuts } from "@/ui/shortcuts";
+import { shortcuts, useShortcuts, type ActiveShortcut } from "@/ui/shortcuts";
+import { CommandPalette } from "@/studio/shell/CommandPalette";
+import { ShortcutSheet } from "@/studio/shell/ShortcutSheet";
 import { trackActions } from "@/state/trackActions";
 import { effectActions } from "@/state/effectActions";
 import { clipActions, isMidiClip, rebuildMidiPart } from "@/state/clipActions";
@@ -1646,6 +1648,7 @@ export function Daw() {
     {
       keys: ["arrowup", "arrowdown", "arrowleft", "arrowright", "mod+arrowleft", "mod+arrowright"],
       label: "Move the selected loop brace (Ctrl/Cmd: resize it)",
+      palette: false,
       run: nudgeLoopWith,
     },
     { keys: "shift+m", label: "Add a section marker on the bar nearest the playhead", run: () => void addMarkerAtPlayhead() },
@@ -2005,6 +2008,31 @@ export function Daw() {
     [startNew, closeStartScreen]
   );
 
+  /** The command palette or the cheat sheet, with what worked when it
+   * was opened. */
+  const [finder, setFinder] = useState<{ kind: "palette" | "sheet"; available: ActiveShortcut[] } | null>(null);
+  const openFinder = useCallback((kind: "palette" | "sheet") => {
+    setFinder((open) => (open?.kind === kind ? null : { kind, available: shortcuts.active() }));
+  }, []);
+  useShortcuts("global", [
+    { keys: "mod+k", label: "Find a command", whileTyping: true, run: () => openFinder("palette") },
+    { keys: ["shift+?", "?"], label: "Show the keyboard shortcuts", run: () => openFinder("sheet") },
+  ]);
+  // What has no key: the command palette runs these.
+  useShortcuts("studio", [
+    { keys: [], label: "Add a MIDI track", run: () => void handleAddChannel("midi") },
+    { keys: [], label: "Add an audio track", run: () => void handleAddChannel("audio") },
+    { keys: [], label: "Add a group track", run: () => void handleAddChannel("group") },
+    { keys: [], label: "New project…", run: handleNewProject },
+    { keys: [], label: "Export…", run: () => setExportOpen(true) },
+    { keys: [], label: "Show or hide the Keys window (play notes)", run: () => toggleNoteInput(!noteInputOpen) },
+    { keys: [], label: "Switch the metronome on or off", run: () => setMetronomeEnabled((v) => !v) },
+    { keys: [], label: "Switch the loop on or off", run: toggleLoop },
+    { keys: [], label: "Open the master's effects", run: openMasterFx },
+    { keys: [], label: "Take the tour", run: () => setTourOpen(true) },
+    { keys: [], label: "About Dawn and what's new", run: () => setAboutTab("news") },
+  ]);
+
   const editingChannel = channels.find((c) => c.id === editingClip?.channelId);
   const editingClipInstance = editingClip
     ? clipsOf(editingClip.channelId).find((c) => c.id === editingClip.clipId)
@@ -2234,7 +2262,7 @@ export function Daw() {
                   ? "double-click a clip to edit it in the piano roll · space to play/pause · ctrl/cmd+C/V to copy/paste the clip at the playhead"
                   : "loading sounds…"}
           </p>
-          <HelpMenu onTour={() => setTourOpen(true)} onFeedback={hasDiscord ? () => openFeedback("help") : undefined} />
+          <HelpMenu onTour={() => setTourOpen(true)} onShortcuts={() => openFinder("sheet")} onCommands={() => openFinder("palette")} onFeedback={hasDiscord ? () => openFeedback("help") : undefined} />
           {hasDiscord && (
             <button
               type="button"
@@ -2916,6 +2944,14 @@ export function Daw() {
       )}
 
       {tourOpen && <Tour onClose={() => setTourOpen(false)} />}
+      {finder?.kind === "palette" && (
+        <CommandPalette
+          available={finder.available}
+          onClose={() => setFinder(null)}
+          onNothingToDo={(label) => flashProjectNotice(`Nothing to ${label.charAt(0).toLowerCase()}${label.slice(1)} right now`)}
+        />
+      )}
+      {finder?.kind === "sheet" && <ShortcutSheet available={finder.available} onClose={() => setFinder(null)} />}
 
       {packs && (
         <PacksWindow

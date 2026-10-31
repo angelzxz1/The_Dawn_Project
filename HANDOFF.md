@@ -478,9 +478,22 @@ Temporary, never committed:
     (`ContextMenuItem.shortcut`), and tooltips name theirs through
     `ui/keyLabel.ts` (`withKeys`, "⌘" on a Mac). Every shortcut in the
     registry has a label, for the coming command palette and cheat sheet.
-  - Items 10–15, 17, 18, 20 and 23–28 are open; 12, 20 and 25 are partly
-    there. Next in `nextSteps.md` is Phase 4's step 13 (18, the command
-    palette and the `?` cheat sheet).
+  - Item 18 (2026-10-31): Ctrl/Cmd+K opens the command palette
+    (`shell/CommandPalette.tsx`) and `?` the cheat sheet
+    (`shell/ShortcutSheet.tsx`), both also in the Help menu. Both list
+    `shortcuts.active()` as it was when they opened (`ui/commandSearch.ts`
+    finds and groups); the palette runs a command as its keys would
+    (`keyEventFor`) once it has closed, and says so when there was nothing
+    to do. A shortcut with no keys (`keys: []`) is a palette-only command
+    (Daw.tsx has a few: add a track, export, the Keys window...);
+    `palette: false` keeps a key-only one (the arrows) out of it.
+  - Items 10–15, 17, 20 and 23–28 are open; 12, 20 and 25 are partly
+    there. Next in `nextSteps.md` is Phase 4's step 14 (20, previews in
+    the browser).
+  - `e2e/site.spec.ts` (3 tests) fails on 2026-10-31, at `2af8ea7` too:
+    the site's links prefetch `__next.!KHNpdGUp.__PAGE__.txt`, but the
+    export writes `__next.!KHNpdGUp/__PAGE__.txt`, so `serve` answers 404
+    and the error check catches it.
   - Fixed 2026-10-31 (the user found it): changing one audio track's
     Input changed every audio track's, as the studio kept one device for
     all and the engine one stream. Each audio track now keeps its own
@@ -510,7 +523,8 @@ Temporary, never committed:
   (editing) has begun: steps 7-11 (Part 2 #8, snapping; #9,
   drawing tools; #22, silent states; #16, the count-in and click sounds;
   #21, the podcast template) were done on 2026-10-31, so Phase 3 is done;
-  Phase 4 has begun: step 12 (Part 2 #19, menus and tooltips) was done
-  on 2026-10-31; next is step 13 (#18). Phase 1 (housekeeping) was done on 2026-10-30: the slow tests got longer limits, a flaky ClipBlock
+  Phase 4 has begun: steps 12 and 13 (Part 2 #19, menus and tooltips;
+  #18, the command palette and cheat sheet) were done on 2026-10-31; next
+  is step 14 (#20). Phase 1 (housekeeping) was done on 2026-10-30: the slow tests got longer limits, a flaky ClipBlock
   double-click test clicks twice in one go, and the JS multiband kernels
   read the band count and their key per sample, as the Rust ports do.

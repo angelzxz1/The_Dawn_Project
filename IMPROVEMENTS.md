@@ -1,11 +1,11 @@
 # Improvements
 
-Checked against the code and the commit history on 2026-10-29; item 7 of Part 2 was added on 2026-10-30, items 8, 9, 16, 19, 21 and 22 on 2026-10-31.
+Checked against the code and the commit history on 2026-10-29; item 7 of Part 2 was added on 2026-10-30, items 8, 9, 16, 18, 19, 21 and 22 on 2026-10-31.
 
 - `[x]` is done; the commit that did it is in brackets.
 - `[ ]` is still open; "Partly" says what already exists.
 
-**Summary:** Part 1 is all done. In Part 2, items 1–9, 16, 19, 21 and 22 are done and the rest of 10–28 are open; three of the open items (12, 20, 25) are partly there.
+**Summary:** Part 1 is all done. In Part 2, items 1–9, 16, 18, 19, 21 and 22 are done and the rest of 10–28 are open; three of the open items (12, 20, 25) are partly there.
 
 ## Part 1: Code improvements
 
@@ -95,8 +95,8 @@ That is already ahead of most browser DAWs, such as BandLab or Soundtrap.
 
 ### Finding things and learning the app
 
-- [ ] **18. A command palette or menu search** ("what do I want to do?") and a shortcut cheat sheet (press `?`).
-- [x] **19. More right-click menus,** covering everything you can do on a track, clip or effect, plus tooltips with the shortcut on every button. (commit to come)
+- [x] **18. A command palette or menu search** ("what do I want to do?") and a shortcut cheat sheet (press `?`). (commit to come)
+- [x] **19. More right-click menus,** covering everything you can do on a track, clip or effect, plus tooltips with the shortcut on every button. (`2af8ea7`)
 - [ ] **20. A browser with previews:** hear grooves, samples, presets and amp models before dropping them in, with favorites and recent items.
   - Partly: grooves can be previewed. Samples, presets and amp models can't, and there are no favorites or recent items.
 - [x] **21. More templates:** guitar recording, podcast and beat-making setups with the routing already wired. (`6599491`)

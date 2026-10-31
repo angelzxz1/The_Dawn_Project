@@ -1,12 +1,24 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { BookOpen, CircleHelp, Compass, LifeBuoy, MessageSquare, SlidersHorizontal, Wrench } from "lucide-react";
+import { BookOpen, CircleHelp, Compass, Keyboard, LifeBuoy, MessageSquare, Search, SlidersHorizontal, Wrench } from "lucide-react";
 import { useShortcuts } from "@/ui/shortcuts";
+import { keyLabel } from "@/ui/keyLabel";
 
-/** Help in the header: the tour, the guides on the website, and (when
- * there's a Discord to send it to) reporting a problem. */
-export function HelpMenu({ onTour, onFeedback }: { onTour: () => void; onFeedback?: () => void }) {
+/** Help in the header: the tour, the shortcuts and the command palette,
+ * the guides on the website, and (when there's a Discord to send it to)
+ * reporting a problem. */
+export function HelpMenu({
+  onTour,
+  onShortcuts,
+  onCommands,
+  onFeedback,
+}: {
+  onTour: () => void;
+  onShortcuts: () => void;
+  onCommands: () => void;
+  onFeedback?: () => void;
+}) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
 
@@ -54,6 +66,30 @@ export function HelpMenu({ onTour, onFeedback }: { onTour: () => void; onFeedbac
             }}
           >
             <Compass size={13} className="text-accent" /> Take the tour
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            className={item}
+            onClick={() => {
+              setOpen(false);
+              onCommands();
+            }}
+          >
+            <Search size={13} className="text-muted" /> <span className="flex-1">Find a command</span>
+            <kbd className="font-sans text-[10px] text-muted">{keyLabel("mod+k")}</kbd>
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            className={item}
+            onClick={() => {
+              setOpen(false);
+              onShortcuts();
+            }}
+          >
+            <Keyboard size={13} className="text-muted" /> <span className="flex-1">Keyboard shortcuts</span>
+            <kbd className="font-sans text-[10px] text-muted">?</kbd>
           </button>
           <div className="my-1 border-t border-border" />
           {links.map(([href, label, Icon]) => (

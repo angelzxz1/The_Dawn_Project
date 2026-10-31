@@ -32,15 +32,28 @@ const MODAL = new Set<ShortcutLayer>(["editor", "dialog", "overlay"]);
 
 export interface Shortcut {
   /** "space", "escape", "delete", "r", "shift+r", "mod+z" (Ctrl, or Cmd on a
-   * Mac), "mod+shift+z", "alt+arrowleft"... Modifiers must match exactly. */
+   * Mac), "mod+shift+z", "alt+arrowleft"... Modifiers must match exactly.
+   * None ([]): a command only the command palette runs. */
   keys: string | string[];
   /** Return false when there was nothing to do: the key goes on to the
    * layers below. Otherwise its default action is prevented. */
   run: (e: KeyboardEvent) => void | boolean;
   /** Also while typing in a text field or a dropdown (default: no). */
   whileTyping?: boolean;
-  /** What it does, for a list of shortcuts. */
+  /** What it does, for the cheat sheet and the command palette. */
   label?: string;
+  /** Left out of the command palette (default: in it, when labeled) - for
+   * keys that only make sense pressed, like the arrows. */
+  palette?: false;
+}
+
+/** A labeled shortcut that works right now (ShortcutRegistry.active). */
+export interface ActiveShortcut {
+  keys: string[];
+  label: string;
+  layer: ShortcutLayer;
+  palette: boolean;
+  run: Shortcut["run"];
 }
 
 export interface ShortcutOptions {
@@ -72,6 +85,18 @@ interface Combo {
   mod: boolean;
   shift: boolean;
   alt: boolean;
+}
+
+/** A key press of `keys`, for running a shortcut without its keys (the
+ * command palette). */
+export function keyEventFor(keys: string): KeyboardEvent {
+  const c = parse(keys);
+  const named: Record<string, string> = { space: " ", delete: "Delete", escape: "Escape", arrowleft: "ArrowLeft", arrowright: "ArrowRight", arrowup: "ArrowUp", arrowdown: "ArrowDown" };
+  const key = named[c.key] ?? (c.key.length === 1 ? c.key : c.key[0].toUpperCase() + c.key.slice(1));
+  const code = c.key === "space" ? "Space" : /^[0-9]$/.test(c.key) ? `Digit${c.key}` : /^[a-z]$/.test(c.key) ? `Key${c.key.toUpperCase()}` : key;
+  // What a handler reads of a key press; no browser event is needed.
+  const event = { type: "keydown", key, code, ctrlKey: c.mod, metaKey: false, shiftKey: c.shift, altKey: c.alt, repeat: false, target: null, preventDefault: () => {} };
+  return event as unknown as KeyboardEvent;
 }
 
 function parse(keys: string): Combo {
@@ -137,12 +162,13 @@ export class ShortcutRegistry {
   }
 
   /** The labeled shortcuts that work right now, top layer first. */
-  active(): { keys: string[]; label: string; layer: ShortcutLayer }[] {
-    const out: { keys: string[]; label: string; layer: ShortcutLayer }[] = [];
+  active(): ActiveShortcut[] {
+    const out: ActiveShortcut[] = [];
     for (const reg of this.ordered()) {
       if (reg.options().enabled === false) continue;
       reg.shortcuts().forEach((s) => {
-        if (s.label) out.push({ keys: Array.isArray(s.keys) ? s.keys : [s.keys], label: s.label, layer: reg.layer });
+        if (s.label)
+          out.push({ keys: Array.isArray(s.keys) ? s.keys : [s.keys], label: s.label, layer: reg.layer, palette: s.palette !== false, run: s.run });
       });
       if (MODAL.has(reg.layer)) break;
     }

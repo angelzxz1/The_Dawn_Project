@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { matches, ShortcutRegistry, type Shortcut, type ShortcutLayer, type ShortcutOptions } from "./shortcuts";
+import { keyEventFor, matches, ShortcutRegistry, type Shortcut, type ShortcutLayer, type ShortcutOptions } from "./shortcuts";
 
 function key(k: string, mods: Partial<Record<"ctrlKey" | "metaKey" | "shiftKey" | "altKey", boolean>> = {}, target: unknown = null) {
   let prevented = false;
@@ -145,5 +145,29 @@ describe("ShortcutRegistry", () => {
     add("studio", [{ keys: "space", label: "Play / pause", run: () => {} }]);
     add("editor", [{ keys: "b", label: "Draw / Select", run: () => {} }]);
     expect(r.active().map((s) => s.label)).toEqual(["Draw / Select"]);
+  });
+
+  it("a command with no keys is listed, but no key runs it", () => {
+    const { r, log, add } = registry();
+    add("studio", [
+      { keys: [], label: "Add an audio track", run: () => void log.push("added") },
+      { keys: "arrowleft", label: "Nudge", palette: false, run: () => {} },
+    ]);
+    expect(r.active().map((s) => [s.label, s.keys, s.palette])).toEqual([
+      ["Add an audio track", [], true],
+      ["Nudge", ["arrowleft"], false],
+    ]);
+    expect(r.keyDown(key("a").e)).toBe(false);
+    r.active()[0].run(key("a").e);
+    expect(log).toEqual(["added"]);
+  });
+});
+
+describe("keyEventFor", () => {
+  it("makes the key press a shortcut's keys match", () => {
+    for (const keys of ["space", "mod+shift+z", "shift+1", "delete", "shift+arrowleft", "f2", "=", "shift+?"]) {
+      expect(matches(keyEventFor(keys), keys), keys).toBe(true);
+    }
+    expect(keyEventFor("mod+arrowright").key).toBe("ArrowRight");
   });
 });
