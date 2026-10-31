@@ -12,6 +12,7 @@ import { trackColorFromHex, type TrackColor } from "@/project/colors";
 import { warpView } from "@/project/warp";
 import { computeAdaptiveMarks, TRACK_ROW_HEIGHT } from "@/studio/timeline/layout";
 import { GROOVE_DRAG_MIME } from "@/library/grooves";
+import { SAMPLE_DRAG_MIME } from "@/studio/rack/GrooveBrowser";
 
 /** What a lane can do, given the track's id. The studio passes the same
  * object to every lane, and the same one on every redraw (see
@@ -35,6 +36,9 @@ export interface TrackLaneActions {
   dropAudioFile(channelId: string, file: File, atSeconds: number): void;
   /** A groove dragged from the browser was dropped here. */
   dropGroove(channelId: string, grooveId: string, atSeconds: number): void;
+  /** A pack's sample dragged from the browser was dropped here (by its
+   * file id). */
+  dropSample(channelId: string, fileId: string, atSeconds: number): void;
   /** Split tool: cut a clip at `seconds` on the timeline. */
   splitClip(channelId: string, clipId: string, seconds: number): void;
   /** Draw tool: a new, empty MIDI clip. */
@@ -154,7 +158,9 @@ export const TrackLane = memo(function TrackLane({
   const marks = computeAdaptiveMarks(tempo, totalSeconds, pxPerSecond, beatsPerBar);
   const [fileDragOver, setFileDragOver] = useState(false);
   const [grooveDragOver, setGrooveDragOver] = useState(false);
-  const isGroove = (e: React.DragEvent) => !!onDropGroove && e.dataTransfer.types.includes(GROOVE_DRAG_MIME);
+  // A sample goes where an audio file does.
+  const isGroove = (e: React.DragEvent) =>
+    (!!onDropGroove && e.dataTransfer.types.includes(GROOVE_DRAG_MIME)) || (acceptsFileDrop && e.dataTransfer.types.includes(SAMPLE_DRAG_MIME));
 
   const atSecondsFromEvent = (e: React.DragEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -250,6 +256,8 @@ export const TrackLane = memo(function TrackLane({
         if (isGroove(e)) {
           e.preventDefault();
           setGrooveDragOver(false);
+          const sample = e.dataTransfer.getData(SAMPLE_DRAG_MIME);
+          if (sample) return actions.dropSample(channelId, sample, atSecondsFromEvent(e));
           const id = e.dataTransfer.getData(GROOVE_DRAG_MIME);
           if (id) onDropGroove?.(id, atSecondsFromEvent(e));
           return;

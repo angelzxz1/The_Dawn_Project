@@ -75,6 +75,34 @@ function levelsOf(meter: Tone.Meter): StereoLevels {
   return [level(left), level(right)];
 }
 
+/** A drum hit in a preview: its pad, when (s from the start) and how hard. */
+export interface PreviewHit {
+  pad: number;
+  time: number;
+  velocity: number;
+}
+
+/** Schedules a preview's drum hits; returns how long they ring (s). */
+function scheduleHits(rack: DrumRack, hits: PreviewHit[], start: number): number {
+  hits.forEach((h) => rack.triggerAttack(Tone.Frequency(padNote(h.pad), "midi").toNote(), start + h.time, h.velocity));
+  return hits.reduce((m, h) => Math.max(m, h.time), 0) + 2.5;
+}
+
+/** A two-bar riff in E (root and fifth, in eighths at 120 BPM) on plucked
+ * strings: a dry, guitar-like phrase for hearing an amp or a cabinet.
+ * Returns how long it lasts (s). */
+function schedulePluckRiff([root, fifth]: Tone.PluckSynth[], start: number): number {
+  const riff = ["E2", "E2", "G2", "E2", "A2", "E2", "B2", "A2", "E2", "E2", "G2", "E2", "D3", "B2", "A2", "G2"];
+  const step = 0.25;
+  riff.forEach((note, i) => {
+    const t = start + i * step;
+    root.triggerAttack(note, t);
+    // A power chord on each beat.
+    if (i % 2 === 0) fifth.triggerAttack(Tone.Frequency(note).transpose(7).toNote(), t);
+  });
+  return riff.length * step;
+}
+
 class AudioEngine {
   private channels = new Map<string, ChannelNodes>();
   private buses = new Map<string, BusNodes>();
@@ -685,38 +713,108 @@ class AudioEngine {
     if (nodes?.instrumentType === "drums") (nodes.instrument as DrumRack).audition(pad, velocity);
   }
 
-  private preview: { rack: DrumRack; gain: Tone.Gain; timer: number } | null = null;
+  /** What a browser preview is playing (one at a time), and when it ends. */
+  private preview: { nodes: { dispose(): unknown }[]; timer: number } | null = null;
   private previewToken = 0;
 
-  /** Plays drum hits once on a kit through the master bus (a groove
-   * previewed from the browser), replacing any preview still playing.
-   * `time` is seconds from now. Resolves when the hits are scheduled. */
-  async previewDrums(kit: DrumKitParams, hits: { pad: number; time: number; velocity: number }[]): Promise<void> {
+  /** Starts a preview through the master bus, replacing any still playing:
+   * `build` makes its nodes into `out` and schedules them from `start`
+   * (context time), returning how long it lasts (s) - or null if the
+   * preview was replaced or can't play. Resolves with how long it plays
+   * (s), or 0 if it doesn't. */
+  private async startPreview(
+    build: (out: Tone.Gain, start: number, live: () => boolean) => Promise<{ nodes: { dispose(): unknown }[]; length: number } | null>
+  ): Promise<number> {
     this.stopPreview();
     const token = ++this.previewToken;
     await this.ensureStarted();
-    const rack = new DrumRack(kit);
-    const gain = new Tone.Gain(Tone.dbToGain(-3));
-    rack.connect(gain);
-    gain.connect(this.ensureMaster().channel);
-    await rack.ready;
-    if (token !== this.previewToken) {
-      rack.dispose();
-      gain.dispose();
-      return;
+    const live = () => token === this.previewToken;
+    const out = new Tone.Gain(Tone.dbToGain(-3));
+    out.connect(this.ensureMaster().channel);
+    const built = await build(out, Tone.now() + 0.05, live).catch((error) => {
+      noteIssue("preview", error, { report: false });
+      return null;
+    });
+    if (!built || !live()) {
+      built?.nodes.forEach((n) => n.dispose());
+      out.dispose();
+      return 0;
     }
-    const start = Tone.now() + 0.05;
-    hits.forEach((h) => rack.triggerAttack(Tone.Frequency(padNote(h.pad), "midi").toNote(), start + h.time, h.velocity));
-    const end = hits.reduce((m, h) => Math.max(m, h.time), 0) + 2.5;
-    this.preview = { rack, gain, timer: window.setTimeout(() => this.stopPreview(), end * 1000) };
+    const nodes = [...built.nodes, out];
+    this.preview = { nodes, timer: window.setTimeout(() => this.stopPreview(), (built.length + 0.1) * 1000) };
+    return built.length;
+  }
+
+  /** Plays drum hits once on a kit through the master bus (a groove
+   * previewed from the browser), replacing any preview still playing.
+   * `time` is seconds from now. Resolves when the hits are scheduled, with
+   * how long they play (s). */
+  async previewDrums(kit: DrumKitParams, hits: PreviewHit[]): Promise<number> {
+    return this.startPreview(async (out, start, live) => {
+      const rack = await this.previewRack(kit, out, live);
+      if (!rack) return null;
+      return { nodes: [rack], length: scheduleHits(rack, hits, start) };
+    });
+  }
+
+  /** Plays a short phrase through an effect - with a preset's settings,
+   * and its file (an IR, an amp model) - once, through the master bus: a
+   * drum groove, or a plucked riff for amps, cabinets and the like. */
+  async previewEffect(
+    effect: { type: EffectType; params?: Record<string, number>; fileId?: string },
+    source: { kind: "drums"; kit: DrumKitParams; hits: PreviewHit[] } | { kind: "pluck" }
+  ): Promise<number> {
+    return this.startPreview(async (out, start, live) => {
+      const node = createEffectNode(effect.type, effect.params ?? {});
+      node.connect(out);
+      if (effect.fileId && node instanceof IrLoaderChain) {
+        node.setImpulse(await decodeEffectFileAudio(effect.fileId, this.sampleRate));
+      } else if (effect.fileId && node instanceof NamAmpChain) {
+        const error = await node.setModel(effect.fileId, await readEffectFileText(effect.fileId));
+        if (error) {
+          node.dispose();
+          return null;
+        }
+      }
+      if (!live()) return { nodes: [node], length: 0 };
+      // Room for what the effect adds after the phrase (a reverb's tail).
+      const tail = 2.5;
+      if (source.kind === "drums") {
+        const rack = await this.previewRack(source.kit, node, live);
+        if (!rack) return { nodes: [node], length: 0 };
+        return { nodes: [rack, node], length: scheduleHits(rack, source.hits, start) + tail };
+      }
+      const voices = [new Tone.PluckSynth({ resonance: 0.96, dampening: 3600 }), new Tone.PluckSynth({ resonance: 0.96, dampening: 3600 })];
+      voices.forEach((v) => v.connect(node));
+      return { nodes: [...voices, node], length: schedulePluckRiff(voices, start) + tail };
+    });
+  }
+
+  /** Plays a sample (a pack's, by its file id) once through the master bus. */
+  async previewSample(fileId: string): Promise<number> {
+    return this.startPreview(async (out, start) => {
+      const buffer = await decodeEffectFileAudio(fileId, this.sampleRate);
+      if (!buffer) return null;
+      const player = new Tone.Player(buffer).connect(out);
+      player.start(start);
+      return { nodes: [player], length: Math.min(buffer.duration, 30) };
+    });
+  }
+
+  private async previewRack(kit: DrumKitParams, into: Tone.InputNode, live: () => boolean): Promise<DrumRack | null> {
+    const rack = new DrumRack(kit);
+    rack.connect(into);
+    await rack.ready;
+    if (live()) return rack;
+    rack.dispose();
+    return null;
   }
 
   stopPreview(): void {
     this.previewToken++;
     if (!this.preview) return;
     window.clearTimeout(this.preview.timer);
-    this.preview.rack.dispose();
-    this.preview.gain.dispose();
+    this.preview.nodes.forEach((n) => n.dispose());
     this.preview = null;
   }
 

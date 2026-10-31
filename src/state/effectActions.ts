@@ -46,18 +46,24 @@ function withPreset(hostId: string, created: EffectInstance, presetId: string | 
 }
 
 export const effectActions = {
-  /** Adds an effect at `atIndex` (or the end), optionally with a preset. */
-  add(hostId: string, type: EffectType, atIndex?: number, presetId?: string): void {
+  /** Adds an effect at `atIndex` (or the end), optionally with a preset
+   * and a file (a cabinet, an amp model) loaded. Returns its id. */
+  add(hostId: string, type: EffectType, atIndex?: number, presetId?: string, file?: EffectFileRef): string | null {
     projectStore.push();
     const added = audioEngine.addEffect(hostId, type, undefined, atIndex);
-    if (!added) return;
-    const created = withPreset(hostId, added, presetId);
+    if (!added) return null;
+    let created = withPreset(hostId, added, presetId);
+    if (file) {
+      created = { ...created, file };
+      void audioEngine.setEffectFile(hostId, created.id, file.id);
+    }
     updateEffects(hostId, (prev) => {
       const list = [...prev];
       if (atIndex !== undefined && atIndex >= 0 && atIndex <= list.length) list.splice(atIndex, 0, created);
       else list.push(created);
       return list;
     });
+    return created.id;
   },
 
   /** Adds a ready-made chain (see chains.ts) to the end, as one undo step. */

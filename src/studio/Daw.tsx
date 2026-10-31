@@ -108,20 +108,25 @@ import { isBrave, recentProjects, supportsFolders } from "@/project/projectFiles
 import { type SerializedProject } from "@/project/projectSchema";
 import type { BounceParams } from "@/export/bounce";
 import { ExportDialog } from "@/studio/dialogs/ExportDialog";
-import { GrooveBrowser } from "@/studio/rack/GrooveBrowser";
+import { GrooveBrowser, type BrowserSample } from "@/studio/rack/GrooveBrowser";
+import { noteUsed, pickKey } from "@/library/browserPicks";
+import { previewSourceFor, toneEffect } from "@/library/previews";
+import { fetchToneFile, type ToneEntry } from "@/library/tones";
+import { findPreset, paramsFromPreset } from "@/effects/presets";
+import { effectFileBlob } from "@/effects/effectFiles";
 import { StartScreen } from "@/studio/dialogs/StartScreen";
 import { Tour, tourDone } from "@/studio/shell/Tour";
 import { HelpMenu } from "@/studio/dialogs/HelpMenu";
 import { PacksWindow } from "@/studio/dialogs/PacksWindow";
 import { AppUpdater } from "@/studio/shell/AppUpdater";
-import { installPack, removePack } from "@/project/packStore";
+import { installPack, packSamples, removePack } from "@/project/packStore";
 import { PACK_EXTENSION } from "@/project/dawnPack";
 import { FeedbackWindow, openFeedback, PostExportNote } from "@/studio/dialogs/SupportViews";
 import { communityLink, shouldAskAfterExport, supportLinks } from "@/services/support";
 import type { ProjectTemplate } from "@/project/templates";
 import { grooveById, grooveHits, grooveKit, type Groove } from "@/library/grooves";
 import { getAudioPrefs } from "@/engine/audioPrefs";
-import { type EffectType } from "@/effects/registry";
+import { defaultParams, type EffectType } from "@/effects/registry";
 import type { ScaleSetting } from "@/project/scales";
 import { DEFAULT_KEY } from "@/project/chords";
 import { nativeEngine } from "@/engine/native/nativeEngine";
@@ -1436,10 +1441,53 @@ export function Daw() {
   const handleSidebarAddEffect = useCallback(
     (type: EffectType, presetId?: string) => {
       const hostId = fxMasterOpen ? "master" : fxBusId ?? fxChannelId;
-      if (hostId) effectActions.add(hostId, type, undefined, presetId);
+      if (!hostId) return;
+      effectActions.add(hostId, type, undefined, presetId);
+      noteUsed(presetId ? pickKey("preset", presetId) : pickKey("effect", type));
     },
     [fxMasterOpen, fxBusId, fxChannelId]
   );
+
+  /** Adds the effect a tone goes in (the NAM Amp, the IR Loader), with it
+   * loaded - a bundled one is downloaded first. */
+  const handleAddTone = useCallback(
+    async (tone: ToneEntry) => {
+      const hostId = fxMasterOpen ? "master" : fxBusId ?? fxChannelId;
+      if (!hostId) return;
+      noteUsed(pickKey("tone", tone.id));
+      if (!tone.file) {
+        effectActions.add(hostId, toneEffect(tone), undefined, undefined, { id: tone.id, name: tone.name });
+        return;
+      }
+      const id = effectActions.add(hostId, toneEffect(tone));
+      if (id) await effectActions.loadFile(hostId, id, await fetchToneFile(tone));
+    },
+    [fxMasterOpen, fxBusId, fxChannelId]
+  );
+
+  /** Plays a phrase through an effect, with a preset's settings if given. */
+  const handlePreviewEffect = useCallback(
+    (type: EffectType, presetId?: string) => {
+      const source = previewSourceFor(type);
+      if (!source) return Promise.resolve(0);
+      const preset = findPreset(presetId);
+      const params = preset && preset.type === type ? paramsFromPreset(preset, defaultParams(type), bpm) : undefined;
+      return audioEngine.previewEffect({ type, params }, source);
+    },
+    [bpm]
+  );
+
+  /** A pack's sample as a file, to import as an audio clip. */
+  const sampleFile = (fileId: string, name: string): File | null => {
+    const blob = effectFileBlob(fileId);
+    return blob ? new File([blob], name, { type: blob.type }) : null;
+  };
+  const handleAddSample = (channelId: string, sample: Pick<BrowserSample, "fileId" | "name">, atSeconds: number) => {
+    const file = sampleFile(sample.fileId, sample.name);
+    if (!file) return;
+    noteUsed(pickKey("sample", sample.fileId));
+    void handleImportAudioAt(channelId, file, atSeconds);
+  };
 
   // --- Automation lanes ---
 
@@ -2157,7 +2205,13 @@ export function Daw() {
     dropAudioFile: (id, file, atSeconds) => void handleDropAudioFile(id, file, atSeconds),
     dropGroove: (id, grooveId, atSeconds) => {
       const groove = grooveById(grooveId);
-      if (groove) handleAddGroove(id, groove, atSeconds);
+      if (!groove) return;
+      noteUsed(pickKey("groove", groove.id));
+      handleAddGroove(id, groove, atSeconds);
+    },
+    dropSample: (id, fileId, atSeconds) => {
+      const sample = packSamples().find((x) => x.fileId === fileId);
+      if (sample) handleAddSample(id, sample, atSeconds);
     },
     splitClip: (id, clipId, seconds) => handleSplitClipAtPlayhead(id, clipId, seconds),
     drawClip: (id, offset, length) => {
@@ -2206,10 +2260,21 @@ export function Daw() {
       <EffectBrowser
         onAddEffect={handleSidebarAddEffect}
         onAddChain={fxChannel ? (chain) => effectActions.addChain(fxChannel.id, chain) : undefined}
+        onPreviewEffect={handlePreviewEffect}
+        onPreviewTone={(tone) => audioEngine.previewEffect({ type: toneEffect(tone), fileId: tone.id }, { kind: "pluck" })}
+        onStopPreview={() => audioEngine.stopPreview()}
+        onAddTone={(tone) => void handleAddTone(tone)}
         grooves={
           <GrooveBrowser
             canAdd={fxChannel?.type === "midi"}
-            onAdd={(g) => fxChannel && handleAddGroove(fxChannel.id, g, cursorSeconds)}
+            onAdd={(g) => {
+              if (!fxChannel) return;
+              noteUsed(pickKey("groove", g.id));
+              handleAddGroove(fxChannel.id, g, cursorSeconds);
+            }}
+            onPreviewSample={(fileId) => audioEngine.previewSample(fileId)}
+            canAddSample={fxChannel?.type === "audio"}
+            onAddSample={(sample) => fxChannel && handleAddSample(fxChannel.id, sample, cursorSeconds)}
             onPreview={(g) => {
               // On the selected track's kit when it has one, else the groove's own.
               const kit = fxChannel?.instrument === "drums" && fxChannel.drumParams ? fxChannel.drumParams : grooveKit(g);
@@ -2873,7 +2938,10 @@ export function Daw() {
           onInstrumentChange={fxChannel ? (type) => handleInstrumentChange(fxChannel.id, type) : undefined}
           onInstrumentSettingsChange={fxChannel ? handleInstrumentSettingsChange : undefined}
           onSendChange={fxChannel ? handleSendChange : undefined}
-          onAddEffect={(type, atIndex, presetId) => effectActions.add(fxHostId, type, atIndex, presetId)}
+          onAddEffect={(type, atIndex, presetId) => {
+            effectActions.add(fxHostId, type, atIndex, presetId);
+            noteUsed(presetId ? pickKey("preset", presetId) : pickKey("effect", type));
+          }}
           onRemoveEffect={(effectId) => effectActions.remove(fxHostId, effectId)}
           onMoveEffect={(effectId, toIndex) => effectActions.move(fxHostId, effectId, toIndex)}
           onDuplicateEffect={(effectId) => effectActions.duplicate(fxHostId, effectId)}

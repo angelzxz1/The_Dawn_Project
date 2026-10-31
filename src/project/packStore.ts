@@ -175,6 +175,14 @@ export async function removePack(id: string): Promise<void> {
   changed(installed.filter((p) => p.id !== id));
 }
 
+/** The installed packs' samples, for the browser: each one's file id
+ * (in the effect files), its name and its pack's. */
+export function packSamples(): { fileId: string; name: string; pack: string }[] {
+  return installed.flatMap((p) =>
+    p.files.filter((f) => f.kind === "sample").map((f) => ({ fileId: f.fileId, name: f.path.split("/").pop()!.replace(/\.[^.]+$/, ""), pack: p.name }))
+  );
+}
+
 /** The installed packs' cabinets and amp captures, for the tone browsers. */
 export function packTones(kind: "ir" | "amp"): ToneEntry[] {
   return installed.flatMap((p) =>

@@ -487,13 +487,27 @@ Temporary, never committed:
     to do. A shortcut with no keys (`keys: []`) is a palette-only command
     (Daw.tsx has a few: add a track, export, the Keys window...);
     `palette: false` keeps a key-only one (the arrows) out of it.
-  - Items 10–15, 17, 20 and 23–28 are open; 12, 20 and 25 are partly
-    there. Next in `nextSteps.md` is Phase 4's step 14 (20, previews in
-    the browser).
-  - `e2e/site.spec.ts` (3 tests) fails on 2026-10-31, at `2af8ea7` too:
-    the site's links prefetch `__next.!KHNpdGUp.__PAGE__.txt`, but the
-    export writes `__next.!KHNpdGUp/__PAGE__.txt`, so `serve` answers 404
-    and the error check catches it.
+  - Item 20 (2026-10-31): the browser previews before adding. Effects and
+    presets play a phrase through a throwaway copy of the effect
+    (`audioEngine.previewEffect`; `library/previews.ts` picks a drum
+    groove or a plucked riff, none for the Tuner); the NAM Amp and IR
+    Loader list their tones (Dawn's cabinets, the packs') to hear and add;
+    the Grooves tab lists the packs' samples (`packSamples`) to hear
+    (`previewSample`), add at the playhead or drag onto an audio track
+    (`SAMPLE_DRAG_MIME`). Stars and the last 8 things added show as
+    Favorites and Recent in both tabs (`library/browserPicks.ts`, in
+    localStorage). Bundled tones (none ship yet) aren't previewed: they're
+    downloaded only when added.
+  - Items 10–15, 17 and 23–28 are open; 12 and 25 are partly there. Next
+    in `nextSteps.md` is Phase 5, step 15 (28, a Preferences window).
+  - Fixed 2026-10-31: on Windows, Next's static export wrote each page's
+    prefetch files as folders (`__next.!KHNpdGUp/__PAGE__.txt`, from a
+    backslash it doesn't turn into a dot) where its router asks for
+    `__next.!KHNpdGUp.__PAGE__.txt`, so every site prefetch 404'd (and
+    `e2e/site.spec.ts` failed). `scripts/fix-export-segments.mjs` runs
+    after the build (`postbuild`) and flattens them; on macOS and Linux
+    there's nothing to fix. Check whether a Next update fixes it
+    (`export/index.js`, `collectSegmentPaths`) and drop the script then.
   - Fixed 2026-10-31 (the user found it): changing one audio track's
     Input changed every audio track's, as the studio kept one device for
     all and the engine one stream. Each audio track now keeps its own
@@ -523,8 +537,8 @@ Temporary, never committed:
   (editing) has begun: steps 7-11 (Part 2 #8, snapping; #9,
   drawing tools; #22, silent states; #16, the count-in and click sounds;
   #21, the podcast template) were done on 2026-10-31, so Phase 3 is done;
-  Phase 4 has begun: steps 12 and 13 (Part 2 #19, menus and tooltips;
-  #18, the command palette and cheat sheet) were done on 2026-10-31; next
-  is step 14 (#20). Phase 1 (housekeeping) was done on 2026-10-30: the slow tests got longer limits, a flaky ClipBlock
+  Phase 4 (steps 12-14: Part 2 #19, menus and tooltips; #18, the command
+  palette and cheat sheet; #20, previews, favorites and recent items) was
+  done on 2026-10-31; next is Phase 5, step 15 (#28). Phase 1 (housekeeping) was done on 2026-10-30: the slow tests got longer limits, a flaky ClipBlock
   double-click test clicks twice in one go, and the JS multiband kernels
   read the band count and their key per sample, as the Rust ports do.

@@ -1,11 +1,16 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
-import { ChevronRight, Drum, Link2, Plug, Search, Sliders, X } from "lucide-react";
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import { ChevronRight, Clock, Drum, Link2, Plug, Search, Sliders, Star, X } from "lucide-react";
 import { EFFECT_CHAINS, type EffectChain } from "@/effects/chains";
 import { EFFECT_GROUPS, EFFECT_LABELS, type EffectType } from "@/effects/registry";
-import { presetsFor, type EffectPreset } from "@/effects/presets";
+import { findPreset, presetsFor, type EffectPreset } from "@/effects/presets";
 import { useUserPresets } from "@/effects/ui/PresetMenu";
+import { parsePick, pickKey, usePicks } from "@/library/browserPicks";
+import { browserTones, PREVIEW_SOURCE, toneEffect } from "@/library/previews";
+import { bundledTones, type ToneEntry } from "@/library/tones";
+import { installedPacks, subscribePacks } from "@/project/packStore";
+import { PreviewButton, StarButton, usePreviewing } from "./BrowserItem";
 
 /** The MIME type used to carry an effect type through HTML5 drag-and-drop
  * from this sidebar to the FX rack - shared with FxRack.tsx. */
@@ -24,6 +29,58 @@ interface EffectBrowserProps {
   plugins?: ReactNode;
   /** Adds a ready-made chain of effects to the selected track. */
   onAddChain?: (chain: EffectChain) => void;
+  /** Plays a phrase through an effect (with a preset) or a tone; resolves
+   * with how long it plays (s). */
+  onPreviewEffect?: (type: EffectType, presetId?: string) => Promise<number>;
+  onPreviewTone?: (tone: ToneEntry) => Promise<number>;
+  onStopPreview?: () => void;
+  /** Adds the effect a tone goes in (the NAM Amp, the IR Loader) with it
+   * loaded. */
+  onAddTone?: (tone: ToneEntry) => void;
+}
+
+/** One row of the browser: preview, the item (click to add, drag onto the
+ * rack), and its star. */
+function Row({
+  name,
+  pick,
+  starred,
+  playing,
+  onPreview,
+  onAdd,
+  drag,
+  title,
+  className = "text-[10.5px]",
+  children,
+}: {
+  name: string;
+  pick: string;
+  starred: boolean;
+  playing: boolean;
+  onPreview?: () => void;
+  onAdd: () => void;
+  drag?: { draggable: boolean; onDragStart: (e: React.DragEvent) => void };
+  title: string;
+  className?: string;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="group flex min-w-0 items-center gap-0.5">
+      {onPreview ? <PreviewButton name={name} playing={playing} onClick={onPreview} /> : <span className="w-4 shrink-0" />}
+      <div
+        {...drag}
+        onClick={onAdd}
+        title={title}
+        className={`flex min-w-0 flex-1 select-none items-center gap-1 rounded px-1 py-[3px] text-muted hover:bg-surface-raised hover:text-accent ${
+          drag ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
+        } ${className}`}
+      >
+        {children}
+        <span className="truncate">{name}</span>
+      </div>
+      <StarButton name={name} pick={pick} starred={starred} />
+    </div>
+  );
 }
 
 const matches = (text: string, query: string) => text.toLowerCase().includes(query);
@@ -36,12 +93,34 @@ const matches = (text: string, query: string) => text.toLowerCase().includes(que
  * and clickable (adds it straight to the currently selected track/bus).
  * The search box filters devices and presets by name.
  */
-export function EffectBrowser({ onAddEffect, grooves, plugins, onAddChain }: EffectBrowserProps) {
+export function EffectBrowser({
+  onAddEffect,
+  grooves,
+  plugins,
+  onAddChain,
+  onPreviewEffect,
+  onPreviewTone,
+  onStopPreview = () => {},
+  onAddTone,
+}: EffectBrowserProps) {
   const [tab, setTab] = useState<"effects" | "grooves" | "plugins">("effects");
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [openDevices, setOpenDevices] = useState<Set<EffectType>>(new Set());
   const [query, setQuery] = useState("");
   const user = useUserPresets();
+  const picks = usePicks();
+  const favorites = new Set(picks.favorites);
+  const { playing, play } = usePreviewing(onStopPreview);
+  // The packs' tones change as packs come and go.
+  useSyncExternalStore(subscribePacks, installedPacks, installedPacks);
+  const [bundled, setBundled] = useState<ToneEntry[]>([]);
+  useEffect(() => {
+    let alive = true;
+    void bundledTones().then((t) => alive && setBundled(t));
+    return () => {
+      alive = false;
+    };
+  }, []);
   const q = query.trim().toLowerCase();
 
   const toggle = <T,>(set: React.Dispatch<React.SetStateAction<Set<T>>>, key: T) =>
@@ -63,6 +142,88 @@ export function EffectBrowser({ onAddEffect, grooves, plugins, onAddChain }: Eff
 
   const chains = EFFECT_CHAINS.filter((c) => !q || matches(c.name, q) || matches("chains", q));
 
+  const previewEffect = (type: EffectType, presetId?: string) =>
+    onPreviewEffect && PREVIEW_SOURCE[type] ? () => play(pickKey(presetId ? "preset" : "effect", presetId ?? type), () => onPreviewEffect(type, presetId)) : undefined;
+  // A bundled tone is downloaded only when it's added, so it isn't previewed.
+  const previewTone = (tone: ToneEntry) => (onPreviewTone && !tone.file ? () => play(pickKey("tone", tone.id), () => onPreviewTone(tone)) : undefined);
+  const toneTitle = (tone: ToneEntry) =>
+    `${tone.name}: ${tone.description} (by ${tone.creator}). Click to add a ${EFFECT_LABELS[toneEffect(tone)]} with it loaded.`;
+
+  const effectRow = (type: EffectType, label = EFFECT_LABELS[type]) => {
+    const pick = pickKey("effect", type);
+    return (
+      <Row
+        key={pick}
+        name={label}
+        pick={pick}
+        starred={favorites.has(pick)}
+        playing={playing === pick}
+        onPreview={previewEffect(type)}
+        onAdd={() => onAddEffect(type)}
+        drag={dragProps(type)}
+        title="Drag onto the FX rack, or click to add it to the selected track/bus"
+        className="py-1 text-[11px]"
+      />
+    );
+  };
+  const presetRow = (type: EffectType, p: EffectPreset, withDevice = false) => {
+    const pick = pickKey("preset", p.id);
+    return (
+      <Row
+        key={pick}
+        name={withDevice ? `${EFFECT_LABELS[type]}: ${p.name}` : p.name}
+        pick={pick}
+        starred={favorites.has(pick)}
+        playing={playing === pick}
+        onPreview={previewEffect(type, p.id)}
+        onAdd={() => onAddEffect(type, p.id)}
+        drag={dragProps(type, p)}
+        title={`${EFFECT_LABELS[type]}: ${p.name}${p.factory ? "" : " (your preset)"} - drag onto the FX rack, or click to add`}
+      >
+        {!p.factory && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" aria-hidden />}
+      </Row>
+    );
+  };
+  const toneRow = (tone: ToneEntry) => {
+    const pick = pickKey("tone", tone.id);
+    return (
+      <Row
+        key={pick}
+        name={tone.name}
+        pick={pick}
+        starred={favorites.has(pick)}
+        playing={playing === pick}
+        onPreview={previewTone(tone)}
+        onAdd={() => onAddTone?.(tone)}
+        title={toneTitle(tone)}
+      />
+    );
+  };
+
+  /** A favorite's or a recent item's row, if it's still there. */
+  const allTones = [...browserTones("irLoader", bundled), ...browserTones("namAmp", bundled)];
+  const pickRow = (key: string) => {
+    const pick = parsePick(key);
+    if (pick?.kind === "effect" && pick.id in EFFECT_LABELS) return effectRow(pick.id as EffectType);
+    if (pick?.kind === "preset") {
+      const preset = findPreset(pick.id);
+      return preset ? presetRow(preset.type, preset, true) : null;
+    }
+    if (pick?.kind === "tone" && onAddTone) {
+      const tone = allTones.find((t) => t.id === pick.id);
+      return tone ? toneRow(tone) : null;
+    }
+    return null;
+  };
+  const pickGroups = q
+    ? []
+    : ([
+        ["Favorites", <Star key="i" size={10} />, picks.favorites],
+        ["Recent", <Clock key="i" size={10} />, picks.recent],
+      ] as const)
+        .map(([name, icon, keys]) => ({ name, icon, rows: keys.map(pickRow).filter((r) => r !== null) }))
+        .filter((g) => g.rows.length > 0);
+
   // Filtered view: which devices show, and which of their presets.
   const view = EFFECT_GROUPS.map((group) => ({
     name: group.name,
@@ -74,11 +235,15 @@ export function EffectBrowser({ onAddEffect, grooves, plugins, onAddChain }: Eff
         if (!q) return { type, presets: all, expanded: openDevices.has(type) };
         const deviceHit = matches(label, q) || matches(group.name, q);
         const hits = all.filter((p) => matches(p.name, q));
-        if (!deviceHit && !hits.length) return null;
-        return { type, presets: deviceHit ? all : hits, expanded: hits.length > 0 || openDevices.has(type) };
+        const toneHits = onAddTone ? browserTones(type, bundled).filter((t) => matches(t.name, q)) : [];
+        if (!deviceHit && !hits.length && !toneHits.length) return null;
+        return { type, presets: deviceHit ? all : hits, expanded: hits.length + toneHits.length > 0 || openDevices.has(type) };
       })
       .filter((d): d is { type: EffectType; presets: EffectPreset[]; expanded: boolean } => !!d),
   })).filter((g) => g.devices.length > 0);
+
+  /** A device's tones (the NAM Amp's and IR Loader's), as the search has them. */
+  const tones = (type: EffectType) => browserTones(type, bundled).filter((t) => !q || matches(t.name, q) || matches(EFFECT_LABELS[type], q));
 
   return (
     <div data-tour="browser" className="flex w-48 shrink-0 flex-col overflow-hidden border-r border-border bg-surface">
@@ -134,6 +299,15 @@ export function EffectBrowser({ onAddEffect, grooves, plugins, onAddChain }: Eff
             </label>
           </div>
           <div className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-2">
+            {pickGroups.map((g) => (
+              <section key={g.name} aria-label={g.name} className="mb-1">
+                <div className="flex items-center gap-1 px-1 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted">
+                  {g.icon}
+                  {g.name}
+                </div>
+                <div className="flex flex-col">{g.rows}</div>
+              </section>
+            ))}
             {onAddChain && chains.length > 0 && (
               <div>
                 <button
@@ -190,29 +364,13 @@ export function EffectBrowser({ onAddEffect, grooves, plugins, onAddChain }: Eff
                             >
                               <ChevronRight size={10} className={`transition-transform ${expanded ? "rotate-90" : ""}`} />
                             </button>
-                            <div
-                              {...dragProps(type)}
-                              onClick={() => onAddEffect(type)}
-                              title="Drag onto the FX rack, or click to add it to the selected track/bus"
-                              className="min-w-0 flex-1 cursor-grab select-none truncate rounded border border-transparent px-1.5 py-1 text-[11px] text-muted hover:border-accent hover:bg-surface-raised hover:text-accent active:cursor-grabbing"
-                            >
-                              {EFFECT_LABELS[type]}
-                            </div>
+                            <div className="min-w-0 flex-1">{effectRow(type)}</div>
                           </div>
                           {expanded && (
                             <div className="mb-1 ml-4 flex flex-col border-l border-border/60 pl-1">
-                              {presets.map((p) => (
-                                <div
-                                  key={p.id}
-                                  {...dragProps(type, p)}
-                                  onClick={() => onAddEffect(type, p.id)}
-                                  title={`${EFFECT_LABELS[type]}: ${p.name}${p.factory ? "" : " (your preset)"} - drag onto the FX rack, or click to add`}
-                                  className="flex min-w-0 cursor-grab select-none items-center gap-1 rounded px-1.5 py-[3px] text-[10.5px] text-muted hover:bg-surface-raised hover:text-accent active:cursor-grabbing"
-                                >
-                                  {!p.factory && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" aria-hidden />}
-                                  <span className="truncate">{p.name}</span>
-                                </div>
-                              ))}
+                              {presets.map((p) => presetRow(type, p))}
+                              {onAddTone &&
+                                tones(type).map((tone) => toneRow(tone))}
                             </div>
                           )}
                         </div>
