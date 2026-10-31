@@ -15,7 +15,8 @@
     "test:engine": "cargo test -p dawn-engine",
     "desktop": "npx --yes @tauri-apps/cli@2 dev",
     "desktop:build": "npx --yes @tauri-apps/cli@2 build",
-    "prebuild": "node scripts/build-sw.mjs"
+    "prebuild": "node scripts/build-sw.mjs",
+    "postbuild": "node scripts/fix-export-segments.mjs"
   },
   "dependencies": {
     "@breezystack/lamejs": "^1.2.7",
