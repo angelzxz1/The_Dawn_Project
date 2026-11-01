@@ -1,7 +1,8 @@
 // Audio settings that belong to this computer rather than to a project
 // (like a DAW's preferences): delay compensation, the recording latency
-// correction for this browser's audio devices, the click's level and sound, and in
-// the desktop app the native engine and its device. Kept
+// correction for this browser's audio devices, the click's level and sound,
+// the browser's output device and buffer, and in the desktop app the native
+// engine and its device. Kept
 // in localStorage; any failure to read or write just falls back to
 // defaults. One copy is shared by everything that shows or changes them
 // (getAudioPrefs, updateAudioPrefs, subscribeAudioPrefs).
@@ -33,7 +34,17 @@ export interface AudioPrefs {
   nativeDevice: string | null;
   nativeSampleRate: number | null;
   nativeBufferSize: number | null;
+  /** The browser's output device (enumerateDevices' audiooutput id; null:
+   * the system's default), where the browser can choose one (setSinkId). */
+  outputDevice: string | null;
+  /** How big a buffer the browser's audio runs with (its latencyHint):
+   * the lowest latency, a middle one, or the steadiest playback. Read when
+   * the page loads (context.ts). */
+  browserLatency: BrowserLatency;
 }
+
+export type BrowserLatency = "interactive" | "balanced" | "playback";
+export const BROWSER_LATENCIES: readonly BrowserLatency[] = ["interactive", "balanced", "playback"];
 
 /** The click level's range, in dB: at the top, the count-in peaks at
  * full scale. */
@@ -53,6 +64,8 @@ export const DEFAULT_AUDIO_PREFS: AudioPrefs = {
   nativeDevice: null,
   nativeSampleRate: null,
   nativeBufferSize: null,
+  outputDevice: null,
+  browserLatency: "interactive",
 };
 
 /** Settings as stored, checked: anything missing or out of range is the
@@ -80,6 +93,8 @@ export function parseAudioPrefs(raw: unknown): AudioPrefs {
     nativeDevice: typeof r.nativeDevice === "string" && r.nativeDevice ? r.nativeDevice : null,
     nativeSampleRate: whole(r.nativeSampleRate, 8000, 384000),
     nativeBufferSize: whole(r.nativeBufferSize, 16, 8192),
+    outputDevice: typeof r.outputDevice === "string" && r.outputDevice ? r.outputDevice : null,
+    browserLatency: (BROWSER_LATENCIES as readonly unknown[]).includes(r.browserLatency) ? (r.browserLatency as BrowserLatency) : "interactive",
   };
 }
 

@@ -1,11 +1,11 @@
 # Improvements
 
-Checked against the code and the commit history on 2026-10-29; item 7 of Part 2 was added on 2026-10-30, items 8, 9, 16, 18, 19, 20, 21 and 22 on 2026-10-31.
+Checked against the code and the commit history on 2026-10-29; item 7 of Part 2 was added on 2026-10-30, items 8, 9, 16, 18, 19, 20, 21 and 22 on 2026-10-31, item 28 on 2026-11-01.
 
 - `[x]` is done; the commit that did it is in brackets.
 - `[ ]` is still open; "Partly" says what already exists.
 
-**Summary:** Part 1 is all done. In Part 2, items 1–9, 16 and 18–22 are done and the rest of 10–28 are open; two of the open items (12, 25) are partly there.
+**Summary:** Part 1 is all done. In Part 2, items 1–9, 16, 18–22 and 28 are done and the rest of 10–27 are open; two of the open items (12, 25) are partly there.
 
 ## Part 1: Code improvements
 
@@ -97,7 +97,7 @@ That is already ahead of most browser DAWs, such as BandLab or Soundtrap.
 
 - [x] **18. A command palette or menu search** ("what do I want to do?") and a shortcut cheat sheet (press `?`). (`19ff690`)
 - [x] **19. More right-click menus,** covering everything you can do on a track, clip or effect, plus tooltips with the shortcut on every button. (`2af8ea7`)
-- [x] **20. A browser with previews:** hear grooves, samples, presets and amp models before dropping them in, with favorites and recent items. (commit to come)
+- [x] **20. A browser with previews:** hear grooves, samples, presets and amp models before dropping them in, with favorites and recent items. (`703947a`)
 - [x] **21. More templates:** guitar recording, podcast and beat-making setups with the routing already wired. (`6599491`)
   - Guitar Demo, Beat and Voice + Guitar were there; Podcast is new: Host (armed) and Guest mic tracks with the vocal chain, in a Voices group that glues and de-esses them, and a Music track whose compressor ducks it under the Voices group (a sidechain). No metronome or count-in, snap off, and Intro, Interview and Outro sections.
 - [x] **22. Clear warnings for silent states:** "track muted by solo", "monitoring is on but no input", "this effect is bypassed". (`06880ac`)
@@ -116,4 +116,4 @@ That is already ahead of most browser DAWs, such as BandLab or Soundtrap.
 ### Accessibility and settings
 
 - [ ] **27. Keyboard navigation of the timeline, screen-reader labels, and focus handling in dialogs.**
-- [ ] **28. A real Preferences window** (audio device, buffer size, default count-in, autosave, theme) instead of settings scattered across popovers.
+- [x] **28. A real Preferences window** (audio device, buffer size, default count-in, autosave, theme) instead of settings scattered across popovers. (commit to come; the theme comes with item 24)

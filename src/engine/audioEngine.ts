@@ -483,6 +483,30 @@ class AudioEngine {
     };
   }
 
+  /** Whether this browser can play through a device other than the
+   * system's default (AudioContext.setSinkId: Chrome and Edge, not
+   * Firefox or Safari yet). */
+  canChooseOutput(): boolean {
+    const ctx = nativeAudioContext() as (AudioContext & { setSinkId?: unknown }) | null;
+    return typeof ctx?.setSinkId === "function";
+  }
+
+  /** Plays through an output device (enumerateDevices' audiooutput id;
+   * null: the system's default). Resolves with an error message if it
+   * can't. */
+  async setOutputDevice(deviceId: string | null): Promise<string | null> {
+    const ctx = nativeAudioContext() as (AudioContext & { setSinkId?: (id: string) => Promise<void>; sinkId?: unknown }) | null;
+    if (!ctx?.setSinkId) return deviceId ? "This browser always plays through the system's output device." : null;
+    if ((ctx.sinkId ?? "") === (deviceId ?? "")) return null;
+    try {
+      await ctx.setSinkId(deviceId ?? "");
+      return null;
+    } catch (error) {
+      noteIssue("audio.output", error, { report: false });
+      return "Couldn't play through that device. Is it still connected?";
+    }
+  }
+
   /** The audio devices' own sample rates, when known: the output's (what a
    * plain AudioContext gets) and the input's (the mic stream's). When they
    * differ from the engine's rate the browser converts, which can add

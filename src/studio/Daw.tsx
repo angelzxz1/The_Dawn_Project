@@ -25,6 +25,7 @@ import {
   Repeat,
   KeyboardMusic,
   Scissors,
+  Settings,
   Undo2,
   Expand,
   ZoomIn,
@@ -53,6 +54,9 @@ import { busActions } from "@/state/busActions";
 import { useProjectFiles } from "./useProjectFiles";
 import { shortcuts, useShortcuts, type ActiveShortcut } from "@/ui/shortcuts";
 import { CommandPalette } from "@/studio/shell/CommandPalette";
+import { PreferencesWindow } from "@/studio/dialogs/PreferencesWindow";
+import { onOpenPreferences, openPreferences, type PrefsTab } from "@/studio/dialogs/preferences";
+import { getStudioPrefs, useStudioPrefs } from "@/state/studioPrefs";
 import { ShortcutSheet } from "@/studio/shell/ShortcutSheet";
 import { trackActions } from "@/state/trackActions";
 import { effectActions } from "@/state/effectActions";
@@ -2045,10 +2049,13 @@ export function Daw() {
     if (confirmDiscard()) setStartScreen("new");
   }, [confirmDiscard]);
 
-  /** Starts a new project from a template (the start screen's cards). */
+  /** Starts a new project from a template (the start screen's cards), with
+   * the count-in chosen in Preferences unless the template has its own. */
   const handleTemplate = useCallback(
     (template: ProjectTemplate) => {
-      startNew(template.build(), template.id === "empty" ? "Untitled" : template.name);
+      const project = template.build();
+      if (!template.ownCountIn) project.countInBars = getStudioPrefs().defaultCountInBars;
+      startNew(project, template.id === "empty" ? "Untitled" : template.name);
       setCursorSeconds(0);
       closeStartScreen();
       track("template_chosen", { template: template.id });
@@ -2062,7 +2069,26 @@ export function Daw() {
   const openFinder = useCallback((kind: "palette" | "sheet") => {
     setFinder((open) => (open?.kind === kind ? null : { kind, available: shortcuts.active() }));
   }, []);
+  /** The Preferences window's tab, while it's open. */
+  const [prefsTab, setPrefsTab] = useState<PrefsTab | null>(null);
+  useEffect(() => onOpenPreferences(setPrefsTab), []);
+  const [studioPrefs] = useStudioPrefs();
+  // Autosave: a project in a folder saves itself there while it has
+  // unsaved changes (Preferences > Projects). Never while recording.
+  const autosaveRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    autosaveRef.current = () => {
+      if (dirty && projectFolderName && !projectBusy && transportState !== "recording") void handleSave();
+    };
+  });
+  useEffect(() => {
+    if (studioPrefs.autosaveMinutes === 0) return;
+    const timer = window.setInterval(() => autosaveRef.current(), studioPrefs.autosaveMinutes * 60_000);
+    return () => window.clearInterval(timer);
+  }, [studioPrefs.autosaveMinutes]);
+
   useShortcuts("global", [
+    { keys: "mod+,", label: "Preferences", run: () => openPreferences(prefsTab ?? "audio") },
     { keys: "mod+k", label: "Find a command", whileTyping: true, run: () => openFinder("palette") },
     { keys: ["shift+?", "?"], label: "Show the keyboard shortcuts", run: () => openFinder("sheet") },
   ]);
@@ -2327,6 +2353,15 @@ export function Daw() {
                   ? "double-click a clip to edit it in the piano roll · space to play/pause · ctrl/cmd+C/V to copy/paste the clip at the playhead"
                   : "loading sounds…"}
           </p>
+          <button
+            type="button"
+            onClick={() => openPreferences("audio")}
+            title={withKeys("Preferences", "mod+,", "audio device, buffer, recording latency, the click, autosave")}
+            aria-label="Preferences"
+            className="flex shrink-0 items-center rounded-md border border-border p-1.5 text-muted hover:bg-surface-raised hover:text-foreground"
+          >
+            <Settings size={13} />
+          </button>
           <HelpMenu onTour={() => setTourOpen(true)} onShortcuts={() => openFinder("sheet")} onCommands={() => openFinder("palette")} onFeedback={hasDiscord ? () => openFeedback("help") : undefined} />
           {hasDiscord && (
             <button
@@ -3020,6 +3055,7 @@ export function Daw() {
         />
       )}
       {finder?.kind === "sheet" && <ShortcutSheet available={finder.available} onClose={() => setFinder(null)} />}
+      {prefsTab && <PreferencesWindow tab={prefsTab} onTab={setPrefsTab} onClose={() => setPrefsTab(null)} />}
 
       {packs && (
         <PacksWindow

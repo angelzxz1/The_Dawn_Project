@@ -498,8 +498,23 @@ Temporary, never committed:
     Favorites and Recent in both tabs (`library/browserPicks.ts`, in
     localStorage). Bundled tones (none ship yet) aren't previewed: they're
     downloaded only when added.
-  - Items 10–15, 17 and 23–28 are open; 12 and 25 are partly there. Next
-    in `nextSteps.md` is Phase 5, step 15 (28, a Preferences window).
+  - Item 28 (2026-11-01): a Preferences window (`dialogs/PreferencesWindow.tsx`;
+    the gear in the header, Ctrl/Cmd+, or `openPreferences(tab)` from
+    anywhere). Audio: the desktop's native engine section, else the
+    browser's output device (`setSinkId`, where the browser has it;
+    `audioPrefs.outputDevice`) and buffer size (`browserLatency`, the
+    context's latencyHint, read at page load in `context.ts`, so a change
+    offers a reload), and delay compensation. Recording: measuring, the
+    offset, the note after a take. Metronome: the click's sound and level.
+    Projects (`state/studioPrefs.ts`): autosave into a project's folder
+    every 1-10 minutes while it has unsaved changes (not while
+    recording), and the count-in for templates without their own
+    (`ProjectTemplate.ownCountIn`). The CPU panel keeps only its
+    readouts, with a link to the window. The theme comes with item 24
+    (step 16), as an Appearance tab. Autosave into a real folder hasn't
+    been tried end to end (the tests can't pick a folder).
+  - Items 10–15, 17 and 23–27 are open; 12 and 25 are partly there. Next
+    in `nextSteps.md` is Phase 5, step 16 (24, a light theme and UI size).
   - Fixed 2026-10-31: on Windows, Next's static export wrote each page's
     prefetch files as folders (`__next.!KHNpdGUp/__PAGE__.txt`, from a
     backslash it doesn't turn into a dot) where its router asks for
@@ -539,6 +554,7 @@ Temporary, never committed:
   #21, the podcast template) were done on 2026-10-31, so Phase 3 is done;
   Phase 4 (steps 12-14: Part 2 #19, menus and tooltips; #18, the command
   palette and cheat sheet; #20, previews, favorites and recent items) was
-  done on 2026-10-31; next is Phase 5, step 15 (#28). Phase 1 (housekeeping) was done on 2026-10-30: the slow tests got longer limits, a flaky ClipBlock
+  done on 2026-10-31. Phase 5 has begun: step 15 (#28, Preferences) was
+  done on 2026-11-01; next is step 16 (#24). Phase 1 (housekeeping) was done on 2026-10-30: the slow tests got longer limits, a flaky ClipBlock
   double-click test clicks twice in one go, and the JS multiband kernels
   read the band count and their key per sample, as the Rust ports do.

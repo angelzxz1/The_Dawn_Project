@@ -42,3 +42,10 @@ describe("parseAudioPrefs", () => {
     });
   });
 });
+
+describe("the browser's output device and buffer", () => {
+  it("keeps a device id and a buffer there is", () => {
+    expect(parseAudioPrefs({ outputDevice: "abc123", browserLatency: "playback" })).toMatchObject({ outputDevice: "abc123", browserLatency: "playback" });
+    expect(parseAudioPrefs({ outputDevice: "", browserLatency: "tiny" })).toMatchObject({ outputDevice: null, browserLatency: "interactive" });
+  });
+});

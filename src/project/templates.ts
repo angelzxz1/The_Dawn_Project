@@ -23,6 +23,9 @@ export interface ProjectTemplate {
   /** What's in it, for the card. */
   contents: string[];
   build: () => SerializedProject;
+  /** It sets its own count-in; others start with the one chosen in
+   * Preferences. */
+  ownCountIn?: true;
 }
 
 // --- builders (ids follow the app's ch-/clip-/fx-/bus- patterns, so new
@@ -242,6 +245,7 @@ export const PROJECT_TEMPLATES: ProjectTemplate[] = [
     description: "Record a riff over a rock groove.",
     contents: ["Drums with a 20-bar rock arrangement", "Guitar track, armed, with a crunch amp chain", "Bass track", "Reverb bus · metronome · 1-bar count-in"],
     build: guitarDemo,
+    ownCountIn: true,
   },
   {
     id: "beat",
@@ -256,6 +260,7 @@ export const PROJECT_TEMPLATES: ProjectTemplate[] = [
     description: "Sing and play: two tracks with vocal and acoustic chains.",
     contents: ["Vocal track, armed: gate, compressor, EQ", "Acoustic guitar track", "Plate reverb bus · metronome · count-in"],
     build: voiceGuitar,
+    ownCountIn: true,
   },
   {
     id: "podcast",
@@ -263,6 +268,7 @@ export const PROJECT_TEMPLATES: ProjectTemplate[] = [
     description: "Two mics and music that ducks when anyone talks.",
     contents: ["Host (armed) and Guest mic tracks, each with a voice chain", "A Voices group that glues and de-esses them", "Music ducking under the voices (sidechain)", "Intro, Interview and Outro sections · no metronome"],
     build: podcast,
+    ownCountIn: true,
   },
   {
     id: "empty",

@@ -63,12 +63,12 @@ test("after a take from the interface, a note offers to measure the latency", as
   };
   const note = page.getByRole("status", { name: "Recording timing" });
 
-  // It opens the Audio panel at its Recording section.
+  // It opens Preferences at Recording.
   await record();
   await note.getByRole("button", { name: "Measure latency…" }).click();
   await expect(note).toBeHidden();
-  const panel = page.getByRole("dialog", { name: "Audio settings" });
-  await expect(panel.getByRole("button", { name: "Measure latency", exact: true })).toBeInViewport();
+  const prefs = page.getByRole("dialog", { name: "Preferences" });
+  await expect(prefs.getByRole("tabpanel", { name: "Recording" }).getByRole("button", { name: "Measure latency", exact: true })).toBeInViewport();
   await page.keyboard.press("Escape");
 
   // Until it's measured, it comes back after each take - unless told not to.
