@@ -42,7 +42,7 @@ export function LoopBar({ loop, tempo, pxPerSecond, totalSeconds, beatsPerBar, s
   const toX = (beats: number) => secondsAtBeat(tempo, beats) * pxPerSecond;
   const left = toX(loop.start);
   const width = Math.max(4, toX(loop.end) - left);
-  const color = loop.on ? "#E6AD5E" : "#6B6C78";
+  const color = loop.on ? "var(--warn)" : "var(--loop-off)";
 
   // Clicking anywhere else lets go of the selection.
   useEffect(() => {
@@ -124,14 +124,14 @@ export function LoopBar({ loop, tempo, pxPerSecond, totalSeconds, beatsPerBar, s
           width,
           height: LOOP_BAR_HEIGHT - 4,
           background: loop.on ? "rgba(230,173,94,0.85)" : "rgba(120,121,135,0.55)",
-          boxShadow: selected ? "0 0 0 1.5px #F4EDE2" : undefined,
+          boxShadow: selected ? "0 0 0 1.5px var(--foreground)" : undefined,
           cursor: "grab",
         }}
       >
         <span className="absolute left-0 top-0 h-full cursor-ew-resize" style={{ width: HANDLE_PX, background: color, filter: "brightness(0.75)" }} />
         <span className="absolute right-0 top-0 h-full cursor-ew-resize" style={{ width: HANDLE_PX, background: color, filter: "brightness(0.75)" }} />
         {width > 60 && (
-          <span className="pointer-events-none font-mono text-[8.5px] font-semibold leading-none" style={{ color: loop.on ? "#1a1408" : "#E6E6EC" }}>
+          <span className="pointer-events-none font-mono text-[8.5px] font-semibold leading-none" style={{ color: loop.on ? "var(--on-warn)" : "var(--on-loop-off)" }}>
             {lengthLabel}
           </span>
         )}

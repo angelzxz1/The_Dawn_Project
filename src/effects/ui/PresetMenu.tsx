@@ -187,7 +187,7 @@ function Popover({ anchor, onClose, children }: { anchor: React.RefObject<HTMLDi
       ref={ref}
       tabIndex={-1}
       role="menu"
-      className="fixed z-[100] flex max-h-[360px] flex-col overflow-hidden rounded-lg text-[12px] shadow-2xl outline-none"
+      className="device-skin fixed z-[100] flex max-h-[360px] flex-col overflow-hidden rounded-lg text-[12px] shadow-2xl outline-none"
       style={{ ...pos, background: "#1F2027", border: "1px solid #34353E", color: "#F4EDE2" }}
     >
       {children}

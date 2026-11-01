@@ -513,8 +513,26 @@ Temporary, never committed:
     readouts, with a link to the window. The theme comes with item 24
     (step 16), as an Appearance tab. Autosave into a real folder hasn't
     been tried end to end (the tests can't pick a folder).
-  - Items 10–15, 17 and 23–27 are open; 12 and 25 are partly there. Next
-    in `nextSteps.md` is Phase 5, step 16 (24, a light theme and UI size).
+  - Item 24 (2026-11-01): a light theme and the UI size, in Preferences >
+    Appearance (`studioPrefs.theme`: system, dark or light; `uiScale`).
+    The colors are roles in `globals.css` (`:root`, retuned under
+    `html[data-theme="light"]`; new ones: `--warn`, `--marker`, `--tempo`,
+    `--switch-*`, `--loop-off`, `--on-accent`, `--row-*`, `--overview-*`);
+    the studio's hard-coded hex colors went to them. `shell/theme.ts` puts
+    the theme on the page while the studio is open, and `themeBoot.ts`
+    does it before the first draw (in `app/app/layout.tsx`). Effect and
+    instrument windows, rack cards and the instrument slot keep their dark
+    device look in either theme (`.device-skin` resets the roles to dark;
+    their own colors stay hex). The size is the desktop app's window zoom
+    (`setZoom`, permission `core:webview:allow-set-webview-zoom`): CSS
+    `zoom` was tried and puts pointer positions and element boxes in
+    different units (1.5x off), which the timeline's ~167 pointer
+    reads would all need fixing for, so a browser uses its own zoom
+    (Preferences says how). Several effect windows have no
+    `role="dialog"`, for the accessibility pass (37).
+  - Items 10–15, 17, 23 and 25–27 are open; 12 and 25 are partly there.
+    Next in `nextSteps.md` is Phase 5, step 17 (25, remember the layout
+    per project).
   - Fixed 2026-10-31: on Windows, Next's static export wrote each page's
     prefetch files as folders (`__next.!KHNpdGUp/__PAGE__.txt`, from a
     backslash it doesn't turn into a dot) where its router asks for
@@ -555,6 +573,7 @@ Temporary, never committed:
   Phase 4 (steps 12-14: Part 2 #19, menus and tooltips; #18, the command
   palette and cheat sheet; #20, previews, favorites and recent items) was
   done on 2026-10-31. Phase 5 has begun: step 15 (#28, Preferences) was
-  done on 2026-11-01; next is step 16 (#24). Phase 1 (housekeeping) was done on 2026-10-30: the slow tests got longer limits, a flaky ClipBlock
+  done on 2026-11-01, and step 16 (#24, the light theme and UI size) too;
+  next is step 17 (#25). Phase 1 (housekeeping) was done on 2026-10-30: the slow tests got longer limits, a flaky ClipBlock
   double-click test clicks twice in one go, and the JS multiband kernels
   read the band count and their key per sample, as the Rust ports do.

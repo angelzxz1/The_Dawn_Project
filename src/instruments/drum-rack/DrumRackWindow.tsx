@@ -141,7 +141,7 @@ export function DrumRackWindow({ channelId, channelName, kit, onChange, onClose,
   const audition = (i: number) => audioEngine.auditionDrumPad(channelId, i);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4">
+    <div className="device-skin fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4">
       <div
         role="dialog"
         aria-label={`Drum Rack - ${channelName}`}

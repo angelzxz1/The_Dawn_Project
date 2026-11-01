@@ -163,7 +163,7 @@ export function Tour({ onClose }: { onClose: () => void }) {
               type="button"
               autoFocus
               onClick={() => (last ? finish() : setStep(step + 1))}
-              className="rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-black hover:brightness-110"
+              className="rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-on-accent hover:brightness-110"
             >
               {last ? "Start making music" : "Next"}
             </button>

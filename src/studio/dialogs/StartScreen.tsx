@@ -123,7 +123,7 @@ export function StartScreen({
               type="button"
               onClick={() => void listen()}
               disabled={demo === "loading"}
-              className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-[12.5px] font-medium text-black hover:brightness-110 disabled:opacity-60"
+              className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-[12.5px] font-medium text-on-accent hover:brightness-110 disabled:opacity-60"
             >
               {demo === "loading" ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
               {firstVisit ? "Listen to the demo song" : "Open the demo song"}

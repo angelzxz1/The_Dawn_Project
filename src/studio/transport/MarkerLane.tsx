@@ -136,8 +136,8 @@ export function MarkerLane({ markers, tempo, pxPerSecond, totalSeconds, beatsPer
         return (
           // Only its flag takes the pointer: the strip under it is for adding.
           <div key={m.id} className="pointer-events-none absolute top-0 h-full" style={{ left, width: Math.max(0, end - left) }}>
-            <span className={`absolute inset-0 ${i % 2 === 0 ? "bg-[#B79BE6]/[0.10]" : "bg-[#B79BE6]/[0.04]"}`} />
-            <span className="absolute left-0 top-0 h-full w-px bg-[#B79BE6]/80" />
+            <span className={`absolute inset-0 ${i % 2 === 0 ? "bg-marker/[0.10]" : "bg-marker/[0.04]"}`} />
+            <span className="absolute left-0 top-0 h-full w-px bg-marker/80" />
             {typing ? (
               <NameInput initial={m.name} onCommit={commit} onCancel={() => setEditing(null)} />
             ) : (
@@ -145,7 +145,7 @@ export function MarkerLane({ markers, tempo, pxPerSecond, totalSeconds, beatsPer
                 type="button"
                 data-marker={m.id}
                 aria-label={`${m.name}, from ${formatPosition(m.beat, beatsPerBar)}: click to jump there`}
-                className="pointer-events-auto absolute left-px top-[2px] max-w-full truncate rounded-[2px] bg-[#B79BE6]/25 px-1 text-[8.5px] font-semibold leading-[11px] text-[#D5C6F2] hover:bg-[#B79BE6]/40"
+                className="pointer-events-auto absolute left-px top-[2px] max-w-full truncate rounded-[2px] bg-marker/25 px-1 text-[8.5px] font-semibold leading-[11px] text-marker-text hover:bg-marker/40"
                 style={{ cursor: "grab", touchAction: "none" }}
                 onPointerDown={(e) => onMarkerDown(m, e)}
                 onPointerMove={onMarkerMove}
@@ -172,7 +172,7 @@ export function MarkerLane({ markers, tempo, pxPerSecond, totalSeconds, beatsPer
       })}
       {newAt !== null && (
         <div className="absolute top-0 h-full" style={{ left: xAt(newAt) }}>
-          <span className="pointer-events-none absolute left-0 top-0 h-full w-px bg-[#B79BE6]" />
+          <span className="pointer-events-none absolute left-0 top-0 h-full w-px bg-marker" />
           <NameInput initial={suggestMarkerName(markers)} onCommit={commit} onCancel={() => setEditing(null)} />
         </div>
       )}
@@ -200,7 +200,7 @@ function NameInput({ initial, onCommit, onCancel }: { initial: string; onCommit:
       aria-label="Section name"
       defaultValue={initial}
       maxLength={MAX_MARKER_NAME}
-      className="pointer-events-auto absolute left-px top-[1px] z-10 w-24 rounded-[2px] border border-[#B79BE6] bg-surface-raised px-1 text-[9px] leading-[11px] text-foreground outline-none"
+      className="pointer-events-auto absolute left-px top-[1px] z-10 w-24 rounded-[2px] border border-marker bg-surface-raised px-1 text-[9px] leading-[11px] text-foreground outline-none"
       onKeyDown={(e) => {
         e.stopPropagation();
         if (e.key === "Enter") finish(() => onCommit(e.currentTarget.value));

@@ -160,7 +160,7 @@ export function PluginBrowser() {
               type="button"
               onClick={() => setShowFailed((v) => !v)}
               aria-expanded={showFailed}
-              className="flex w-full items-center gap-1 rounded px-1 py-1 text-left text-[11px] text-[#E6AD5E] hover:bg-surface-raised"
+              className="flex w-full items-center gap-1 rounded px-1 py-1 text-left text-[11px] text-warn hover:bg-surface-raised"
             >
               <ChevronRight size={11} className={`shrink-0 transition-transform ${showFailed ? "rotate-90" : ""}`} />
               {list.failed.length} couldn&apos;t be read
@@ -240,7 +240,7 @@ export function PluginBrowser() {
                     <FolderPlus size={12} />
                   </button>
                 </form>
-                {folderError && <p className="text-[10.5px] leading-snug text-[#FF6B6B]">{folderError}</p>}
+                {folderError && <p className="text-[10.5px] leading-snug text-record">{folderError}</p>}
               </div>
             )}
           </div>

@@ -77,7 +77,7 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
                   }}
                   className={
                     option.swatch
-                      ? `h-4 w-4 rounded-full ring-1 hover:ring-white/70 ${option.selected ? "ring-2 ring-white" : "ring-black/30"}`
+                      ? `h-4 w-4 rounded-full ring-1 hover:ring-foreground/70 ${option.selected ? "ring-2 ring-foreground" : "ring-black/30"}`
                       : `rounded border px-1.5 py-0.5 text-[11px] hover:bg-surface ${option.selected ? "border-accent text-accent" : "border-border text-foreground"}`
                   }
                   style={option.swatch ? { background: option.swatch } : undefined}

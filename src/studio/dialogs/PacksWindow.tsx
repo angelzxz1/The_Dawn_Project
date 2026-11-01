@@ -122,7 +122,7 @@ export function PacksWindow({
             type="button"
             onClick={() => fileInput.current?.click()}
             disabled={!!busy}
-            className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-black hover:brightness-110 disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-on-accent hover:brightness-110 disabled:opacity-50"
           >
             {busy === "install" ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
             Install a pack…
@@ -168,7 +168,7 @@ export function PacksWindow({
               type="button"
               onClick={() => void exportMine()}
               disabled={!!busy}
-              className="flex items-center gap-1.5 self-end rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-black hover:brightness-110 disabled:opacity-50"
+              className="flex items-center gap-1.5 self-end rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-on-accent hover:brightness-110 disabled:opacity-50"
             >
               {busy === "export" ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} Save pack
             </button>

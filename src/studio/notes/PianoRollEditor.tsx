@@ -1149,7 +1149,7 @@ export function PianoRollEditor({
                   return (
                     <div
                       key={midi}
-                      className="absolute left-0 w-full border-b border-black/20"
+                      className="absolute left-0 w-full border-b border-(--row-line)"
                       style={{
                         top: rowTop(midi),
                         height: ROW_H,
@@ -1157,13 +1157,13 @@ export function PianoRollEditor({
                           instrument === "drums"
                             ? isDrumRow
                               ? "rgba(94,177,255,0.07)"
-                              : "rgba(0,0,0,0.22)"
+                              : "var(--row-shade)"
                             : inScale
                               ? isRoot
                                 ? color.accentSoft
                                 : "rgba(94,177,255,0.07)"
                               : black
-                                ? "rgba(0,0,0,0.22)"
+                                ? "var(--row-shade)"
                                 : "transparent",
                       }}
                     />

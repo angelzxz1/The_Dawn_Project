@@ -120,7 +120,7 @@ export function TempoLane({ tempo, pxPerSecond, totalSeconds, beatsPerBar, snapU
         const typing = editing && "index" in editing && editing.index === m.index;
         return (
           <div key={m.index} className="absolute top-0 h-full" style={{ left: m.left }}>
-            <span className="pointer-events-none absolute left-0 top-0 h-full w-px bg-[#7FB4E6]/70" />
+            <span className="pointer-events-none absolute left-0 top-0 h-full w-px bg-tempo/70" />
             {typing ? (
               <BpmInput initial={m.bpm} onCommit={commit} onCancel={() => setEditing(null)} />
             ) : (
@@ -128,7 +128,7 @@ export function TempoLane({ tempo, pxPerSecond, totalSeconds, beatsPerBar, snapU
                 type="button"
                 data-tempo-marker={m.index}
                 aria-label={`Tempo ${formatBpm(m.bpm)} BPM from ${formatPosition(m.beat, beatsPerBar)}${m.index === 0 ? " (the song's start)" : ""}`}
-                className="absolute left-px top-[2px] rounded-[2px] bg-[#7FB4E6]/20 px-1 font-mono text-[8.5px] font-semibold leading-[11px] text-[#A9CDEE] hover:bg-[#7FB4E6]/35"
+                className="absolute left-px top-[2px] rounded-[2px] bg-tempo/20 px-1 font-mono text-[8.5px] font-semibold leading-[11px] text-tempo-text hover:bg-tempo/35"
                 style={{ cursor: m.index === 0 ? "text" : "grab", touchAction: "none" }}
                 onPointerDown={(e) => onMarkerDown(m.index, e)}
                 onPointerMove={onMarkerMove}
@@ -152,7 +152,7 @@ export function TempoLane({ tempo, pxPerSecond, totalSeconds, beatsPerBar, snapU
       })}
       {newAt !== null && (
         <div className="absolute top-0 h-full" style={{ left: secondsAtBeat(tempo, newAt) * pxPerSecond }}>
-          <span className="pointer-events-none absolute left-0 top-0 h-full w-px bg-[#7FB4E6]" />
+          <span className="pointer-events-none absolute left-0 top-0 h-full w-px bg-tempo" />
           <BpmInput initial={tempo.segments.findLast((s) => s.beat <= newAt)?.bpm ?? bpm} onCommit={commit} onCancel={() => setEditing(null)} />
         </div>
       )}
@@ -179,7 +179,7 @@ function BpmInput({ initial, onCommit, onCancel }: { initial: number; onCommit: 
       aria-label="Tempo (BPM)"
       defaultValue={formatBpm(initial)}
       inputMode="decimal"
-      className="absolute left-px top-[1px] z-10 w-11 rounded-[2px] border border-[#7FB4E6] bg-surface-raised px-1 font-mono text-[9px] leading-[11px] text-foreground outline-none"
+      className="absolute left-px top-[1px] z-10 w-11 rounded-[2px] border border-tempo bg-surface-raised px-1 font-mono text-[9px] leading-[11px] text-foreground outline-none"
       onKeyDown={(e) => {
         e.stopPropagation();
         if (e.key === "Enter") finish(() => onCommit(e.currentTarget.value));

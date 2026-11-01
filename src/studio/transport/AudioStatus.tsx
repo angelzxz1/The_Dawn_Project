@@ -18,7 +18,7 @@ export function showRecordingSettings(): void {
 }
 
 function loadColor(load: number): string {
-  return load >= 0.85 ? "#FF6B6B" : load >= 0.6 ? "#E6AD5E" : "#6BD68B";
+  return load >= 0.85 ? "#FF6B6B" : load >= 0.6 ? "var(--warn)" : "#6BD68B";
 }
 
 function Row({ label, value, title }: { label: string; value: string; title?: string }) {
@@ -101,7 +101,7 @@ export function AudioStatus() {
       >
         <Cpu size={13} />
         <span className="font-mono text-foreground">CPU {pct}</span>
-        <span className="h-1.5 w-10 overflow-hidden rounded-full" style={{ background: "#2E2F37" }}>
+        <span className="h-1.5 w-10 overflow-hidden rounded-full" style={{ background: "var(--switch-off)" }}>
           <span className="block h-full" style={{ width: `${Math.min(100, load * 100)}%`, background: loadColor(load) }} />
         </span>
       </button>
@@ -109,7 +109,7 @@ export function AudioStatus() {
       {open && (
         <div
           className="absolute right-0 top-full z-50 mt-2 flex max-h-[calc(100vh-140px)] w-[360px] flex-col gap-3 overflow-y-auto rounded-xl p-4 shadow-2xl"
-          style={{ background: "#1B1C22", border: "1px solid #2E2F37" }}
+          style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
           role="dialog"
           aria-label="Audio settings"
         >
@@ -137,7 +137,7 @@ export function AudioStatus() {
               <Row label="Input device rate" value={`${(deviceRates.input / 1000).toFixed(1)} kHz`} title="The rate your microphone or interface input runs at." />
             )}
             {[deviceRates?.output, deviceRates?.input].some((r) => r && r !== info.sampleRate) && (
-              <p className="rounded border border-[#E6AD5E]/40 bg-[#E6AD5E]/10 px-2 py-1.5 text-[11px] leading-snug text-[#E6AD5E]">
+              <p className="rounded border border-warn/40 bg-warn/10 px-2 py-1.5 text-[11px] leading-snug text-warn">
                 Your audio device runs at a different rate than Dawn ({(info.sampleRate / 1000).toFixed(1)} kHz), so the browser
                 converts the audio on the way in and out, which adds delay. Set the device to {(info.sampleRate / 1000).toFixed(1)} kHz
                 (on Windows: Sound settings → the device → Properties → Advanced, for both the output and the input), then reload.

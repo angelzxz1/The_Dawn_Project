@@ -1,13 +1,14 @@
 // Opening the Preferences window from anywhere (the CPU panel, the note
 // after a take, a shortcut), at one of its tabs. The studio listens.
 
-export type PrefsTab = "audio" | "recording" | "metronome" | "projects";
+export type PrefsTab = "audio" | "recording" | "metronome" | "projects" | "appearance";
 
 export const PREFS_TABS: { id: PrefsTab; label: string }[] = [
   { id: "audio", label: "Audio" },
   { id: "recording", label: "Recording" },
   { id: "metronome", label: "Metronome" },
   { id: "projects", label: "Projects" },
+  { id: "appearance", label: "Appearance" },
 ];
 
 const listeners = new Set<(tab: PrefsTab) => void>();

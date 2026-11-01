@@ -144,11 +144,11 @@ export function ClipOverview({
       onPointerUp={endDrag}
       onPointerCancel={endDrag}
       onDoubleClick={() => onShow(0, length, "start")}
-      className="relative min-w-0 flex-1 cursor-pointer select-none overflow-hidden bg-black/40"
+      className="relative min-w-0 flex-1 cursor-pointer select-none overflow-hidden bg-(--overview-bg)"
       style={{ height: OVERVIEW_H }}
     >
       {barLines.map((x) => (
-        <div key={x} className="pointer-events-none absolute top-0 h-full border-l border-white/10" style={{ left: `${x * 100}%` }} />
+        <div key={x} className="pointer-events-none absolute top-0 h-full border-l border-(--overview-line)" style={{ left: `${x * 100}%` }} />
       ))}
       {notes.map((n, i) => (
         <div

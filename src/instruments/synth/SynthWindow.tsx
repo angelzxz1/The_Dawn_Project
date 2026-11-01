@@ -122,7 +122,7 @@ export function SynthWindow({ channelId, channelName, params, onChange, onClose,
 
   return (
     <SynthContext.Provider value={ctx}>
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65" onPointerDown={(e) => e.target === e.currentTarget && setFocus(null)}>
+      <div className="device-skin fixed inset-0 z-50 flex items-center justify-center bg-black/65" onPointerDown={(e) => e.target === e.currentTarget && setFocus(null)}>
         <div style={{ width: W * scale, height: H * scale }}>
           <div
             role="dialog"

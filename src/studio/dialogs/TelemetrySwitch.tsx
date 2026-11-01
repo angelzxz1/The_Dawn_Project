@@ -22,9 +22,9 @@ export function TelemetrySwitch() {
           aria-label="Share anonymous usage statistics and error reports"
           onClick={() => setTelemetryEnabled(!on)}
           className="relative h-5 w-9 shrink-0 rounded-full transition-colors"
-          style={{ background: on ? "#E6AD5E" : "#2E2F37" }}
+          style={{ background: on ? "var(--warn)" : "var(--switch-off)" }}
         >
-          <span className="absolute top-0.5 h-4 w-4 rounded-full bg-[#F4EDE2] transition-all" style={{ left: on ? 18 : 2 }} />
+          <span className="absolute top-0.5 h-4 w-4 rounded-full bg-(--switch-knob) transition-all" style={{ left: on ? 18 : 2 }} />
         </button>
       </label>
       {!telemetryConfigured && <p className="text-[11px] text-muted">This copy of Dawn doesn&rsquo;t collect any statistics.</p>}

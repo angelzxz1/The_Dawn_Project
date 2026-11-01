@@ -229,7 +229,7 @@ function ChordReadout({ chord, keyLabel, picked }: { chord: ChordReading | null;
             </span>
           )}
           {chord.quality && <span className="min-w-0 truncate text-muted/80">{chord.quality}</span>}
-          <span className={`shrink-0 ${chord.inKey ? "text-muted" : "text-[#E6AD5E]"}`}>{chord.inKey ? `in ${keyLabel}` : `outside ${keyLabel}`}</span>
+          <span className={`shrink-0 ${chord.inKey ? "text-muted" : "text-warn"}`}>{chord.inKey ? `in ${keyLabel}` : `outside ${keyLabel}`}</span>
         </>
       ) : (
         <span className="text-muted/70">Chords in {keyLabel}</span>

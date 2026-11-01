@@ -74,7 +74,7 @@ export function FeedbackWindow() {
               void copy();
               track("support_link_clicked", { where: "feedback", target: "discord" });
             }}
-            className="rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-black hover:brightness-110"
+            className="rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-on-accent hover:brightness-110"
           >
             Open the Discord
           </a>
@@ -111,7 +111,7 @@ export function SupportSection() {
               rel="noreferrer"
               title={l.hint}
               onClick={() => track("support_link_clicked", { where: "about", target: l.id })}
-              className="rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-black hover:brightness-110"
+              className="rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-on-accent hover:brightness-110"
             >
               {l.label}
             </a>
@@ -188,7 +188,7 @@ export function PostExportNote({ onClose }: { onClose: () => void }) {
               track("support_link_clicked", { where: "export", target: links[0].id });
               onClose();
             }}
-            className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-black hover:brightness-110"
+            className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-on-accent hover:brightness-110"
           >
             <Heart size={12} /> Support Dawn
           </a>

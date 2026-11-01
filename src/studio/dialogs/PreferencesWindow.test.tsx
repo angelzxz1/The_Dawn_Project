@@ -83,10 +83,19 @@ describe("the Preferences window", () => {
     expect(getAudioPrefs().metronomeSound).toBe("wood");
   });
 
+  test("Appearance: the theme; in a browser, its zoom sets the size", async () => {
+    const screen = render(<Window start="appearance" />);
+    await screen.getByRole("radio", { name: "Light" }).click();
+    expect(getStudioPrefs().theme).toBe("light");
+    await expect.element(screen.getByRole("radio", { name: "Light" })).toHaveAttribute("aria-checked", "true");
+    await expect.element(screen.getByText(/browser's zoom/)).toBeVisible();
+    await expect.element(screen.getByRole("combobox", { name: "Interface size" })).not.toBeInTheDocument();
+  });
+
   test("Projects: autosave and the count-in for new projects", async () => {
     const screen = render(<Window start="projects" />);
     await screen.getByRole("combobox", { name: "Autosave" }).selectOptions("Every 5 minutes");
     await screen.getByRole("combobox", { name: "Count-in for new projects" }).selectOptions("2 bars");
-    expect(getStudioPrefs()).toEqual({ autosaveMinutes: 5, defaultCountInBars: 2 });
+    expect(getStudioPrefs()).toMatchObject({ autosaveMinutes: 5, defaultCountInBars: 2 });
   });
 });

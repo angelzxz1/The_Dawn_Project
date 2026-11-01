@@ -265,7 +265,7 @@ export function ExportDialog({
             <button type="button" onClick={onClose} className="rounded-md border border-border px-3 py-1.5 text-[12px] hover:bg-surface">
               Cancel
             </button>
-            <button type="button" onClick={() => void run()} className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-black hover:brightness-110">
+            <button type="button" onClick={() => void run()} className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-on-accent hover:brightness-110">
               <Download size={13} />
               Export {stems ? "stems" : s.format.toUpperCase()}
             </button>

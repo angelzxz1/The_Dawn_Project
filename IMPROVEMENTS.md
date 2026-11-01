@@ -1,11 +1,11 @@
 # Improvements
 
-Checked against the code and the commit history on 2026-10-29; item 7 of Part 2 was added on 2026-10-30, items 8, 9, 16, 18, 19, 20, 21 and 22 on 2026-10-31, item 28 on 2026-11-01.
+Checked against the code and the commit history on 2026-10-29; item 7 of Part 2 was added on 2026-10-30, items 8, 9, 16, 18, 19, 20, 21 and 22 on 2026-10-31, items 24 and 28 on 2026-11-01.
 
 - `[x]` is done; the commit that did it is in brackets.
 - `[ ]` is still open; "Partly" says what already exists.
 
-**Summary:** Part 1 is all done. In Part 2, items 1–9, 16, 18–22 and 28 are done and the rest of 10–27 are open; two of the open items (12, 25) are partly there.
+**Summary:** Part 1 is all done. In Part 2, items 1–9, 16, 18–22, 24 and 28 are done and the rest of 10–27 are open; two of the open items (12, 25) are partly there.
 
 ## Part 1: Code improvements
 
@@ -108,7 +108,7 @@ That is already ahead of most browser DAWs, such as BandLab or Soundtrap.
 ### Visual and comfort
 
 - [ ] **23. One consistent style for windows.** Effect windows, the Keys window and the Drum Rack each look and behave differently.
-- [ ] **24. Light theme and adjustable UI size,** for laptop screens and 1440p/4K monitors.
+- [x] **24. Light theme and adjustable UI size,** for laptop screens and 1440p/4K monitors. (commit to come; the size is the desktop app's window zoom, and in a browser its own zoom)
 - [ ] **25. Remember the layout:** panel sizes, folded tracks, the open FX rack and zoom, per project.
   - Partly: folded tracks and track heights are saved with the project. Panel sizes, the open FX rack and the zoom aren't.
 - [ ] **26. Detach or second-screen windows** for the mixer and piano roll (Ableton 12, Logic).
@@ -116,4 +116,4 @@ That is already ahead of most browser DAWs, such as BandLab or Soundtrap.
 ### Accessibility and settings
 
 - [ ] **27. Keyboard navigation of the timeline, screen-reader labels, and focus handling in dialogs.**
-- [x] **28. A real Preferences window** (audio device, buffer size, default count-in, autosave, theme) instead of settings scattered across popovers. (commit to come; the theme comes with item 24)
+- [x] **28. A real Preferences window** (audio device, buffer size, default count-in, autosave, theme) instead of settings scattered across popovers. (`405b1b6`; the theme came with item 24)

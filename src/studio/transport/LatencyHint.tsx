@@ -28,7 +28,7 @@ export function LatencyHint({ onClose }: { onClose: () => void }) {
           showRecordingSettings();
           onClose();
         }}
-        className="rounded-md bg-accent px-2.5 py-1 text-[11px] font-semibold text-black hover:brightness-110"
+        className="rounded-md bg-accent px-2.5 py-1 text-[11px] font-semibold text-on-accent hover:brightness-110"
       >
         Measure latency…
       </button>

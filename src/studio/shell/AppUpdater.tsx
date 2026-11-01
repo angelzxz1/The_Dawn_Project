@@ -67,7 +67,7 @@ export function AppUpdater() {
           waiting.postMessage("SKIP_WAITING");
         }}
         title="Save first if you have unsaved changes outside the autosave"
-        className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-1 font-medium text-black hover:brightness-110"
+        className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-1 font-medium text-on-accent hover:brightness-110"
       >
         <RefreshCw size={12} /> Reload
       </button>

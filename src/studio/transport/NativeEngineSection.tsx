@@ -83,9 +83,9 @@ export function NativeEngineSection({ prefs, update }: { prefs: AudioPrefs; upda
           aria-label="Native engine"
           onClick={() => update({ nativeEngine: !prefs.nativeEngine })}
           className="relative mt-0.5 h-5 w-9 shrink-0 rounded-full transition-colors"
-          style={{ background: prefs.nativeEngine ? "#E6AD5E" : "#2E2F37" }}
+          style={{ background: prefs.nativeEngine ? "var(--warn)" : "var(--switch-off)" }}
         >
-          <span className="absolute top-0.5 h-4 w-4 rounded-full bg-[#F4EDE2] transition-all" style={{ left: prefs.nativeEngine ? 18 : 2 }} />
+          <span className="absolute top-0.5 h-4 w-4 rounded-full bg-(--switch-knob) transition-all" style={{ left: prefs.nativeEngine ? 18 : 2 }} />
         </button>
       </label>
 
@@ -161,7 +161,7 @@ export function NativeEngineSection({ prefs, update }: { prefs: AudioPrefs; upda
           </Field>
 
           {state.error ? (
-            <p className="rounded border border-[#FF6B6B]/40 bg-[#FF6B6B]/10 px-2 py-1.5 text-[11px] leading-snug text-[#FF6B6B]">
+            <p className="rounded border border-record/40 bg-record/10 px-2 py-1.5 text-[11px] leading-snug text-record">
               Couldn&apos;t open the device: {state.error}
             </p>
           ) : state.starting ? (
@@ -184,7 +184,7 @@ export function NativeEngineSection({ prefs, update }: { prefs: AudioPrefs; upda
             through NAM&apos;s own plugin.
           </p>
           {(missing.instruments.length > 0 || missing.effects.length > 0 || missing.automation.length > 0) && (
-            <ul className="rounded border border-[#E6AD5E]/40 bg-[#E6AD5E]/10 px-2 py-1.5 text-[11px] leading-snug text-[#E6AD5E]">
+            <ul className="rounded border border-warn/40 bg-warn/10 px-2 py-1.5 text-[11px] leading-snug text-warn">
               {missing.instruments.length > 0 && <li>Silent here: the instruments on {missing.instruments.join(", ")}.</li>}
               {missing.effects.length > 0 && <li>Played without: {missing.effects.join(", ")}.</li>}
               {missing.automation.length > 0 && <li>Without their automation: {missing.automation.join(", ")}.</li>}

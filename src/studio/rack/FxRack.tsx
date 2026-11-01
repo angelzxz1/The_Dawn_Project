@@ -265,7 +265,7 @@ export function FxRack({
           <div
             role="group"
             aria-label="Instrument"
-            className={`flex ${instrument ? INSTRUMENT_UI[instrument].slotWidth : "w-56"} shrink-0 flex-col rounded border border-border bg-surface-raised p-2`}
+            className={`flex ${instrument ? INSTRUMENT_UI[instrument].slotWidth : "w-56"} device-skin shrink-0 flex-col rounded border border-border bg-surface-raised p-2`}
           >
             <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted">
               Instrument
@@ -323,7 +323,7 @@ export function FxRack({
               }}
             >
               <div
-                className={`flex shrink-0 rounded-xl ${EFFECT_UI[fx.type].cardWidth} ${fx.bypass ? "opacity-50" : ""}`}
+                className={`device-skin flex shrink-0 rounded-xl ${EFFECT_UI[fx.type].cardWidth} ${fx.bypass ? "opacity-50" : ""}`}
                 style={{ background: "#1B1C22", border: "1px solid #2E2F37" }}
               >
                 <div

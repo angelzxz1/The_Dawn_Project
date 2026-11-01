@@ -41,7 +41,7 @@ export function InputMeter({ channelId }: { channelId: string }) {
       className="flex min-w-0 flex-1 items-center gap-1 px-1"
       title={open ? "Input level: aim for peaks around the mark (-12 dB); the light turns red if it clips (click it to reset)" : "Waiting for the input…"}
     >
-      <div className="relative h-2 min-w-0 flex-1 overflow-hidden rounded-sm border border-border bg-black/50" role="img" aria-label="Input level meter">
+      <div className="relative h-2 min-w-0 flex-1 overflow-hidden rounded-sm border border-border bg-background" role="img" aria-label="Input level meter">
         <div
           ref={fill}
           className="absolute inset-0"

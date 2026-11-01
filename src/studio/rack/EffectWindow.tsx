@@ -40,28 +40,31 @@ export function EffectWindow({
   const { Window } = EFFECT_UI[effect.type];
   return (
     <EffectPresetContext.Provider value={{ effect, bpm, onChange: (change) => effectActions.changePreset(hostId, effect.id, change) }}>
-      <Window
-        hostId={hostId}
-        effectId={effect.id}
-        channelName={hostName}
-        params={effect.params}
-        bypass={!!effect.bypass}
-        bpm={bpm}
-        file={effect.file}
-        sidechain={effect.sidechain}
-        sidechainSources={sidechainSources}
-        onBypassToggle={() => effectActions.toggleBypass(hostId, effect.id)}
-        onClose={onClose}
-        onParamChange={(key, v) => effectActions.setParam(hostId, effect.id, key, v)}
-        onParamDragStart={startEdit}
-        onSidechainChange={(routing) => effectActions.setSidechain(hostId, effect.id, routing)}
-        onLoadFile={(file) => effectActions.loadFile(hostId, effect.id, file)}
-        onClearFile={() => effectActions.setFile(hostId, effect.id, null)}
-        onPickFile={(ref) => {
-          effectActions.setFile(hostId, effect.id, ref);
-          track(effect.type === "namAmp" ? "nam_model_loaded" : "ir_loaded", { via: "browser" });
-        }}
-      />
+      {/* Dark in either theme, like hardware (globals.css). */}
+      <div className="device-skin contents">
+        <Window
+          hostId={hostId}
+          effectId={effect.id}
+          channelName={hostName}
+          params={effect.params}
+          bypass={!!effect.bypass}
+          bpm={bpm}
+          file={effect.file}
+          sidechain={effect.sidechain}
+          sidechainSources={sidechainSources}
+          onBypassToggle={() => effectActions.toggleBypass(hostId, effect.id)}
+          onClose={onClose}
+          onParamChange={(key, v) => effectActions.setParam(hostId, effect.id, key, v)}
+          onParamDragStart={startEdit}
+          onSidechainChange={(routing) => effectActions.setSidechain(hostId, effect.id, routing)}
+          onLoadFile={(file) => effectActions.loadFile(hostId, effect.id, file)}
+          onClearFile={() => effectActions.setFile(hostId, effect.id, null)}
+          onPickFile={(ref) => {
+            effectActions.setFile(hostId, effect.id, ref);
+            track(effect.type === "namAmp" ? "nam_model_loaded" : "ir_loaded", { via: "browser" });
+          }}
+        />
+      </div>
     </EffectPresetContext.Provider>
   );
 }

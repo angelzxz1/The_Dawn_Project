@@ -72,7 +72,7 @@ export function PluginWindow({
   children: React.ReactNode;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+    <div className="device-skin fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <div
         className={`${spaceGrotesk.className} flex max-w-full flex-col gap-4 rounded-2xl shadow-2xl`}
         style={{ width, background: "#1B1C22", border: "1px solid #2E2F37", padding: "18px 22px 20px" }}

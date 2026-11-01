@@ -205,7 +205,7 @@ function SilentChip({ label, detail }: { label: string; detail: string }) {
       role="status"
       title={detail}
       aria-label={detail}
-      className="flex shrink-0 items-center gap-0.5 rounded border border-[#E6AD5E]/50 bg-[#E6AD5E]/15 px-1 text-[9px] font-medium text-[#E6AD5E]"
+      className="flex shrink-0 items-center gap-0.5 rounded border border-warn/50 bg-warn/15 px-1 text-[9px] font-medium text-warn"
     >
       <VolumeX size={9} aria-hidden />
       {label}
@@ -406,7 +406,7 @@ export const TrackHeader = memo(function TrackHeader({
                   onRecolor({ colorIndex: i });
                   setShowColorPicker(false);
                 }}
-                className="h-4 w-4 rounded-full ring-1 ring-black/30 hover:ring-white/60"
+                className="h-4 w-4 rounded-full ring-1 ring-black/30 hover:ring-foreground/60"
                 style={{ background: swatch.accent }}
               />
             ))}
@@ -580,12 +580,12 @@ export const TrackHeader = memo(function TrackHeader({
             <Sliders size={11} />
             FX
             {effectsCount > 0 && (
-              <span className="flex h-3 w-3 items-center justify-center rounded-full bg-accent text-[7px] font-bold text-black">
+              <span className="flex h-3 w-3 items-center justify-center rounded-full bg-accent text-[7px] font-bold text-on-accent">
                 {effectsCount}
               </span>
             )}
             {bypassedCount > 0 && (
-              <span aria-hidden className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-[#E6AD5E]" />
+              <span aria-hidden className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-warn" />
             )}
           </button>
         </div>

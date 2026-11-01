@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AudioLines, FolderOpen, Mic, Settings, Timer, X } from "lucide-react";
+import { AudioLines, FolderOpen, Mic, Palette, Settings, Timer, X } from "lucide-react";
 import { audioEngine } from "@/engine/audioEngine";
 import { BROWSER_LATENCIES, METRONOME_DB_RANGE, type BrowserLatency } from "@/engine/audioPrefs";
 import { CLICK_SOUNDS, CLICK_SOUND_LABELS, type ClickSound } from "@/engine/clickSounds";
@@ -9,7 +9,8 @@ import { pageBrowserLatency } from "@/engine/context";
 import { noteIssue } from "@/services/issues";
 import { isDesktopApp } from "@/services/desktop";
 import { projectStore } from "@/state/projectStore";
-import { AUTOSAVE_CHOICES, COUNT_IN_CHOICES, useStudioPrefs, type StudioPrefs } from "@/state/studioPrefs";
+import { AUTOSAVE_CHOICES, COUNT_IN_CHOICES, THEME_CHOICES, UI_SCALES, useStudioPrefs, type StudioPrefs, type ThemeChoice } from "@/state/studioPrefs";
+import { keyLabel } from "@/ui/keyLabel";
 import { useAudioPrefs } from "@/studio/transport/useAudioPrefs";
 import { NativeEngineSection } from "@/studio/transport/NativeEngineSection";
 import { ValueBar } from "@/studio/tracks/ValueBar";
@@ -32,9 +33,9 @@ export function Toggle({ label, hint, value, onChange }: { label: string; hint: 
         aria-label={label}
         onClick={() => onChange(!value)}
         className="relative mt-0.5 h-5 w-9 shrink-0 rounded-full transition-colors"
-        style={{ background: value ? "#E6AD5E" : "#2E2F37" }}
+        style={{ background: value ? "var(--warn)" : "var(--switch-off)" }}
       >
-        <span className="absolute top-0.5 h-4 w-4 rounded-full bg-[#F4EDE2] transition-all" style={{ left: value ? 18 : 2 }} />
+        <span className="absolute top-0.5 h-4 w-4 rounded-full bg-(--switch-knob) transition-all" style={{ left: value ? 18 : 2 }} />
       </button>
     </label>
   );
@@ -124,9 +125,9 @@ function BrowserAudio() {
         </select>
       </Choice>
       {prefs.browserLatency !== pageBrowserLatency && (
-        <p className="flex items-center justify-between gap-2 rounded border border-[#E6AD5E]/40 bg-[#E6AD5E]/10 px-2 py-1.5 text-[11px] leading-snug text-[#E6AD5E]">
+        <p className="flex items-center justify-between gap-2 rounded border border-warn/40 bg-warn/10 px-2 py-1.5 text-[11px] leading-snug text-warn">
           The new buffer size is used once the page reloads. Your project is kept.
-          <button type="button" onClick={() => window.location.reload()} className="shrink-0 rounded border border-[#E6AD5E]/60 px-2 py-0.5 font-semibold hover:bg-[#E6AD5E]/15">
+          <button type="button" onClick={() => window.location.reload()} className="shrink-0 rounded border border-warn/60 px-2 py-0.5 font-semibold hover:bg-warn/15">
             Reload
           </button>
         </p>
@@ -333,16 +334,63 @@ function ProjectsTab() {
   );
 }
 
+const THEME_LABELS: Record<ThemeChoice, string> = { system: "Like the system", dark: "Dark", light: "Light" };
+
+function AppearanceTab() {
+  const [prefs, update] = useStudioPrefs();
+  const [desktop] = useState(isDesktopApp);
+  return (
+    <section className="flex flex-col gap-3">
+      <Heading>Theme</Heading>
+      <div role="radiogroup" aria-label="Theme" className="flex gap-2">
+        {THEME_CHOICES.map((t) => (
+          <button
+            key={t}
+            type="button"
+            role="radio"
+            aria-checked={prefs.theme === t}
+            onClick={() => update({ theme: t })}
+            className={`flex-1 rounded-lg border px-3 py-2 text-[12px] ${prefs.theme === t ? "border-accent bg-accent/10 text-foreground" : "border-border text-muted hover:bg-surface hover:text-foreground"}`}
+          >
+            {THEME_LABELS[t]}
+          </button>
+        ))}
+      </div>
+      <p className="text-[11px] leading-snug text-muted">
+        The studio&apos;s colors. Effect and instrument windows keep their dark look, like hardware, in either theme.
+      </p>
+      <Heading>Size</Heading>
+      {desktop ? (
+        <Choice label="Interface size" hint="Makes everything in the window larger or smaller.">
+          <select aria-label="Interface size" value={prefs.uiScale} onChange={(e) => update({ uiScale: Number(e.target.value) })} className={SELECT}>
+            {UI_SCALES.map((s) => (
+              <option key={s} value={s}>
+                {Math.round(s * 100)}%
+              </option>
+            ))}
+          </select>
+        </Choice>
+      ) : (
+        <p className="text-[11px] leading-snug text-muted">
+          Use the browser&apos;s zoom to make the studio larger or smaller: {keyLabel("mod+=")} zooms in, {keyLabel("mod+-")} zooms out
+          and {keyLabel("mod+0")} goes back. The browser remembers it for Dawn.
+        </p>
+      )}
+    </section>
+  );
+}
+
 const TAB_ICONS: Record<PrefsTab, React.ReactNode> = {
   audio: <AudioLines size={13} />,
   recording: <Mic size={13} />,
   metronome: <Timer size={13} />,
   projects: <FolderOpen size={13} />,
+  appearance: <Palette size={13} />,
 };
 
 /** Preferences: the settings of this computer and this browser, not of a
- * project - the audio device and buffer, recording latency, the click, and
- * saving. */
+ * project - the audio device and buffer, recording latency, the click,
+ * saving, and how the studio looks. */
 export function PreferencesWindow({ tab, onTab, onClose }: { tab: PrefsTab; onTab: (tab: PrefsTab) => void; onClose: () => void }) {
   useShortcuts("dialog", [{ keys: "escape", label: "Close", run: onClose, whileTyping: true }]);
   return (
@@ -372,7 +420,17 @@ export function PreferencesWindow({ tab, onTab, onClose }: { tab: PrefsTab; onTa
             ))}
           </div>
           <div role="tabpanel" aria-label={PREFS_TABS.find((t) => t.id === tab)?.label} className="min-w-0 flex-1 overflow-y-auto p-5">
-            {tab === "audio" ? <AudioTab /> : tab === "recording" ? <RecordingTab /> : tab === "metronome" ? <MetronomeTab /> : <ProjectsTab />}
+            {tab === "audio" ? (
+              <AudioTab />
+            ) : tab === "recording" ? (
+              <RecordingTab />
+            ) : tab === "metronome" ? (
+              <MetronomeTab />
+            ) : tab === "projects" ? (
+              <ProjectsTab />
+            ) : (
+              <AppearanceTab />
+            )}
           </div>
         </div>
         <p className="border-t border-border px-5 py-2 text-[10.5px] text-muted">Kept in this browser on this computer, for every project.</p>

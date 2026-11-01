@@ -44,7 +44,7 @@ export function Meter({ channelId }: MeterProps) {
   }, [channelId]);
 
   return (
-    <div className="flex h-full w-3 gap-px overflow-hidden rounded-sm border border-border bg-black/50">
+    <div className="flex h-full w-3 gap-px overflow-hidden rounded-sm border border-border bg-background">
       {SIDES.map((side, i) => (
         <div key={side} title={side} className="relative h-full flex-1">
           <div

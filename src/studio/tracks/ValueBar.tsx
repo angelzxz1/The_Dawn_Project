@@ -144,7 +144,7 @@ export function ValueBar({
             onChange(clamp(value - step));
           }
         }}
-        className="relative h-4 w-[67px] cursor-ns-resize touch-none select-none overflow-hidden rounded-[3px] border border-border bg-black/40"
+        className="relative h-4 w-[67px] cursor-ns-resize touch-none select-none overflow-hidden rounded-[3px] border border-border bg-background"
       >
         <div
           className="absolute inset-y-0"
@@ -153,8 +153,8 @@ export function ValueBar({
             background: boosted
               ? "#ffb454"
               : bipolar
-                ? "#5eb1ff"
-                : "rgba(94,177,255,0.55)",
+                ? "var(--accent)"
+                : "color-mix(in srgb, var(--accent) 55%, transparent)",
           }}
         />
         {bipolar && (

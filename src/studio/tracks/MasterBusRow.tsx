@@ -115,7 +115,7 @@ export function MasterBusRow({ limiterThreshold, onLimiterThresholdChange, onOpe
           <Sliders size={11} />
           FX
           {masterEffects.length > 0 && (
-            <span className="flex h-3 w-3 items-center justify-center rounded-full bg-accent text-[7px] font-bold text-black">
+            <span className="flex h-3 w-3 items-center justify-center rounded-full bg-accent text-[7px] font-bold text-on-accent">
               {masterEffects.length}
             </span>
           )}

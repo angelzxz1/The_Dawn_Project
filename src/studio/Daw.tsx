@@ -57,6 +57,7 @@ import { CommandPalette } from "@/studio/shell/CommandPalette";
 import { PreferencesWindow } from "@/studio/dialogs/PreferencesWindow";
 import { onOpenPreferences, openPreferences, type PrefsTab } from "@/studio/dialogs/preferences";
 import { getStudioPrefs, useStudioPrefs } from "@/state/studioPrefs";
+import { useStudioTheme, useUiScale } from "@/studio/shell/theme";
 import { ShortcutSheet } from "@/studio/shell/ShortcutSheet";
 import { trackActions } from "@/state/trackActions";
 import { effectActions } from "@/state/effectActions";
@@ -2073,6 +2074,8 @@ export function Daw() {
   const [prefsTab, setPrefsTab] = useState<PrefsTab | null>(null);
   useEffect(() => onOpenPreferences(setPrefsTab), []);
   const [studioPrefs] = useStudioPrefs();
+  useStudioTheme(studioPrefs.theme);
+  useUiScale(studioPrefs.uiScale);
   // Autosave: a project in a folder saves itself there while it has
   // unsaved changes (Preferences > Projects). Never while recording.
   const autosaveRef = useRef<() => void>(() => {});

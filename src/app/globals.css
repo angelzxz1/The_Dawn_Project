@@ -1,6 +1,11 @@
 @import "tailwindcss";
 
-:root {
+/* The studio's colors, by role. Dark is the default; Preferences >
+ * Appearance switches the studio to light (html[data-theme="light"]).
+ * Effect and instrument windows and rack cards keep their dark device
+ * look in either (.device-skin, below). */
+:root,
+.device-skin {
   --background: #131316;
   --surface: #1b1b20;
   --surface-raised: #232329;
@@ -14,6 +19,64 @@
   --soft: #b4b4bc;
   --border-strong: #3d3d45;
   --glow: #1f2a36;
+  /* Notes, warnings and switches that are on. */
+  --warn: #e6ad5e;
+  /* A switch that's off, and its knob. */
+  --switch-off: #2e2f37;
+  --switch-knob: #f4ede2;
+  /* Section markers and tempo changes, on their lanes. */
+  --marker: #b79be6;
+  --marker-text: #d5c6f2;
+  --tempo: #7fb4e6;
+  --tempo-text: #a9cdee;
+  /* The loop brace when it's off, and text on it and on --warn. */
+  --loop-off: #6b6c78;
+  --on-loop-off: #e6e6ec;
+  --on-warn: #1a1408;
+  /* Text on an accent-colored button. */
+  --on-accent: #0a0a0a;
+  /* Shaded rows (the piano roll's black keys) and the lines between rows. */
+  --row-shade: rgba(0, 0, 0, 0.22);
+  --row-line: rgba(0, 0, 0, 0.2);
+  /* The piano roll's overview of the whole clip. */
+  --overview-bg: rgba(0, 0, 0, 0.4);
+  --overview-line: rgba(255, 255, 255, 0.1);
+}
+
+.device-skin {
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  --background: #eef0f3;
+  --surface: #ffffff;
+  --surface-raised: #f3f4f7;
+  --border: #d5d8de;
+  --foreground: #1c1d22;
+  --muted: #676a75;
+  --accent: #1f74d6;
+  --accent-strong: #1560b8;
+  --record: #d92f2f;
+  --success: #16924a;
+  --soft: #3f424b;
+  --border-strong: #bfc3cb;
+  --glow: #e2ecf8;
+  --warn: #b26a12;
+  --switch-off: #c9ccd3;
+  --switch-knob: #ffffff;
+  --marker: #7b55c7;
+  --marker-text: #5a3a9e;
+  --tempo: #2f74b8;
+  --tempo-text: #1f5791;
+  --loop-off: #9a9ca6;
+  --on-loop-off: #ffffff;
+  --on-warn: #ffffff;
+  --on-accent: #ffffff;
+  --row-shade: rgba(20, 30, 50, 0.06);
+  --row-line: rgba(20, 30, 50, 0.08);
+  --overview-bg: rgba(20, 30, 50, 0.06);
+  --overview-line: rgba(20, 30, 50, 0.12);
+  color-scheme: light;
 }
 
 /* The website (landing, features, FAQ...): the same tokens, retuned to the
@@ -55,6 +118,12 @@
   --color-border-strong: var(--border-strong);
   --color-glow: var(--glow);
   --color-accent-strong: var(--accent-strong);
+  --color-warn: var(--warn);
+  --color-on-accent: var(--on-accent);
+  --color-marker: var(--marker);
+  --color-marker-text: var(--marker-text);
+  --color-tempo: var(--tempo);
+  --color-tempo-text: var(--tempo-text);
   --font-display: var(--font-fraunces), Georgia, serif;
   --font-code: var(--font-jetbrains), var(--font-geist-mono), monospace;
   --font-sans: var(--font-geist-sans);
@@ -62,6 +131,11 @@
 }
 
 html {
+  color-scheme: dark;
+}
+
+/* The website keeps its own dark palette (.site), whatever the studio's. */
+html:has(.site) {
   color-scheme: dark;
 }
 
