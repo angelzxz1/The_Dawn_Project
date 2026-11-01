@@ -75,6 +75,9 @@ interface FxRackProps {
   outputOptions?: { value: string; label: string }[];
   outputValue?: string;
   onOutputChange?: (value: string) => void;
+  /** Folded away to its title bar (the project's layout keeps it). */
+  collapsed?: boolean;
+  onCollapsedChange?: (collapsed: boolean) => void;
 }
 
 const REORDER_DRAG_MIME = "application/x-dawn-effect-reorder";
@@ -167,9 +170,10 @@ export function FxRack({
   outputOptions,
   outputValue = "",
   onOutputChange,
+  collapsed = false,
+  onCollapsedChange,
 }: FxRackProps) {
   const [dragOverGap, setDragOverGap] = useState<number | null>(null);
-  const [collapsed, setCollapsed] = useState(false);
   /** The effect whose right-click menu is open, and where. */
   const [menu, setMenu] = useState<{ effectId: string; x: number; y: number } | null>(null);
   const isBus = channelType === undefined;
@@ -192,7 +196,7 @@ export function FxRack({
       <div className="flex items-center border-b border-border bg-surface-raised">
         <button
           type="button"
-          onClick={() => setCollapsed((v) => !v)}
+          onClick={() => onCollapsedChange?.(!collapsed)}
           title={collapsed ? "Expand the FX rack" : "Collapse the FX rack"}
           className="flex min-w-0 flex-1 items-center gap-2 px-3 py-1.5 text-left"
         >

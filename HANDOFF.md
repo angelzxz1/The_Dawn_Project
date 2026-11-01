@@ -530,9 +530,17 @@ Temporary, never committed:
     reads would all need fixing for, so a browser uses its own zoom
     (Preferences says how). Several effect windows have no
     `role="dialog"`, for the accessibility pass (37).
-  - Items 10–15, 17, 23 and 25–27 are open; 12 and 25 are partly there.
-    Next in `nextSteps.md` is Phase 5, step 17 (25, remember the layout
-    per project).
+  - Item 25 (2026-11-01): a project keeps its layout (`SerializedProject.layout`,
+    `ProjectLayout`: the zoom, the scroll across and down, the selected
+    track or the open bus or master rack, the rack folded, the automation
+    lane), and opens with it; a template or an older project opens with
+    the standard one. The layout is read when saving (`useProjectFiles`'s
+    `LayoutSource`), so changing it isn't an unsaved change, but it
+    autosaves the working copy a moment later. The FX rack's fold moved
+    from FxRack to the studio. A resizable rack was tried and dropped: its
+    cards are a fixed height, so a taller rack was empty space.
+  - Items 10–15, 17, 23, 26 and 27 are open; 12 is partly there. Next in
+    `nextSteps.md` is Phase 6, step 18 (11, better meters).
   - Fixed 2026-10-31: on Windows, Next's static export wrote each page's
     prefetch files as folders (`__next.!KHNpdGUp/__PAGE__.txt`, from a
     backslash it doesn't turn into a dot) where its router asks for
@@ -573,7 +581,8 @@ Temporary, never committed:
   Phase 4 (steps 12-14: Part 2 #19, menus and tooltips; #18, the command
   palette and cheat sheet; #20, previews, favorites and recent items) was
   done on 2026-10-31. Phase 5 has begun: step 15 (#28, Preferences) was
-  done on 2026-11-01, and step 16 (#24, the light theme and UI size) too;
-  next is step 17 (#25). Phase 1 (housekeeping) was done on 2026-10-30: the slow tests got longer limits, a flaky ClipBlock
+  done on 2026-11-01, and steps 16 (#24, the light theme and UI size) and
+  17 (#25, the layout per project) too, so Phase 5 is done; next is Phase
+  6, step 18 (#11). Phase 1 (housekeeping) was done on 2026-10-30: the slow tests got longer limits, a flaky ClipBlock
   double-click test clicks twice in one go, and the JS multiband kernels
   read the band count and their key per sample, as the Rust ports do.

@@ -138,6 +138,22 @@ export class Studio {
 
   /** The clips in the autosaved working copy (on the tracks' lanes, or in
    * a take with `lane`), each with whether its audio was saved with it. */
+  /** The layout kept with the browser's working copy (ProjectLayout). */
+  autosavedLayout(): Promise<Record<string, unknown> | null> {
+    return this.page.evaluate(
+      () =>
+        new Promise<Record<string, unknown> | null>((resolve, reject) => {
+          const open = indexedDB.open("dawn-project-db");
+          open.onerror = () => reject(open.error);
+          open.onsuccess = () => {
+            const meta = open.result.transaction("meta").objectStore("meta").get("current");
+            meta.onsuccess = () => resolve((meta.result as { layout?: Record<string, unknown> } | undefined)?.layout ?? null);
+            meta.onerror = () => reject(meta.error);
+          };
+        })
+    );
+  }
+
   autosavedClips(): Promise<SavedClip[]> {
     return this.page.evaluate(
       () =>

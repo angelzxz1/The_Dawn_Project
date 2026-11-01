@@ -28,6 +28,7 @@ import type {
   AudioWarp,
   AutomationLane,
   AutomationPoint,
+  AutomationTarget,
   BusConfig,
   ChannelConfig,
   InstrumentType,
@@ -115,6 +116,54 @@ export interface SerializedProject {
   loop: ArrangementLoop;
   /** Audio tracks monitoring their input (ids). */
   monitoredTracks: string[];
+  /** How the studio was laid out when it was saved; none in a template or
+   * an older project, which open with the standard layout. */
+  layout?: ProjectLayout;
+}
+
+/** The studio's layout for a project (no undo; not an unsaved change). */
+export interface ProjectLayout {
+  /** The arrangement's zoom (px a second), the second at the left of the
+   * view, and how far down it's scrolled (px). */
+  pxPerSecond: number;
+  scrollSeconds: number;
+  scrollTop: number;
+  /** The selected track, whose FX rack shows - unless a bus's (`fxBus`) or
+   * the master's is open instead. */
+  selectedTrack: string | null;
+  fxBus: string | null;
+  fxMaster: boolean;
+  /** The FX rack folded away. */
+  rackCollapsed: boolean;
+  /** The automation lane showing, on which track and for what. */
+  automation: { track: string; target: AutomationTarget } | null;
+}
+
+/** A saved layout, checked: what refers to a track, bus or effect that
+ * isn't there is left out. */
+function normalizeLayout(raw: unknown, channels: ChannelConfig[], busIds: Set<string>, effectsOf: (track: string) => EffectInstance[]): ProjectLayout | undefined {
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const r = raw as Raw;
+  const track = (v: unknown) => (typeof v === "string" && channels.some((c) => c.id === v) ? v : null);
+  const a = obj(r.automation);
+  const t = obj(a.target);
+  const lane = track(a.track);
+  const target: AutomationTarget | null =
+    t.kind === "volume" || t.kind === "pan"
+      ? { kind: t.kind }
+      : t.kind === "effect" && lane && typeof t.effectId === "string" && typeof t.paramKey === "string" && effectsOf(lane).some((fx) => fx.id === t.effectId)
+        ? { kind: "effect", effectId: t.effectId, paramKey: t.paramKey }
+        : null;
+  return {
+    pxPerSecond: num(r.pxPerSecond, 70, 1, 1000),
+    scrollSeconds: num(r.scrollSeconds, 0, 0),
+    scrollTop: num(r.scrollTop, 0, 0),
+    selectedTrack: track(r.selectedTrack),
+    fxBus: typeof r.fxBus === "string" && busIds.has(r.fxBus) ? r.fxBus : null,
+    fxMaster: bool(r.fxMaster, false),
+    rackCollapsed: bool(r.rackCollapsed, false),
+    automation: lane && target ? { track: lane, target } : null,
+  };
 }
 
 // --- primitives ---
@@ -553,5 +602,8 @@ export function normalizeProject(raw: unknown): SerializedProject | null {
     monitoredTracks: [...new Set(arr(r.monitoredTracks).filter((id): id is string => typeof id === "string"))].filter((id) =>
       channels.some((c) => c.id === id && c.type === "audio")
     ),
+    ...withLayout(normalizeLayout(r.layout, channels, busIds, (id) => channelEffects[id] ?? [])),
   };
 }
+
+const withLayout = (layout: ProjectLayout | undefined) => (layout ? { layout } : {});

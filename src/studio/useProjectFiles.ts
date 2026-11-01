@@ -28,7 +28,7 @@ import {
   type RecentProject,
 } from "@/project/projectFiles";
 import { startFreshKeepingBackup } from "@/project/projectRecovery";
-import type { SerializedProject } from "@/project/projectSchema";
+import type { ProjectLayout, SerializedProject } from "@/project/projectSchema";
 import { track } from "@/services/telemetry";
 import { autosaveBlobs, documentToSave, openInStore, serializeProject, type SessionSettings } from "@/state/projectDocument";
 import { projectStore, useProjectDoc } from "@/state/projectStore";
@@ -47,13 +47,23 @@ export interface ProjectFilesEvents {
   started: (info: { firstVisit: boolean; newVersion: boolean }) => void;
 }
 
-export function useProjectFiles(session: SessionSettings, events: ProjectFilesEvents) {
+/** The studio's layout, saved with the project but not a change to it:
+ * `get` reads it as it is now, and `version` changes when it does (which
+ * autosaves the working copy, without making the project unsaved). */
+export interface LayoutSource {
+  get: () => ProjectLayout;
+  version: string;
+}
+
+export function useProjectFiles(session: SessionSettings, events: ProjectFilesEvents, layout?: LayoutSource) {
   const doc = useProjectDoc();
   const { masterLimiterThreshold, scaleSetting, snapResolution, countInBars, metronomeEnabled, midiOverdub, loop, monitoredTracks } = session;
 
   const eventsRef = useRef(events);
+  const layoutRef = useRef(layout);
   useEffect(() => {
     eventsRef.current = events;
+    layoutRef.current = layout;
   });
 
   const loadedRef = useRef(false);
@@ -78,8 +88,12 @@ export function useProjectFiles(session: SessionSettings, events: ProjectFilesEv
   /** The project as saved. A new function exactly when the song changes,
    * which is what tells unsaved changes and autosave something changed. */
   const buildProject = useCallback(
-    (): SerializedProject =>
-      serializeProject(doc, { masterLimiterThreshold, scaleSetting, snapResolution, countInBars, metronomeEnabled, midiOverdub, loop, monitoredTracks }),
+    (): SerializedProject => {
+      const project = serializeProject(doc, { masterLimiterThreshold, scaleSetting, snapResolution, countInBars, metronomeEnabled, midiOverdub, loop, monitoredTracks });
+      // The layout as it is when saved; changing it isn't an unsaved change.
+      const view = layoutRef.current?.get();
+      return view ? { ...project, layout: view } : project;
+    },
     [doc, masterLimiterThreshold, scaleSetting, snapResolution, countInBars, metronomeEnabled, midiOverdub, loop, monitoredTracks]
   );
 
@@ -352,12 +366,14 @@ export function useProjectFiles(session: SessionSettings, events: ProjectFilesEv
   ]);
 
   // Autosave a moment after the project settles, not on every keystroke
-  // or drag frame.
+  // or drag frame - and after the layout does (zooming, scrolling, opening
+  // another rack), so the working copy opens as it was left.
+  const layoutVersion = layout?.version ?? "";
   useEffect(() => {
     if (!loadedRef.current) return;
     const timer = setTimeout(() => void persistNow(), 1200);
     return () => clearTimeout(timer);
-  }, [persistNow]);
+  }, [persistNow, layoutVersion]);
 
   return {
     isLoading,

@@ -167,12 +167,17 @@ describe("the effect cards", () => {
     expect(onAddEffect).not.toHaveBeenCalled();
   });
 
-  test("the rack folds away and back", async () => {
-    const { screen } = renderRack({ effects: [effect("a", "reverb")] });
+  test("the rack asks to fold away and back, and shows only its title bar folded", async () => {
+    const onCollapsedChange = vi.fn();
+    const { screen } = renderRack({ effects: [effect("a", "reverb")], onCollapsedChange });
     await screen.getByTitle("Collapse the FX rack").click();
+    expect(onCollapsedChange).toHaveBeenCalledWith(true);
+    screen.rerender(
+      <FxRack channelName="Lead" channelType="midi" color={TRACK_COLOR_PALETTE[0]} instrument="synth" effects={[effect("a", "reverb")]} bpm={120} onAddEffect={vi.fn()} onRemoveEffect={vi.fn()} onMoveEffect={vi.fn()} onBypassToggle={vi.fn()} onParamChange={vi.fn()} collapsed onCollapsedChange={onCollapsedChange} />
+    );
     await expect.element(screen.getByTitle("Remove effect")).not.toBeInTheDocument();
     await screen.getByTitle("Expand the FX rack").click();
-    await expect.element(screen.getByTitle("Remove effect")).toBeVisible();
+    expect(onCollapsedChange).toHaveBeenLastCalledWith(false);
   });
 });
 

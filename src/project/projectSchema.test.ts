@@ -476,3 +476,36 @@ describe("an audio track's input device", () => {
     expect(p?.channels.map((c) => c.inputDevice)).toEqual(["usb-1", undefined, undefined]);
   });
 });
+
+describe("the layout", () => {
+  const channels = [
+    { id: "a", name: "Gtr", type: "audio" },
+    { id: "b", name: "Vox", type: "audio" },
+  ];
+  const channelEffects = { a: [{ id: "fx-1", type: "reverb", params: {} }] };
+
+  it("is kept, with what it refers to", () => {
+    const layout = {
+      pxPerSecond: 140,
+      scrollSeconds: 12.5,
+      scrollTop: 80,
+      selectedTrack: "b",
+      fxBus: "bus-1",
+      fxMaster: false,
+      rackCollapsed: true,
+      automation: { track: "a", target: { kind: "effect", effectId: "fx-1", paramKey: "wet" } },
+    };
+    const p = normalizeProject({ channels, channelEffects, buses: [{ id: "bus-1", name: "Verb" }], layout });
+    expect(p?.layout).toEqual(layout);
+  });
+
+  it("drops what points nowhere and keeps numbers in range; none is the standard layout", () => {
+    const p = normalizeProject({
+      channels,
+      channelEffects,
+      layout: { pxPerSecond: "far", scrollTop: -5, selectedTrack: "gone", fxBus: "gone", automation: { track: "b", target: { kind: "effect", effectId: "fx-1", paramKey: "wet" } } },
+    });
+    expect(p?.layout).toMatchObject({ pxPerSecond: 70, scrollTop: 0, selectedTrack: null, fxBus: null, automation: null });
+    expect(normalizeProject({ channels })?.layout).toBeUndefined();
+  });
+});

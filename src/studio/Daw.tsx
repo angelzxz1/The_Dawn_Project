@@ -110,7 +110,7 @@ import { AboutWindow, type AboutTab } from "@/studio/dialogs/AboutWindow";
 import { TelemetrySwitch } from "@/studio/dialogs/TelemetrySwitch";
 import { startTelemetry, track, trackAppOpened, trackOnce } from "@/services/telemetry";
 import { isBrave, recentProjects, supportsFolders } from "@/project/projectFiles";
-import { type SerializedProject } from "@/project/projectSchema";
+import { type ProjectLayout, type SerializedProject } from "@/project/projectSchema";
 import type { BounceParams } from "@/export/bounce";
 import { ExportDialog } from "@/studio/dialogs/ExportDialog";
 import { GrooveBrowser, type BrowserSample } from "@/studio/rack/GrooveBrowser";
@@ -218,6 +218,8 @@ export function Daw() {
     () => channels[0]?.id ?? null
   );
   const [fxBusId, setFxBusId] = useState<string | null>(null);
+  /** The FX rack folded away to its title bar. */
+  const [rackCollapsed, setRackCollapsed] = useState(false);
   /** Whether the FX rack at the bottom of the screen is currently showing
    * the master bus's own effects chain instead of a track's or a bus's. */
   const [fxMasterOpen, setFxMasterOpen] = useState(false);
@@ -540,11 +542,25 @@ export function Daw() {
   const rulerViewportRef = useRef<HTMLDivElement>(null);
   const lanesScrollRef = useRef<HTMLDivElement>(null);
 
-  const handleLanesScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    if (rulerViewportRef.current) {
-      rulerViewportRef.current.scrollLeft = e.currentTarget.scrollLeft;
-    }
+  /** Bumped a moment after the arrangement stops scrolling: the project's
+   * layout changed (see layoutSource). */
+  const [scrollTick, setScrollTick] = useState(0);
+  const scrollTimer = useRef<number | undefined>(undefined);
+  const noteScrolled = useCallback(() => {
+    window.clearTimeout(scrollTimer.current);
+    scrollTimer.current = window.setTimeout(() => setScrollTick((n) => n + 1), 600);
   }, []);
+  useEffect(() => () => window.clearTimeout(scrollTimer.current), []);
+
+  const handleLanesScroll = useCallback(
+    (e: React.UIEvent<HTMLDivElement>) => {
+      if (rulerViewportRef.current) {
+        rulerViewportRef.current.scrollLeft = e.currentTarget.scrollLeft;
+      }
+      noteScrolled();
+    },
+    [noteScrolled]
+  );
 
   // --- Zoom (zoom.ts) ---
   /** The arrangement (its vertical scroller): where the wheel and a pinch
@@ -1967,6 +1983,8 @@ export function Daw() {
 
   /** A project was opened: its session settings, a fresh view, and the
    * engine rebuilt from it. */
+  /** Where the arrangement scrolls to once an opened project is drawn. */
+  const restoreViewRef = useRef<{ scrollLeft: number; scrollTop: number } | null>(null);
   const applyOpened = useCallback((project: SerializedProject, state: ProjectState) => {
     setMasterLimiterThreshold(project.masterLimiterThreshold);
     setScaleSetting(project.scaleSetting);
@@ -1981,12 +1999,57 @@ export function Daw() {
     setRenamingClip(null);
     setEditingClip(null);
     setExpandedEffectId(null);
-    setFxBusId(null);
-    setFxMasterOpen(false);
-    setFxChannelId(state.channels[0]?.id ?? null);
-    if (state.channels[0]) setSelectedChannelId(state.channels[0].id);
+    // As the project was laid out when saved (a template, or a project from
+    // before layouts were kept, opens with the standard one).
+    const layout = project.layout;
+    const track = layout?.selectedTrack ?? state.channels[0]?.id ?? null;
+    setFxBusId(layout?.fxBus ?? null);
+    setFxMasterOpen(layout?.fxMaster ?? false);
+    setFxChannelId(track);
+    if (track) setSelectedChannelId(track);
+    setRackCollapsed(layout?.rackCollapsed ?? false);
+    setAutomationChannelId(layout?.automation?.track ?? null);
+    setAutomationTarget(layout?.automation?.target ?? { kind: "volume" });
+    const px = clampZoom(layout?.pxPerSecond ?? DEFAULT_PX_PER_SECOND);
+    zoomRef.current = px;
+    setPxPerSecond(px);
+    restoreViewRef.current = { scrollLeft: (layout?.scrollSeconds ?? 0) * px, scrollTop: layout?.scrollTop ?? 0 };
     hydrateEngine(state, registeredChannelIds.current, audioEngine);
   }, [restoreMonitoring]);
+
+  useEffect(() => {
+    const view = restoreViewRef.current;
+    if (!view) return;
+    restoreViewRef.current = null;
+    // After the lanes have their new width.
+    const frame = requestAnimationFrame(() => {
+      if (lanesScrollRef.current) lanesScrollRef.current.scrollLeft = view.scrollLeft;
+      if (arrangementRef.current) arrangementRef.current.scrollTop = view.scrollTop;
+    });
+    return () => cancelAnimationFrame(frame);
+  });
+
+  /** The studio's layout, saved with the project (projectSchema.ts
+   * ProjectLayout): read as it is when saving; `version` changes with it. */
+  const layoutStateRef = useRef({ selectedChannelId, fxChannelId, fxBusId, fxMasterOpen, rackCollapsed, automationChannelId, automationTarget });
+  useEffect(() => {
+    layoutStateRef.current = { selectedChannelId, fxChannelId, fxBusId, fxMasterOpen, rackCollapsed, automationChannelId, automationTarget };
+  });
+  const getLayout = useCallback((): ProjectLayout => {
+    const st = layoutStateRef.current;
+    const px = zoomRef.current;
+    return {
+      pxPerSecond: px,
+      scrollSeconds: (lanesScrollRef.current?.scrollLeft ?? 0) / px,
+      scrollTop: arrangementRef.current?.scrollTop ?? 0,
+      selectedTrack: st.fxChannelId ?? st.selectedChannelId,
+      fxBus: st.fxBusId,
+      fxMaster: st.fxMasterOpen,
+      rackCollapsed: st.rackCollapsed,
+      automation: st.automationChannelId ? { track: st.automationChannelId, target: st.automationTarget } : null,
+    };
+  }, []);
+  const layoutVersion = JSON.stringify([pxPerSecond, fxChannelId, fxBusId, fxMasterOpen, rackCollapsed, automationChannelId, automationTarget, scrollTick]);
   const {
     isLoading: isLoadingProject,
     saveStatus,
@@ -2023,7 +2086,8 @@ export function Daw() {
         }
         if (newVersion) setAboutTab("news");
       },
-    }
+    },
+    { get: getLayout, version: layoutVersion }
   );
   useEffect(() => {
     noticeRef.current = flashProjectNotice;
@@ -2565,7 +2629,7 @@ export function Daw() {
         </div>
       </div>
 
-      <div ref={arrangementRef} className="flex min-h-0 flex-1 flex-col overflow-y-auto rounded-lg border border-border">
+      <div ref={arrangementRef} onScroll={noteScrolled} className="flex min-h-0 flex-1 flex-col overflow-y-auto rounded-lg border border-border">
         {/* Sticky ruler row - a direct child of the vertical scroller (not
             nested inside the horizontally-scrolling lanes column), so
             position: sticky actually has that scroller as its containing
@@ -2998,6 +3062,8 @@ export function Daw() {
           outputOptions={fxChannel ? outputOptionsFor(fxChannel) : undefined}
           outputValue={fxChannel?.output ?? ""}
           onOutputChange={fxChannel ? (value) => handleSetOutput(fxChannel.id, value || null) : undefined}
+          collapsed={rackCollapsed}
+          onCollapsedChange={setRackCollapsed}
         />
       )}
 
