@@ -2,6 +2,7 @@
 // made of, and where they can be tapped.
 
 import * as Tone from "tone";
+import type { LevelMeter } from "./levelMeter";
 import type { AudioWarp, NoteEvent, InstrumentType, ChannelType } from "../project/types";
 import { type Instrument } from "../instruments/instrument";
 import { type EffectType } from "../effects/registry";
@@ -57,7 +58,7 @@ export interface ChannelNodes extends EffectsHost {
    * feeds `pdc`. */
   taps: SidechainTaps;
   head: Tone.Gain;
-  meter: Tone.Meter;
+  meter: LevelMeter;
   /** Fixed for the channel's lifetime - decides whether the instrument or
    * the audio player feeds the effects chain. */
   channelType: ChannelType;
@@ -113,7 +114,7 @@ export interface BusNodes extends EffectsHost {
   taps: SidechainTaps;
   head: Tone.Gain;
   channel: Tone.Channel;
-  meter: Tone.Meter;
+  meter: LevelMeter;
   /** Delay compensation, between the effects chain and the strip. */
   pdc: Tone.Delay;
 }

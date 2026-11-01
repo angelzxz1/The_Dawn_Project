@@ -1,7 +1,8 @@
 // WAV files for the tests: a tone to import, and reading what was exported.
 
-/** A mono 16-bit WAV of a sine tone. */
-export function toneWav(seconds = 1, frequency = 440, sampleRate = 48000): Buffer {
+/** A mono 16-bit WAV of a sine tone, peaking at `dbfs`. */
+export function toneWav(seconds = 1, frequency = 440, sampleRate = 48000, dbfs = 20 * Math.log10(8000 / 32767)): Buffer {
+  const amplitude = Math.pow(10, dbfs / 20) * 32767;
   const frames = Math.round(seconds * sampleRate);
   const buffer = Buffer.alloc(44 + frames * 2);
   buffer.write("RIFF", 0);
@@ -16,7 +17,7 @@ export function toneWav(seconds = 1, frequency = 440, sampleRate = 48000): Buffe
   buffer.writeUInt16LE(16, 34);
   buffer.write("data", 36);
   buffer.writeUInt32LE(frames * 2, 40);
-  for (let i = 0; i < frames; i++) buffer.writeInt16LE(Math.round(Math.sin((2 * Math.PI * frequency * i) / sampleRate) * 8000), 44 + i * 2);
+  for (let i = 0; i < frames; i++) buffer.writeInt16LE(Math.round(Math.sin((2 * Math.PI * frequency * i) / sampleRate) * amplitude), 44 + i * 2);
   return buffer;
 }
 

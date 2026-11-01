@@ -163,20 +163,20 @@ test("the meter shows left and right apart: a track panned right shows only on t
   // The drums play from the first bar.
   const drums = studio.header("808 Drums");
   await drums.getByTitle("Solo", { exact: true }).click();
-  const bar = (side: string) => drums.locator(`[title="${side}"] > div`).first();
-  const level = async (side: string) => 1 - parseFloat((await bar(side).evaluate((el) => (el as HTMLElement).style.clipPath)).slice("inset(".length)) / 100;
-  /** The highest each of the drums' meter bars reaches over 2 s of playing,
-   * from silence. */
+  // Each side's level in dB (-60: silence), as its meter says.
+  const level = async (side: string) => Number(await drums.getByRole("meter", { name: `${side} level` }).getAttribute("aria-valuenow"));
+  /** The highest each of the drums' meter sides reaches over 2 s of
+   * playing, from silence (dB). */
   const peaks = async () => {
-    await expect.poll(async () => (await level("Left")) + (await level("Right"))).toBe(0);
+    await expect.poll(async () => Math.max(await level("Left"), await level("Right"))).toBe(-60);
     await page.evaluate(() => {
       const w = window as unknown as { __peaks: Record<string, number>; __raf: number };
-      w.__peaks = { Left: 0, Right: 0 };
+      w.__peaks = { Left: -60, Right: -60 };
       const header = document.querySelector('[aria-label="Track 808 Drums"]')!;
       const tick = () => {
         for (const side of ["Left", "Right"]) {
-          const fill = header.querySelector<HTMLElement>(`[title="${side}"] > div`)!;
-          w.__peaks[side] = Math.max(w.__peaks[side], 1 - parseFloat(fill.style.clipPath.slice("inset(".length)) / 100);
+          const meter = header.querySelector<HTMLElement>(`[role="meter"][aria-label="${side} level"]`)!;
+          w.__peaks[side] = Math.max(w.__peaks[side], Number(meter.getAttribute("aria-valuenow")));
         }
         w.__raf = requestAnimationFrame(tick);
       };
@@ -200,11 +200,11 @@ test("the meter shows left and right apart: a track panned right shows only on t
 
   await pan("-1");
   const left = await peaks();
-  expect(left.Left).toBeGreaterThan(0.005);
-  expect(left.Right).toBeLessThan(0.001);
+  expect(left.Left).toBeGreaterThan(-40);
+  expect(left.Right).toBe(-60);
 
   await pan("1");
   const right = await peaks();
-  expect(right.Right).toBeGreaterThan(0.005);
-  expect(right.Left).toBeLessThan(0.001);
+  expect(right.Right).toBeGreaterThan(-40);
+  expect(right.Left).toBe(-60);
 });

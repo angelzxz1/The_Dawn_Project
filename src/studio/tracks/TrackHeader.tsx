@@ -517,7 +517,7 @@ export const TrackHeader = memo(function TrackHeader({
           />
         </div>
         <div className="h-[26px]">
-          <Meter channelId={isMaster ? "master" : channel.id} />
+          <Meter source={isMaster ? "master" : channel.id} />
         </div>
       </div>
       )}

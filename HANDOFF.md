@@ -539,8 +539,26 @@ Temporary, never committed:
     autosaves the working copy a moment later. The FX rack's fold moved
     from FxRack to the studio. A resizable rack was tried and dropped: its
     cards are a fixed height, so a taller rack was empty space.
-  - Items 10–15, 17, 23, 26 and 27 are open; 12 is partly there. Next in
-    `nextSteps.md` is Phase 6, step 18 (11, better meters).
+  - Item 11 (2026-11-01): the meters show dB (-60 to +6,
+    `tracks/meterScale.ts`), each side's RMS with its peaks over it, the
+    loudest peak held 1.5 s, and a clip light that stays on until it's
+    clicked (`tracks/Meter.tsx`, on tracks, buses and the master). The
+    engine's `LevelMeter` (`engine/levelMeter.ts`) replaced Tone's Meter,
+    which gave a smoothed level on a linear scale: it reads each side's
+    sample peak and RMS over 1024 samples (`getMeter`, `getBusMeter`,
+    `getMasterMeter`). The master's loudness (`engine/loudness.ts`, an
+    AudioWorklet running `loudnessKernel.ts`: BS.1770-4 K-weighting and
+    EBU R128 gating) gives momentary, short-term and integrated LUFS and
+    the loudest sample, shown in the master row (`LoudnessReadout`); it
+    starts afresh when playback starts from a stop or a recording starts.
+    The kernel matches BS.1770's coefficients and EBU Tech 3341 cases 1
+    and 3, and `e2e/meters.spec.ts` checks the studio reads a -23 dBFS
+    1 kHz tone as -23 LUFS. In the desktop app with the native engine
+    on, the meters still read the browser's audio, which is silent then:
+    the engine needs to send its levels (with Phase 7 or 8).
+  - Items 10, 12–15, 17, 23, 26 and 27 are open; 12 is partly there. Next
+    in `nextSteps.md` is Phase 6, step 19 (13, pre/post sends and routing
+    highlights).
   - Fixed 2026-10-31: on Windows, Next's static export wrote each page's
     prefetch files as folders (`__next.!KHNpdGUp/__PAGE__.txt`, from a
     backslash it doesn't turn into a dot) where its router asks for
@@ -582,7 +600,8 @@ Temporary, never committed:
   palette and cheat sheet; #20, previews, favorites and recent items) was
   done on 2026-10-31. Phase 5 has begun: step 15 (#28, Preferences) was
   done on 2026-11-01, and steps 16 (#24, the light theme and UI size) and
-  17 (#25, the layout per project) too, so Phase 5 is done; next is Phase
-  6, step 18 (#11). Phase 1 (housekeeping) was done on 2026-10-30: the slow tests got longer limits, a flaky ClipBlock
+  17 (#25, the layout per project) too, so Phase 5 is done. Phase 6 has
+  begun: step 18 (#11, better meters) was done on 2026-11-01; next is
+  step 19 (#13). Phase 1 (housekeeping) was done on 2026-10-30: the slow tests got longer limits, a flaky ClipBlock
   double-click test clicks twice in one go, and the JS multiband kernels
   read the band count and their key per sample, as the Rust ports do.

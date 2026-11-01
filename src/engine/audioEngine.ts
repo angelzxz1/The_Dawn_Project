@@ -21,6 +21,8 @@ import { chainLatency, detectRoundTrip, nodeLatency, type CompensationPlan } fro
 import { InputRecorder, takeToWav } from "./inputRecorder";
 import type { Waveform } from "./waveform";
 import { installCpuMeter } from "./cpuMeter";
+import { LevelMeter, SILENT_READING, type MeterReading } from "./levelMeter";
+import { LoudnessMeter, type LoudnessReading } from "./loudness";
 import { decodeEffectFileAudio, readEffectFileText } from "../effects/effectFiles";
 import { NamAmpChain } from "../effects/nam-amp/namAmp";
 import { NoiseGate, type GateReading } from "../effects/gate/noiseGate";
@@ -57,23 +59,6 @@ export function bumpEffectIdCounter(atLeast: number): void {
 }
 
 /** A level meter's reading: the left and right channels, 0-1 each. */
-export type StereoLevels = [left: number, right: number];
-
-/** A meter reading the left and right channels apart. Tone's default
- * meter reads one channel, and its splitter keeps channel 0 - the left
- * alone - so a track panned right, or the right side of anything wide,
- * didn't show. Everything metered is stereo by then (after a channel
- * strip, or the master limiter). It passes its input through unchanged. */
-function stereoMeter(): Tone.Meter {
-  return new Tone.Meter({ channelCount: 2, normalRange: true, smoothing: 0.8 });
-}
-
-function levelsOf(meter: Tone.Meter): StereoLevels {
-  const value = meter.getValue();
-  const [left, right] = Array.isArray(value) ? value : [value, value];
-  const level = (v: number | undefined) => (v !== undefined && Number.isFinite(v) ? v : 0);
-  return [level(left), level(right)];
-}
 
 /** A drum hit in a preview: its pad, when (s from the start) and how hard. */
 export interface PreviewHit {
@@ -252,6 +237,7 @@ class AudioEngine {
         // Browsers' own nodes hide some delay; measure it for compensation.
         void measureNativeLatencies(Tone.getContext().sampleRate).then(() => this.refreshMix());
         void installCpuMeter();
+        void this.loudness.listen(this.ensureMaster().meter).catch((error) => noteIssue("loudness.load", error, { report: false }));
       });
     }
     await this.startPromise;
@@ -267,15 +253,17 @@ class AudioEngine {
   // downstream can clip no matter how hot the mix gets. ---
   private masterChannel: Tone.Channel | null = null;
   private masterLimiter: LookaheadLimiter | null = null;
-  private masterMeter: Tone.Meter | null = null;
+  private masterMeter: LevelMeter | null = null;
+  /** The master's loudness (LUFS), on what reaches the speakers. */
+  private readonly loudness = new LoudnessMeter();
   /** The master bus's own effects chain (e.g. a final EQ or compressor
    * across the whole mix) - sits between the master channel and the
    * limiter, wired the same way a track's or bus's chain is. */
   private masterEffects: EffectNode[] = [];
 
-  private ensureMaster(): { channel: Tone.Channel; limiter: LookaheadLimiter; meter: Tone.Meter } {
+  private ensureMaster(): { channel: Tone.Channel; limiter: LookaheadLimiter; meter: LevelMeter } {
     if (!this.masterChannel || !this.masterLimiter || !this.masterMeter) {
-      this.masterMeter = stereoMeter();
+      this.masterMeter = new LevelMeter();
       this.masterLimiter = new LookaheadLimiter({ ceilingDb: -1 }).connect(this.masterMeter);
       this.masterMeter.toDestination();
       // channelCount: 2 - see the comment on the per-track Channel below;
@@ -540,8 +528,20 @@ class AudioEngine {
   }
 
   /** Current master output level, left and right, 0-1. */
-  getMasterLevels(): StereoLevels {
-    return levelsOf(this.ensureMaster().meter);
+  /** The master's level (what reaches the speakers), for its meter. */
+  getMasterMeter(): MeterReading {
+    return this.ensureMaster().meter.read();
+  }
+
+  /** The master's loudness: momentary, short-term and integrated LUFS,
+   * and its loudest sample, since playback last started from a stop (or
+   * resetLoudness). */
+  getLoudness(): LoudnessReading {
+    return this.loudness.reading;
+  }
+
+  resetLoudness(): void {
+    this.loudness.reset();
   }
 
   addChannel(
@@ -552,7 +552,7 @@ class AudioEngine {
   ): void {
     if (this.channels.has(id)) return;
 
-    const meter = stereoMeter();
+    const meter = new LevelMeter();
     // channelCount: 2 - Tone.Channel's Panner defaults to channelCount 1
     // with channelCountMode "explicit", which per the Web Audio spec means
     // *any* input, stereo included, gets downmixed to mono before panning.
@@ -1153,7 +1153,7 @@ class AudioEngine {
   addBus(id: string): void {
     if (this.buses.has(id)) return;
     const input = new Tone.Gain(1);
-    const meter = stereoMeter();
+    const meter = new LevelMeter();
     const channel = new Tone.Channel({ volume: 0, pan: 0, channelCount: 2 }) // see addChannel's comment
       .connect(meter)
       .connect(this.ensureMaster().channel);
@@ -1199,9 +1199,8 @@ class AudioEngine {
     if (bus) bus.channel.pan.value = pan;
   }
 
-  getBusLevels(id: string): StereoLevels {
-    const bus = this.buses.get(id);
-    return bus ? levelsOf(bus.meter) : [0, 0];
+  getBusMeter(id: string): MeterReading {
+    return this.buses.get(id)?.meter.read() ?? SILENT_READING;
   }
 
   /** Sets (or, with `db === null`, removes) a channel's send to a bus, in
@@ -1262,10 +1261,9 @@ class AudioEngine {
     this.refreshMix();
   }
 
-  /** Current output level for the channel's meter, left and right, 0-1. */
-  getLevels(id: string): StereoLevels {
-    const nodes = this.channels.get(id);
-    return nodes ? levelsOf(nodes.meter) : [0, 0];
+  /** A track's output level (after its fader), for its meter. */
+  getMeter(id: string): MeterReading {
+    return this.channels.get(id)?.meter.read() ?? SILENT_READING;
   }
 
   /** Live input/gain-reduction/output levels (all in dB) for one compressor
@@ -1556,6 +1554,8 @@ class AudioEngine {
   async startPlayback(): Promise<void> {
     await this.ensureStarted();
     const from = this.transport.seconds;
+    // Played from a stop: the loudness is measured afresh (not after a pause).
+    if (this.transport.state === "stopped") this.loudness.reset();
     this.transport.play();
     this.follower?.play(from);
   }
@@ -1631,6 +1631,7 @@ class AudioEngine {
     await this.ensureStarted();
     if (!this.channels.has(channelId)) return;
     beforeStart?.();
+    this.loudness.reset();
     const startTime = this.transport.startRecording(countInBeats, fromSeconds, loop);
     this.take = { startTime, loop };
     // Going round a loop, the transport jumps back each time: the notes
@@ -1799,6 +1800,7 @@ class AudioEngine {
       return;
     }
     beforeStart?.();
+    this.loudness.reset();
     const startTime = this.transport.startRecording(countInBeats, fromSeconds, loop);
     this.take = { startTime, loop };
     // A track's audio reaches its tap a known time after the beat (its

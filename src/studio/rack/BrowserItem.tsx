@@ -46,7 +46,7 @@ export function PreviewButton({ name, playing, onClick }: { name: string; playin
         onClick();
       }}
       aria-label={`${playing ? "Stop" : "Preview"} ${name}`}
-      title={playing ? "Stop the preview" : "Hear it before adding it"}
+      title={playing ? "End the preview" : "Hear it before adding it"}
       className={`flex h-4 w-4 shrink-0 items-center justify-center rounded hover:text-accent ${playing ? "text-accent" : "text-muted"}`}
     >
       {playing ? <Square size={9} /> : <Play size={9} />}

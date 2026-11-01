@@ -12,10 +12,11 @@ import type { ChannelConfig } from "@/project/types";
 import { FOLDED_ROW_HEIGHT } from "@/studio/timeline/layout";
 
 const engine = vi.hoisted(() => ({ levels: [0, 0] as [number, number], input: null as number | null }));
+const reading = () => ({ peak: engine.levels, rms: engine.levels });
 vi.mock("@/engine/audioEngine", () => ({
   audioEngine: {
-    getLevels: () => engine.levels,
-    getMasterLevels: () => engine.levels,
+    getMeter: () => reading(),
+    getMasterMeter: () => reading(),
     getInputPeak: () => engine.input,
   },
 }));
@@ -175,13 +176,25 @@ describe("a MIDI track", () => {
     expect(actions.importMidi).toHaveBeenCalledWith("bass", expect.objectContaining({ name: "riff.mid" }));
   });
 
-  test("the meter shows the engine's left and right levels", async () => {
+  test("the meter shows the engine's left and right levels, in dB", async () => {
     const { screen } = renderHeader();
     engine.levels = [0.5, 0.25];
-    const level = (side: string) =>
-      screen.getByTitle(side, { exact: true }).element().firstElementChild!.getAttribute("style") ?? "";
-    await expect.poll(() => level("Left")).toContain("inset(50% 0px 0px)");
-    await expect.poll(() => level("Right")).toContain("inset(75% 0px 0px)");
+    const level = (side: string) => Number(screen.getByRole("meter", { name: `${side} level` }).element().getAttribute("aria-valuenow"));
+    await expect.poll(() => level("Left")).toBeCloseTo(-6, 0);
+    await expect.poll(() => level("Right")).toBeCloseTo(-12, 0);
+  });
+
+  test("going over 0 dB lights the clip light until it's clicked", async () => {
+    const { screen } = renderHeader();
+    engine.levels = [1.2, 0.5];
+    await expect.element(screen.getByRole("button", { name: "Clipped - click to reset" })).toBeVisible();
+    engine.levels = [0.5, 0.5];
+    // It stays lit once the level's back down...
+    await new Promise((r) => setTimeout(r, 100));
+    await expect.element(screen.getByRole("button", { name: "Clipped - click to reset" })).toBeVisible();
+    // ...until it's clicked.
+    await screen.getByRole("button", { name: "Clipped - click to reset" }).click();
+    await expect.element(screen.getByRole("button", { name: "Clip light" })).toBeVisible();
   });
 });
 
@@ -260,9 +273,7 @@ describe("other kinds of track", () => {
     await expect.element(screen.getByTitle("Change track color")).not.toBeInTheDocument();
     await expect.element(screen.getByTitle("Mute", { exact: true })).not.toBeInTheDocument();
     engine.levels = [1, 1];
-    await expect
-      .poll(() => screen.getByTitle("Left", { exact: true }).element().firstElementChild!.getAttribute("style"))
-      .toContain("inset(0% 0px 0px)");
+    await expect.poll(() => screen.getByRole("meter", { name: "Left level" }).element().getAttribute("aria-valuenow")).toBe("0");
   });
 });
 

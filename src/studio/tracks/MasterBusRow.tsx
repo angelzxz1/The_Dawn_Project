@@ -6,6 +6,7 @@ import { MASTER_COLOR, trackColorOf } from "@/project/colors";
 import { busActions } from "@/state/busActions";
 import { projectSetter, projectStore, useProjectValue } from "@/state/projectStore";
 import { Meter } from "./Meter";
+import { LoudnessReadout } from "./LoudnessReadout";
 import { ValueBar } from "./ValueBar";
 
 const setMasterName = projectSetter("masterName");
@@ -70,7 +71,7 @@ export function MasterBusRow({ limiterThreshold, onLimiterThresholdChange, onOpe
           </span>
         )}
         <div className="h-8">
-          <Meter channelId="master" />
+          <Meter source="master" />
         </div>
         <ValueBar
           label="Pan"
@@ -120,6 +121,7 @@ export function MasterBusRow({ limiterThreshold, onLimiterThresholdChange, onOpe
             </span>
           )}
         </button>
+        <LoudnessReadout />
       </div>
       <div className="h-8 w-px shrink-0 bg-border" />
       <span
@@ -156,6 +158,9 @@ export function MasterBusRow({ limiterThreshold, onLimiterThresholdChange, onOpe
               className="w-20 bg-transparent text-xs outline-none"
               title="Bus name"
             />
+            <div className="h-5">
+              <Meter source={{ bus: bus.id }} />
+            </div>
             <button
               type="button"
               title="Open bus effects"
