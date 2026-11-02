@@ -40,6 +40,9 @@ pub struct ClipSpec {
 pub struct SendSpec {
     pub bus: String,
     pub db: f64,
+    /// Before the fader (a song from before pre-fader sends has none).
+    #[serde(default)]
+    pub pre: bool,
 }
 
 /// A Drum Rack pad, as `compileDrumKit` makes it.
@@ -562,6 +565,7 @@ pub fn build(
                     bus_index.get(s.bus.as_str()).map(|&bus| Send {
                         bus,
                         gain: db_to_gain(s.db),
+                        pre: s.pre,
                     })
                 })
                 .collect(),

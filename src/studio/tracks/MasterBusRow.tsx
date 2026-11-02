@@ -7,6 +7,7 @@ import { busActions } from "@/state/busActions";
 import { projectSetter, projectStore, useProjectValue } from "@/state/projectStore";
 import { Meter } from "./Meter";
 import { LoudnessReadout } from "./LoudnessReadout";
+import type { RouteHighlight } from "./routeHighlight";
 import { ValueBar } from "./ValueBar";
 
 const setMasterName = projectSetter("masterName");
@@ -21,12 +22,17 @@ interface MasterBusRowProps {
   onOpenMasterFx: () => void;
   onOpenBusFx: (busId: string) => void;
   onRemoveBus: (busId: string) => void;
+  /** While the pointer's on a track or a bus: what of the master and the
+   * buses it reaches. */
+  route?: RouteHighlight | null;
+  /** The pointer came onto a bus (null: left it). */
+  onHoverBus?: (busId: string | null) => void;
 }
 
 /** The master (name, meter, pan, volume, limiter, FX) and the send/return
  * buses, in one row so the tracks keep the room. The buses scroll sideways
  * when there are many. */
-export function MasterBusRow({ limiterThreshold, onLimiterThresholdChange, onOpenMasterFx, onOpenBusFx, onRemoveBus }: MasterBusRowProps) {
+export function MasterBusRow({ limiterThreshold, onLimiterThresholdChange, onOpenMasterFx, onOpenBusFx, onRemoveBus, route = null, onHoverBus }: MasterBusRowProps) {
   const masterName = useProjectValue("masterName");
   const masterVolume = useProjectValue("masterVolume");
   const masterPan = useProjectValue("masterPan");
@@ -39,7 +45,16 @@ export function MasterBusRow({ limiterThreshold, onLimiterThresholdChange, onOpe
 
   return (
     <div className="flex shrink-0 items-center gap-3 rounded-lg border border-border bg-surface px-3 py-1.5">
-      <div className="flex shrink-0 items-center gap-2" title="Master output: every track routes through here before the speakers.">
+      <div
+        className="relative flex shrink-0 items-center gap-2"
+        data-route={route?.master ? "to" : undefined}
+        title="Master output: every track routes through here before the speakers."
+      >
+        {route?.master && (
+          <span className="pointer-events-none absolute -top-2.5 left-0 z-10 rounded bg-accent px-1 text-[8.5px] font-semibold uppercase leading-[12px] tracking-wide text-on-accent">
+            receives
+          </span>
+        )}
         <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: MASTER_COLOR.accent }} />
         {editingMasterName ? (
           <input
@@ -65,7 +80,7 @@ export function MasterBusRow({ limiterThreshold, onLimiterThresholdChange, onOpe
               setMasterNameDraft(masterName);
               setEditingMasterName(true);
             }}
-            className="w-20 shrink-0 truncate text-xs font-medium"
+            className={`w-20 shrink-0 truncate rounded text-xs font-medium ${route?.master ? "px-1 ring-2 ring-accent/80" : ""}`}
           >
             {masterName}
           </span>
@@ -143,11 +158,26 @@ export function MasterBusRow({ limiterThreshold, onLimiterThresholdChange, onOpe
         + Bus
       </button>
       <div ref={busRowRef} className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto py-0.5">
-        {buses.map((bus) => (
+        {buses.map((bus) => {
+          const sent = route?.buses.get(bus.id);
+          return (
           <div
             key={bus.id}
-            className="flex shrink-0 items-center gap-1 rounded border border-border bg-surface-raised px-1.5 py-1"
+            role="group"
+            aria-label={`Bus ${bus.name}`}
+            data-route={sent ? "to" : undefined}
+            onPointerEnter={() => onHoverBus?.(bus.id)}
+            onPointerLeave={() => onHoverBus?.(null)}
+            className={`relative flex shrink-0 items-center gap-1 rounded border bg-surface-raised px-1.5 py-1 ${sent ? "border-accent ring-1 ring-accent/60" : "border-border"}`}
           >
+            {sent && (
+              <span
+                title={sent.pre ? "Sent before the track's fader" : "Sent after the track's fader"}
+                className="rounded bg-accent px-1 text-[8.5px] font-semibold uppercase leading-[12px] tracking-wide text-on-accent"
+              >
+                {sent.pre ? "pre" : "post"}
+              </span>
+            )}
             <span
               className="h-2 w-2 shrink-0 rounded-full"
               style={{ background: trackColorOf(bus).accent }}
@@ -178,7 +208,8 @@ export function MasterBusRow({ limiterThreshold, onLimiterThresholdChange, onOpe
               ✕
             </button>
           </div>
-        ))}
+          );
+        })}
         {buses.length === 0 && <span className="text-[10px] text-muted/70">No buses yet: add one for a shared reverb or delay.</span>}
       </div>
     </div>

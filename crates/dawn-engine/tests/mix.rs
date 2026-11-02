@@ -115,12 +115,46 @@ fn a_track_routed_into_another_goes_through_its_fader() {
 fn sends_feed_buses_after_the_fader() {
     let mut a = track_with("a", vec![clip(dc(0.2, 1.0), 0.0, 1.0)]);
     a.volume = 0.5;
-    a.sends = vec![Send { bus: 0, gain: 0.5 }];
+    a.sends = vec![Send {
+        bus: 0,
+        gain: 0.5,
+        pre: false,
+    }];
     let mut s = song(vec![a]);
     s.buses = vec![Bus::new("fx")];
     let (l, _) = play(s, 0.0, 0.1);
     // Dry 0.1, plus the send: 0.1 at half.
     assert!(close(l[LAG + 100], 0.15));
+}
+
+#[test]
+fn pre_fader_sends_skip_the_fader_but_not_the_mute() {
+    let mut a = track_with("a", vec![clip(dc(0.2, 1.0), 0.0, 1.0)]);
+    a.volume = 0.5;
+    a.sends = vec![Send {
+        bus: 0,
+        gain: 0.5,
+        pre: true,
+    }];
+    let mut s = song(vec![a.clone()]);
+    s.buses = vec![Bus::new("fx")];
+    let (l, _) = play(s, 0.0, 0.1);
+    // Dry 0.1, plus the send before the fader: 0.2 at half.
+    assert!(close(l[LAG + 100], 0.2));
+
+    // With the fader all the way down, the send still goes...
+    a.volume = 0.0;
+    let mut s = song(vec![a.clone()]);
+    s.buses = vec![Bus::new("fx")];
+    let (l, _) = play(s, 0.0, 0.1);
+    assert!(close(l[LAG + 100], 0.1));
+
+    // ...but not when the track isn't heard.
+    a.audible = false;
+    let mut s = song(vec![a]);
+    s.buses = vec![Bus::new("fx")];
+    let (l, _) = play(s, 0.0, 0.1);
+    assert!(l[LAG + 100].abs() < 1e-6);
 }
 
 #[test]

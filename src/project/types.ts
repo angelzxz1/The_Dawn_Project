@@ -44,6 +44,11 @@ export interface ChannelConfig extends InstrumentSettings {
    * the channel's own dry signal always keeps going straight to master
    * regardless of any sends. */
   sends?: Record<string, number>;
+  /** The buses (ids, among `sends`) it sends to before its fader: what its
+   * effects make, heard as it is (mute, solo) but not at its fader's level
+   * or pan - a headphone mix, or a reverb that keeps going as it fades.
+   * The rest are after the fader. */
+  preSends?: string[];
   /** The group this track belongs to (a group track's id). Its audio goes
    * into the group unless `output` says otherwise. */
   groupId?: string;

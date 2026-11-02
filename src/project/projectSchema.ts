@@ -329,6 +329,8 @@ function normalizeChannel(
       ([busId, db]) => busIds.has(busId) && typeof db === "number" && Number.isFinite(db)
     )
   ) as Record<string, number>;
+  // Only sends there are, each once.
+  const preSends = [...new Set(arr(r.preSends).filter((id): id is string => typeof id === "string" && id in sends))];
   const effectsById = new Map(effects.map((fx) => [fx.id, fx]));
   const automationLanes = uniqueById(arr(r.automationLanes).map((lane) => normalizeLane(lane, effectsById, legacyFilterIds)));
   return {
@@ -353,6 +355,7 @@ function normalizeChannel(
     ...(typeof r.height === "number" && Number.isFinite(r.height) ? { height: clampTrackHeight(r.height) } : {}),
     ...(r.showTakes === true && type !== "group" ? { showTakes: true } : {}),
     sends,
+    ...(preSends.length ? { preSends } : {}),
     automationLanes,
   };
 }

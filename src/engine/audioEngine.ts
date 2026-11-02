@@ -381,6 +381,7 @@ class AudioEngine {
       setDelay(n.pdc, plan.channel.get(id) ?? 0);
       setDelay(n.ownDelay, plan.own.get(id) ?? 0);
       setDelay(n.sendTap, plan.send.get(id) ?? 0);
+      setDelay(n.preSendTap, plan.send.get(id) ?? 0);
       const audible = mix.audible.has(id);
       if (audible !== n.audible) {
         n.audible = audible;
@@ -574,6 +575,10 @@ class AudioEngine {
     const ownDelay = new Tone.Delay(0, MAX_COMPENSATION).connect(taps.preFx);
     const sendTap = new Tone.Delay(0, MAX_COMPENSATION);
     channel.connect(sendTap);
+    // Pre-fader sends: after the effects and mute and solo, ahead of the
+    // fader and pan (the strip adds no delay, so they wait as long).
+    const preSendTap = new Tone.Delay(0, MAX_COMPENSATION);
+    muteGain.connect(preSendTap);
     this.pendingLoads += 1;
     this.setReady(false);
     const onSettled = () => {
@@ -592,6 +597,7 @@ class AudioEngine {
       effects: [],
       audioClips: new Map(),
       sends: new Map(),
+      preSends: new Set(),
       userMuted: false,
       muteGain,
       audible: true,
@@ -599,6 +605,7 @@ class AudioEngine {
       routeIn,
       ownDelay,
       sendTap,
+      preSendTap,
       taps,
       head,
       route: null,
@@ -621,6 +628,7 @@ class AudioEngine {
     nodes.routeIn.dispose();
     nodes.ownDelay.dispose();
     nodes.sendTap.dispose();
+    nodes.preSendTap.dispose();
     Object.values(nodes.taps).forEach((tap) => tap.dispose());
     nodes.head.dispose();
     nodes.channel.dispose();
@@ -1204,9 +1212,10 @@ class AudioEngine {
   }
 
   /** Sets (or, with `db === null`, removes) a channel's send to a bus, in
-   * dB - independent of the channel's own dry output, which always keeps
-   * going straight to master regardless of any sends. */
-  setSend(channelId: string, busId: string, db: number | null): void {
+   * dB, taken after its fader or before it (`pre`) - independent of the
+   * channel's own dry output, which always keeps going straight to master
+   * regardless of any sends. */
+  setSend(channelId: string, busId: string, db: number | null, pre = false): void {
     const nodes = this.channels.get(channelId);
     if (!nodes) return;
     const bus = this.buses.get(busId);
@@ -1215,19 +1224,28 @@ class AudioEngine {
       if (gain) {
         gain.dispose();
         nodes.sends.delete(busId);
+        nodes.preSends.delete(busId);
         this.refreshMix();
       }
       return;
     }
+    const tap = (isPre: boolean) => (isPre ? nodes.preSendTap : nodes.sendTap);
     if (!gain) {
       gain = new Tone.Gain(Tone.dbToGain(db));
-      nodes.sendTap.connect(gain);
+      tap(pre).connect(gain);
       gain.connect(bus.input);
       nodes.sends.set(busId, gain);
+      if (pre) nodes.preSends.add(busId);
       // Sends can close (or open) a sidechain loop.
       this.refreshMix();
-    } else {
-      gain.gain.value = Tone.dbToGain(db);
+      return;
+    }
+    gain.gain.value = Tone.dbToGain(db);
+    if (nodes.preSends.has(busId) !== pre) {
+      tap(!pre).disconnect(gain);
+      tap(pre).connect(gain);
+      if (pre) nodes.preSends.add(busId);
+      else nodes.preSends.delete(busId);
     }
   }
 

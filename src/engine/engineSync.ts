@@ -128,7 +128,7 @@ function addTrack(engine: EngineApi, state: ProjectState, channel: ChannelConfig
   engine.setMute(channel.id, channel.muted);
   engine.setSolo(channel.id, channel.solo);
   syncEffects(engine, channel.id, [], state.channelEffects[channel.id] ?? NO_EFFECTS);
-  Object.entries(channel.sends ?? {}).forEach(([busId, db]) => engine.setSend(channel.id, busId, db));
+  Object.entries(channel.sends ?? {}).forEach(([busId, db]) => engine.setSend(channel.id, busId, db, !!channel.preSends?.includes(busId)));
   engine.setAutomation(channel.id, channel.automationLanes ?? []);
   syncClips(engine, channel, [], state.clipsByChannel[channel.id] ?? NO_CLIPS);
 }
@@ -146,11 +146,12 @@ function syncTrack(engine: EngineApi, prev: ChannelConfig, next: ChannelConfig):
   if (prev.pan !== next.pan) engine.setPan(id, next.pan);
   if (prev.muted !== next.muted) engine.setMute(id, next.muted);
   if (prev.solo !== next.solo) engine.setSolo(id, next.solo);
-  if (prev.sends !== next.sends) {
+  if (prev.sends !== next.sends || prev.preSends !== next.preSends) {
     const buses = new Set([...Object.keys(prev.sends ?? {}), ...Object.keys(next.sends ?? {})]);
     buses.forEach((busId) => {
       const db = next.sends?.[busId] ?? null;
-      if (db !== (prev.sends?.[busId] ?? null)) engine.setSend(id, busId, db);
+      const pre = !!next.preSends?.includes(busId);
+      if (db !== (prev.sends?.[busId] ?? null) || pre !== !!prev.preSends?.includes(busId)) engine.setSend(id, busId, db, pre);
     });
   }
   if (prev.automationLanes !== next.automationLanes) engine.setAutomation(id, next.automationLanes ?? []);

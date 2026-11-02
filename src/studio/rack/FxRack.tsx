@@ -35,6 +35,10 @@ interface FxRackProps {
   bpm: number;
   buses?: BusConfig[];
   sends?: Record<string, number>;
+  /** The sends taken before the fader (bus ids). */
+  preSends?: string[];
+  /** Takes a send before the fader, or after it. */
+  onSendPreChange?: (busId: string, pre: boolean) => void;
   onInstrumentChange?: (type: InstrumentType | null) => void;
   /** Edits from the instrument's card (the synth's macro knobs). */
   onInstrumentSettingsChange?: (settings: InstrumentSettings) => void;
@@ -147,6 +151,8 @@ export function FxRack({
   bpm,
   buses = [],
   sends = {},
+  preSends = [],
+  onSendPreChange,
   onInstrumentChange,
   onInstrumentSettingsChange,
   onOpenInstrument,
@@ -426,19 +432,42 @@ export function FxRack({
             </div>
             {/* Many buses scroll inside the card instead of growing past the rack. */}
             <div className="grid min-h-0 flex-1 grid-cols-2 content-start gap-x-1.5 gap-y-2 overflow-y-auto overflow-x-hidden pr-0.5">
-              {buses.map((bus) => (
-                <ValueBar
-                  key={bus.id}
-                  label={bus.name}
-                  value={sends[bus.id] ?? SEND_OFF_DB}
-                  min={SEND_MIN_DB}
-                  max={0}
-                  defaultValue={SEND_OFF_DB}
-                  onChange={(v) => onSendChange(bus.id, v <= SEND_MIN_DB ? null : v)}
-                  onDragStart={onParamDragStart}
-                  formatValue={(v) => (v <= SEND_MIN_DB ? "off" : `${v.toFixed(1)}dB`)}
-                />
-              ))}
+              {buses.map((bus) => {
+                const on = sends[bus.id] !== undefined;
+                const pre = preSends.includes(bus.id);
+                return (
+                  <div key={bus.id} role="group" aria-label={`Send to ${bus.name}`} className="flex flex-col gap-0.5">
+                    <ValueBar
+                      label={bus.name}
+                      value={sends[bus.id] ?? SEND_OFF_DB}
+                      min={SEND_MIN_DB}
+                      max={0}
+                      defaultValue={SEND_OFF_DB}
+                      onChange={(v) => onSendChange(bus.id, v <= SEND_MIN_DB ? null : v)}
+                      onDragStart={onParamDragStart}
+                      formatValue={(v) => (v <= SEND_MIN_DB ? "off" : `${v.toFixed(1)}dB`)}
+                    />
+                    {on && onSendPreChange && (
+                      <button
+                        type="button"
+                        aria-pressed={pre}
+                        aria-label={`Take the send to ${bus.name} before the fader`}
+                        onClick={() => onSendPreChange(bus.id, !pre)}
+                        title={
+                          pre
+                            ? "Pre-fader: the bus gets the track at this level whatever its fader and pan do (a headphone mix, or a reverb that rings on as the track fades). Click for post-fader."
+                            : "Post-fader: the send follows the track's fader. Click to take it before the fader."
+                        }
+                        className={`self-start rounded border px-1 text-[8.5px] font-semibold uppercase leading-[13px] tracking-wide ${
+                          pre ? "border-warn/60 bg-warn/15 text-warn" : "border-border text-muted hover:text-foreground"
+                        }`}
+                      >
+                        {pre ? "Pre" : "Post"}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

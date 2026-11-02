@@ -29,7 +29,7 @@ beforeEach(() => {
 const ACTIONS = [
   "select", "rename", "renameDone", "setVolume", "setPan", "adjustStart", "toggleMute", "toggleSolo", "toggleArm",
   "toggleMonitor", "openFx", "importMidi", "exportMidi", "importAudio", "clear", "remove", "contextMenu",
-  "recolor", "move", "toggleAutomation", "setInputDevice", "requestInputDevices", "toggleFold", "pick", "resizeHeight",
+  "recolor", "move", "toggleAutomation", "setInputDevice", "requestInputDevices", "toggleFold", "pick", "resizeHeight", "hover",
 ] as const satisfies readonly (keyof TrackHeaderActions)[];
 
 type Actions = { [K in keyof TrackHeaderActions]: Mock<TrackHeaderActions[K]> };
@@ -195,6 +195,23 @@ describe("a MIDI track", () => {
     // ...until it's clicked.
     await screen.getByRole("button", { name: "Clipped - click to reset" }).click();
     await expect.element(screen.getByRole("button", { name: "Clip light" })).toBeVisible();
+  });
+});
+
+describe("routing highlights", () => {
+  test("the pointer on the header asks to light up its routing", async () => {
+    const { screen, actions } = renderHeader();
+    await screen.getByRole("group", { name: "Track Bass" }).hover();
+    expect(actions.hover).toHaveBeenCalledWith("bass");
+    await userEvent.unhover(screen.getByRole("group", { name: "Track Bass" }));
+    expect(actions.hover).toHaveBeenLastCalledWith(null);
+  });
+
+  test("a track another one plays into says it receives it; one playing into it, that it feeds it", async () => {
+    const { screen } = renderHeader({ route: "to" });
+    await expect.element(screen.getByText("receives")).toBeVisible();
+    screen.rerender(<TrackHeader channel={channel()} color={TRACK_COLOR_PALETTE[0]} selected={false} recording={false} hasNotes canRemove actions={{} as never} route="from" />);
+    await expect.element(screen.getByText("feeds")).toBeVisible();
   });
 });
 

@@ -201,6 +201,24 @@ describe("sends and routing", () => {
     expect(onSendChange).toHaveBeenLastCalledWith("verb", null);
   });
 
+  test("a send on says whether it's before or after the fader, and switches", async () => {
+    const onSendPreChange = vi.fn();
+    const { screen } = renderRack({ buses, sends: { verb: -12, dly: -6 }, preSends: ["dly"], onSendPreChange });
+    const toggle = (bus: string) => screen.getByRole("button", { name: `Take the send to ${bus} before the fader` });
+    await expect.element(toggle("Reverb")).toHaveAttribute("aria-pressed", "false");
+    await expect.element(toggle("Reverb")).toHaveTextContent("Post");
+    await expect.element(toggle("Echo")).toHaveTextContent("Pre");
+    await toggle("Reverb").click();
+    expect(onSendPreChange).toHaveBeenCalledWith("verb", true);
+    await toggle("Echo").click();
+    expect(onSendPreChange).toHaveBeenLastCalledWith("dly", false);
+  });
+
+  test("a send that's off has no pre/post switch", async () => {
+    const { screen } = renderRack({ buses, sends: { verb: -12 }, onSendPreChange: vi.fn() });
+    await expect.element(screen.getByRole("button", { name: "Take the send to Echo before the fader" })).not.toBeInTheDocument();
+  });
+
   test("a bus's own rack has no sends", async () => {
     const { screen } = renderRack({ channelType: undefined, instrument: undefined, buses });
     await expect.element(screen.getByRole("slider", { name: "Reverb" })).not.toBeInTheDocument();

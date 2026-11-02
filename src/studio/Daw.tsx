@@ -58,6 +58,7 @@ import { PreferencesWindow } from "@/studio/dialogs/PreferencesWindow";
 import { onOpenPreferences, openPreferences, type PrefsTab } from "@/studio/dialogs/preferences";
 import { getStudioPrefs, useStudioPrefs } from "@/state/studioPrefs";
 import { useStudioTheme, useUiScale } from "@/studio/shell/theme";
+import { routeHighlights, type Hovered } from "@/studio/tracks/routeHighlight";
 import { ShortcutSheet } from "@/studio/shell/ShortcutSheet";
 import { trackActions } from "@/state/trackActions";
 import { effectActions } from "@/state/effectActions";
@@ -218,6 +219,8 @@ export function Daw() {
     () => channels[0]?.id ?? null
   );
   const [fxBusId, setFxBusId] = useState<string | null>(null);
+  /** The track or bus the pointer's on (its routing lights up). */
+  const [hovered, setHovered] = useState<Hovered | null>(null);
   /** The FX rack folded away to its title bar. */
   const [rackCollapsed, setRackCollapsed] = useState(false);
   /** Whether the FX rack at the bottom of the screen is currently showing
@@ -753,7 +756,7 @@ export function Daw() {
         audioEngine.setPan(c.id, c.pan);
         audioEngine.setMute(c.id, c.muted);
         audioEngine.setSolo(c.id, c.solo);
-        Object.entries(c.sends ?? {}).forEach(([busId, db]) => audioEngine.setSend(c.id, busId, db));
+        Object.entries(c.sends ?? {}).forEach(([busId, db]) => audioEngine.setSend(c.id, busId, db, !!c.preSends?.includes(busId)));
         audioEngine.setAutomation(c.id, c.automationLanes ?? []);
         registeredChannelIds.current.add(c.id);
       }
@@ -2191,6 +2194,8 @@ export function Daw() {
   const hiddenTracks = hiddenByFoldedGroups(channels);
   const visibleChannels = channels.filter((c) => !hiddenTracks.has(c.id));
   const trackRoutes = routeMap(channels);
+  /** What lights up while the pointer's on a track or a bus. */
+  const routeLights = routeHighlights(hovered, channels, trackRoutes);
   /** Where a track's audio goes when that isn't the default, for its header. */
   const outputNameOf = (c: ChannelConfig): string | null => {
     if (!c.output) return null;
@@ -2265,6 +2270,7 @@ export function Daw() {
     resizeHeight: (id, height, all) => (all ? trackActions.setAllHeights(height) : trackActions.setHeight(id, height)),
     pick: handlePickTrack,
     toggleTakes: takeActions.toggleShowTakes,
+    hover: (id) => setHovered(id ? { kind: "track", id } : null),
   });
   const laneActions = useStableActions<TrackLaneActions>({
     selectTrack: (id) => {
@@ -2747,6 +2753,7 @@ export function Daw() {
                   monitoring={monitoredChannelIds.has(channel.id)}
                   takeCount={(takesByChannel[channel.id] ?? NO_TAKES).length}
                   renaming={renamingTrackId === channel.id}
+                  route={routeLights?.tracks.get(channel.id) ?? null}
                   actions={headerActions}
                 />
                 {shownTakes(channel).map((lane) => (
@@ -2938,6 +2945,8 @@ export function Daw() {
         onOpenMasterFx={openMasterFx}
         onOpenBusFx={openBusFx}
         onRemoveBus={handleRemoveBus}
+        route={routeLights}
+        onHoverBus={(id) => setHovered(id ? { kind: "bus", id } : null)}
       />
 
       <NoteInputWindow
@@ -3037,6 +3046,8 @@ export function Daw() {
           bpm={bpm}
           buses={buses}
           sends={fxChannel?.sends}
+          preSends={fxChannel?.preSends}
+          onSendPreChange={fxChannel ? (busId, pre) => trackActions.setSendPre(fxChannel.id, busId, pre) : undefined}
           onInstrumentChange={fxChannel ? (type) => handleInstrumentChange(fxChannel.id, type) : undefined}
           onInstrumentSettingsChange={fxChannel ? handleInstrumentSettingsChange : undefined}
           onSendChange={fxChannel ? handleSendChange : undefined}

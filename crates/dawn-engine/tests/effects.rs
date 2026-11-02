@@ -100,7 +100,11 @@ fn a_bypassed_effect_is_skipped() {
 #[test]
 fn a_buss_effects_run_on_what_its_sent() {
     let mut t = track("a", 0.25, vec![]);
-    t.sends = vec![Send { bus: 0, gain: 1.0 }];
+    t.sends = vec![Send {
+        bus: 0,
+        gain: 1.0,
+        pre: false,
+    }];
     let mut s = song(vec![t]);
     s.buses = vec![Bus {
         effects: vec![gain("u", -6.0)],

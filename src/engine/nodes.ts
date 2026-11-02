@@ -97,6 +97,10 @@ export interface ChannelNodes extends EffectsHost {
   ownDelay: Tone.Delay;
   /** Sends leave the strip through this (delay compensation). */
   sendTap: Tone.Delay;
+  /** Where its pre-fader sends leave: after its mute, before its fader. */
+  preSendTap: Tone.Delay;
+  /** The buses it sends to before its fader. */
+  preSends: Set<string>;
   /** Where the strip's dry output goes: through the shared direct-path
    * delay, straight to the master (a live track skipping compensation),
    * or into another track ("to:" + its id). */

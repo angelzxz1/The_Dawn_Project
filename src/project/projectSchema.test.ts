@@ -509,3 +509,17 @@ describe("the layout", () => {
     expect(normalizeProject({ channels })?.layout).toBeUndefined();
   });
 });
+
+describe("pre-fader sends", () => {
+  it("are kept for sends there are, each once", () => {
+    const p = normalizeProject({
+      buses: [{ id: "verb", name: "Verb" }, { id: "dly", name: "Dly" }],
+      channels: [
+        { id: "a", name: "Gtr", type: "audio", sends: { verb: -6, dly: -12 }, preSends: ["verb", "verb", "dly", "gone", 3] },
+        { id: "b", name: "Vox", type: "audio", sends: { verb: -6 }, preSends: ["dly"] },
+      ],
+    });
+    expect(p?.channels[0].preSends).toEqual(["verb", "dly"]);
+    expect(p?.channels[1].preSends).toBeUndefined();
+  });
+});

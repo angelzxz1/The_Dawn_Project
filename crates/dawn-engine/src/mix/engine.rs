@@ -101,6 +101,8 @@ pub struct Engine {
     master: Stereo,
     /// A strip's output on its way to its destination and sends.
     scratch: Stereo,
+    /// A track's sound before its fader, for its pre-fader sends.
+    pre_scratch: Stereo,
     /// The tracks going to the master through the direct delay.
     direct: Stereo,
     click: Vec<f32>,
@@ -128,6 +130,7 @@ impl Engine {
             limiter_meters: None,
             master: Stereo::new(),
             scratch: Stereo::new(),
+            pre_scratch: Stereo::new(),
             direct: Stereo::new(),
             click: vec![0.0; MAX_BLOCK],
             missing: false,
@@ -217,6 +220,7 @@ impl Engine {
                 keep(&mut new.own_delays[i], &mut old.own_delays[j]);
                 keep(&mut new.channel_delays[i], &mut old.channel_delays[j]);
                 keep(&mut new.send_delays[i], &mut old.send_delays[j]);
+                keep(&mut new.pre_send_delays[i], &mut old.pre_send_delays[j]);
             }
         }
         for i in 0..new.song.buses.len() {
@@ -534,10 +538,35 @@ impl Engine {
             add(&mut dest.l[..n], &out.l[..n], 1.0);
             add(&mut dest.r[..n], &out.r[..n], 1.0);
             p.send_delays[i].run(&mut out.l[..n], &mut out.r[..n]);
-            for send in &track.sends {
+            for send in track.sends.iter().filter(|s| !s.pre) {
                 let bus = &mut p.bus_bufs[send.bus];
                 add(&mut bus.l[..n], &out.l[..n], send.gain);
                 add(&mut bus.r[..n], &out.r[..n], send.gain);
+            }
+            // Pre-fader sends: the sound after its effects, heard (mute
+            // and solo) but not at its fader's level or pan.
+            let heard = Applied {
+                gain: if track.audible { 1.0 } else { 0.0 },
+                pan: 0.0,
+            };
+            let from = std::mem::replace(&mut p.track_heard[i], heard);
+            if track.sends.iter().any(|s| s.pre) {
+                let pre = &mut self.pre_scratch;
+                pre.clear(n);
+                strip(
+                    &p.track_bufs[i],
+                    from,
+                    heard,
+                    n,
+                    &mut pre.l[..n],
+                    &mut pre.r[..n],
+                );
+                p.pre_send_delays[i].run(&mut pre.l[..n], &mut pre.r[..n]);
+                for send in track.sends.iter().filter(|s| s.pre) {
+                    let bus = &mut p.bus_bufs[send.bus];
+                    add(&mut bus.l[..n], &pre.l[..n], send.gain);
+                    add(&mut bus.r[..n], &pre.r[..n], send.gain);
+                }
             }
         }
         p.direct_delay

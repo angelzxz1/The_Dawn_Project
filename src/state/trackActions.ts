@@ -29,6 +29,14 @@ function without<K extends keyof ChannelConfig>(c: ChannelConfig, key: K): Chann
   return copy;
 }
 
+/** A track with these pre-fader sends (none: the field goes). */
+function withPreSends(c: ChannelConfig, preSends: string[]): ChannelConfig {
+  if (preSends.length) return { ...c, preSends };
+  const { preSends: _drop, ...rest } = c;
+  void _drop;
+  return rest;
+}
+
 export const trackActions = {
   /** Adds an empty track at the end ("MIDI 3", "Audio 2", "Group 1"...);
    * returns its id. */
@@ -140,13 +148,27 @@ export const trackActions = {
 
   /** A send's level in dB, or null to remove it. */
   setSend(id: string, busId: string, db: number | null): void {
-    audioEngine.setSend(id, busId, db);
+    const pre = !!channels().find((c) => c.id === id)?.preSends?.includes(busId);
+    audioEngine.setSend(id, busId, db, pre);
     updateTrack(id, (c) => {
       const sends = { ...(c.sends ?? {}) };
       if (db === null) delete sends[busId];
       else sends[busId] = db;
-      return { ...c, sends };
+      const next = { ...c, sends };
+      // A send taken away forgets where it was taken.
+      if (db === null && c.preSends?.includes(busId)) return withPreSends(next, c.preSends.filter((b) => b !== busId));
+      return next;
     });
+  },
+
+  /** Takes a send before the track's fader, or after it (one undo step). */
+  setSendPre(id: string, busId: string, pre: boolean): void {
+    const track = channels().find((c) => c.id === id);
+    const db = track?.sends?.[busId];
+    if (!track || db === undefined || !!track.preSends?.includes(busId) === pre) return;
+    projectStore.push();
+    audioEngine.setSend(id, busId, db, pre);
+    updateTrack(id, (c) => withPreSends(c, pre ? [...(c.preSends ?? []), busId] : (c.preSends ?? []).filter((b) => b !== busId)));
   },
 
   // --- Groups and routing (routing.ts) ---

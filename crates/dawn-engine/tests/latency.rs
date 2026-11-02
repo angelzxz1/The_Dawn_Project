@@ -107,7 +107,11 @@ fn without_compensation_the_latent_track_comes_out_late() {
 #[test]
 fn a_send_through_a_latent_bus_lines_up_with_the_dry_path() {
     let a = Track {
-        sends: vec![Send { bus: 0, gain: 1.0 }],
+        sends: vec![Send {
+            bus: 0,
+            gain: 1.0,
+            pre: false,
+        }],
         ..track("a", vec![impulse(0.25)], vec![])
     };
     let s = Song {

@@ -89,7 +89,8 @@ export interface NativeTrack {
   audible: boolean;
   /** The track it feeds, or null for the master. */
   output: string | null;
-  sends: { bus: string; db: number }[];
+  /** `pre`: before the fader (and its pan). */
+  sends: { bus: string; db: number; pre: boolean }[];
   clips: NativeClip[];
   /** What plays its notes, if the native engine has it. */
   instrument: NativeInstrument | null;
@@ -220,7 +221,7 @@ export function describeSong(doc: ProjectState, session: NativeSession, ids: Nat
       output: routes.get(c.id) ?? null,
       sends: Object.entries(c.sends ?? {})
         .filter(([bus]) => busIds.has(bus))
-        .map(([bus, db]) => ({ bus, db })),
+        .map(([bus, db]) => ({ bus, db, pre: !!c.preSends?.includes(bus) })),
       clips: (doc.clipsByChannel[c.id] ?? []).flatMap((clip) => (clip.kind === "audio" ? [nativeClip(clip, ids.clip(clip))] : [])),
       instrument: nativeInstrument(c, ids),
       notes: nativeNotes(doc, c),

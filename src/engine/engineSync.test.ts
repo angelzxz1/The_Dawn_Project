@@ -27,6 +27,8 @@ interface FakeTrack {
   solo: boolean;
   effects: FakeFx[];
   sends: Record<string, number>;
+  /** The sends taken before the fader. */
+  pre: string[];
   automation: unknown;
   notes: NoteEvent[];
   clips: Record<string, { url: string; timing: unknown; gain: number }>;
@@ -69,6 +71,7 @@ class FakeEngine {
       solo: false,
       effects: [],
       sends: {},
+      pre: [],
       automation: [],
       notes: [],
       clips: {},
@@ -110,12 +113,16 @@ class FakeEngine {
     const t = this.tracks.get(id);
     if (t) t.solo = solo;
   }
-  setSend(id: string, busId: string, db: number | null) {
+  setSend(id: string, busId: string, db: number | null, pre = false) {
     this.log("setSend");
     const t = this.tracks.get(id);
     if (!t) return;
+    t.pre = t.pre.filter((b) => b !== busId);
     if (db === null) delete t.sends[busId];
-    else t.sends[busId] = db;
+    else {
+      t.sends[busId] = db;
+      if (pre) t.pre = [...t.pre, busId].sort();
+    }
   }
   setAutomation(id: string, lanes: unknown) {
     this.log("setAutomation");
@@ -326,6 +333,7 @@ const edits: Record<string, Edit> = {
   "change instrument": (s) => onTrack(s, "ch-1", (c) => ({ ...c, instrument: "synth", synthParams: { a: 1 } as never })),
   "tweak the kit": (s) => onTrack(s, "ch-3", (c) => ({ ...c, drumParams: { kit: "b" } as never })),
   "sends": (s) => onTrack(s, "ch-1", (c) => ({ ...c, sends: {} })),
+  "take a send before the fader": (s) => onTrack(s, "ch-1", (c) => ({ ...c, preSends: ["bus-1"] })),
   "move and trim an audio clip": (s) => onClips(s, "ch-2", (l) => l.map((c) => (c.id === "clip-3" ? { ...c, offset: 3, length: 0.5, gainDb: -4 } : c))),
   "replace a clip's audio": (s) => onClips(s, "ch-2", (l) => l.map((c) => (c.id === "clip-2" ? { ...c, url: "blob:other" } : c))),
   "delete an audio clip": (s) => onClips(s, "ch-2", (l) => l.slice(1)),

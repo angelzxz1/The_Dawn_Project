@@ -120,6 +120,7 @@
   --color-accent-strong: var(--accent-strong);
   --color-warn: var(--warn);
   --color-on-accent: var(--on-accent);
+  --color-on-warn: var(--on-warn);
   --color-marker: var(--marker);
   --color-marker-text: var(--marker-text);
   --color-tempo: var(--tempo);

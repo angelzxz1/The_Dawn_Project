@@ -25,6 +25,7 @@ import type { ChannelConfig } from "@/project/types";
 import { INSTRUMENT_LABELS } from "@/instruments/registry";
 import { TRACK_COLOR_PALETTE, type TrackColor, type TrackColorPick } from "@/project/colors";
 import { CustomColorButton } from "./CustomColorButton";
+import type { RouteRole } from "./routeHighlight";
 import { TRACK_HEADER_WIDTH, TRACK_ROW_HEIGHT } from "@/studio/timeline/layout";
 
 /** From these heights (px) the header shows its controls row (input,
@@ -115,6 +116,9 @@ export interface TrackHeaderActions {
   pick(id: string): void;
   /** Shows or hides the track's take lanes. */
   toggleTakes(id: string): void;
+  /** The pointer came onto a track's header (its routing lights up), or
+   * left it (null). */
+  hover(id: string | null): void;
 }
 
 interface TrackHeaderProps {
@@ -167,6 +171,9 @@ interface TrackHeaderProps {
   bypassedCount?: number;
   /** Its name is a text field, as asked from its menu (until renameDone). */
   renaming?: boolean;
+  /** While the pointer's on another track or a bus: this one gets its
+   * audio ("to"), or plays into it ("from"). */
+  route?: RouteRole | null;
 }
 
 /** A track's name being typed: Enter or leaving it keeps it, Esc lets go
@@ -283,6 +290,7 @@ export const TrackHeader = memo(function TrackHeader({
   silent = null,
   bypassedCount = 0,
   renaming = false,
+  route = null,
 }: TrackHeaderProps) {
   const id = channel.id;
   const onSelect = () => actions.select(id);
@@ -343,15 +351,27 @@ export const TrackHeader = memo(function TrackHeader({
         else onSelect();
       }}
       onContextMenu={onContextMenu}
+      onPointerEnter={() => actions.hover(id)}
+      onPointerLeave={() => actions.hover(null)}
+      data-route={route ?? undefined}
       style={{ width: TRACK_HEADER_WIDTH, height: rowHeight }}
       title="Ctrl/Cmd-click to pick several tracks, then Ctrl+G to group them"
       className={`relative flex shrink-0 cursor-pointer flex-col gap-1 border-b border-r border-border py-1.5 pr-1.5 transition-colors ${
         groupColor ? "pl-3" : "pl-1.5"
-      } ${oneRow ? "justify-center" : ""} ${picked ? "ring-2 ring-inset ring-accent" : ""} ${
+      } ${oneRow ? "justify-center" : ""} ${picked ? "ring-2 ring-inset ring-accent" : route === "to" ? "ring-2 ring-inset ring-accent/80" : route === "from" ? "ring-2 ring-inset ring-warn/80" : ""} ${
         picked ? "bg-accent/10" : selected ? "bg-surface-raised" : isGroup ? "bg-surface-raised/40 hover:bg-surface-raised/70" : "bg-surface hover:bg-surface-raised/60"
       }`}
     >
       {groupColor && <div className="pointer-events-none absolute inset-y-0 left-0 w-1.5" style={{ background: groupColor.accent, opacity: 0.7 }} />}
+      {route && (
+        <span
+          className={`pointer-events-none absolute bottom-0.5 right-1 z-10 rounded px-1 text-[8.5px] font-semibold uppercase leading-[12px] tracking-wide ${
+            route === "to" ? "bg-accent text-on-accent" : "bg-warn text-on-warn"
+          }`}
+        >
+          {route === "to" ? "receives" : "feeds"}
+        </span>
+      )}
       {isGroup && !oneRow && <div className="pointer-events-none absolute inset-x-0 top-0 h-0.5" style={{ background: color.accent }} />}
       <div className="relative flex items-center gap-1.5">
         <button

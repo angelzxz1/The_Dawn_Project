@@ -33,12 +33,15 @@ pub enum Destination {
     Track(usize),
 }
 
-/// A send from a track (post-fader) to a bus.
+/// A send from a track to a bus: after its fader, or before it (`pre`:
+/// after its effects, heard as the track is, but not at its fader's level
+/// or pan).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Send {
     pub bus: usize,
     /// Linear.
     pub gain: f64,
+    pub pre: bool,
 }
 
 /// dB to a linear gain (-Infinity: 0), as Tone's `dbToGain`.
@@ -201,6 +204,9 @@ pub struct Prepared {
     pub(crate) track_bufs: Vec<Stereo>,
     pub(crate) bus_bufs: Vec<Stereo>,
     pub(crate) track_applied: Vec<Applied>,
+    /// Each track heard or not (mute and solo, as a gain), for its
+    /// pre-fader sends: they glide with it as the strip does.
+    pub(crate) track_heard: Vec<Applied>,
     pub(crate) bus_applied: Vec<Applied>,
     pub(crate) master_applied: Applied,
     /// A copy of the tempo map for the metronome (`Engine::set_song`).
@@ -229,6 +235,9 @@ pub struct Prepared {
     pub(crate) own_delays: Vec<Delay>,
     pub(crate) channel_delays: Vec<Delay>,
     pub(crate) send_delays: Vec<Delay>,
+    /// The pre-fader sends' own, as long as the post-fader ones (the strip
+    /// adds no delay).
+    pub(crate) pre_send_delays: Vec<Delay>,
     pub(crate) bus_delays: Vec<Delay>,
     pub(crate) direct_delay: Delay,
     pub(crate) click_delay: Ring,
@@ -360,6 +369,19 @@ impl Song {
                     .map_or_else(|| strip_of(t), strip_of)
             })
             .collect();
+        let heard_of = |t: &Track| Applied {
+            gain: if t.audible { 1.0 } else { 0.0 },
+            pan: 0.0,
+        };
+        let track_heard = self
+            .tracks
+            .iter()
+            .map(|t| {
+                previous
+                    .and_then(|p| p.tracks.iter().find(|x| x.id == t.id))
+                    .map_or_else(|| heard_of(t), heard_of)
+            })
+            .collect();
         let bus_of = |b: &Bus| Applied {
             gain: b.volume,
             pan: b.pan,
@@ -436,6 +458,7 @@ impl Song {
             own_delays: delays(&plan.own),
             channel_delays: delays(&plan.channel),
             send_delays: delays(&plan.send),
+            pre_send_delays: delays(&plan.send),
             bus_delays: delays(&plan.bus),
             direct_delay: Delay::new(plan.direct.min(most)),
             click_delay: Ring::new(plan.total.min(most)),
@@ -447,6 +470,7 @@ impl Song {
             track_bufs: vec![Stereo::new(); n],
             bus_bufs: vec![Stereo::new(); self.buses.len()],
             track_applied,
+            track_heard,
             bus_applied,
             master_applied,
             track_peaks: vec![[0.0; 2]; n],
