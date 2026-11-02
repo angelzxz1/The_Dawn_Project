@@ -144,12 +144,12 @@ The Dawn Project is a browser DAW, also built as a desktop app.
   main always. I'll let you now when we'll create a new branch." Don't
   branch until they say so.
 - Don't commit. The user commits; give them the command, in PowerShell,
-  with several `-m` flags: a short title, a paragraph on what changed (in
-  the user's terms), and the attribution:
+  with several `-m` flags: a short title and a paragraph on what changed (in
+  the user's terms):
 
   ```powershell
   git add -A
-  git commit -m "Title" -m "What it does." -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+  git commit -m "Title" -m "What it does."
   ```
 
 - Before 2026-10-29, work went through PRs from `claude/busy-rubin-wagwyi`

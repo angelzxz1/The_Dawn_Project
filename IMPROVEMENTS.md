@@ -1,11 +1,11 @@
 # Improvements
 
-Checked against the code and the commit history on 2026-10-29; item 7 of Part 2 was added on 2026-10-30, items 8, 9, 16, 18, 19, 20, 21 and 22 on 2026-10-31, items 11, 12, 13, 24, 25 and 28 on 2026-11-01.
+Checked against the code and the commit history on 2026-10-29, and again on 2026-11-02; item 7 of Part 2 was added on 2026-10-30, items 8, 9, 16, 18, 19, 20, 21 and 22 on 2026-10-31, items 11, 12, 13, 24, 25 and 28 on 2026-11-01.
 
 - `[x]` is done; the commit that did it is in brackets.
 - `[ ]` is still open; "Partly" says what already exists.
 
-**Summary:** Part 1 is all done. In Part 2, items 1–9, 11–13, 16, 18–22, 24, 25 and 28 are done and the rest of 10–27 are open.
+**Summary:** Part 1 is all done. In Part 2, items 1–9, 11–13, 16, 18–22, 24, 25 and 28 are done; 10, 14, 15, 17, 23, 26 and 27 are open.
 
 ## Part 1: Code improvements
 
@@ -13,7 +13,7 @@ Checked against the code and the commit history on 2026-10-29; item 7 of Part 2 
 
 - [x] **1. Split up `Daw.tsx`.** One component held 64 pieces of state, 135 handler functions and 31 effects, and every change redrew the whole studio. That was part of why notes came out late at record start. The plan was to move it into feature modules (tracks, clips, transport, mixer, project) behind a shared store, to make it easier to read and much faster to redraw.
   - Done: the project document is now in a shared store (`src/state/projectStore.ts`), with actions in `src/state/`, and the context menus, project files and automation are in their own files (`51afb1a`, `4addae6`, `4685bba`, `0d4c979`, `4743a8e`).
-  - Still large: `Daw.tsx` has 2,838 lines, 47 `useState` calls and 34 `useEffect` calls. It could be split further.
+  - Still large: on 2026-11-02 `Daw.tsx` has 3,230 lines, 53 `useState` calls and 37 `useEffect` calls (it has grown with the Part 2 items). It could be split further.
 - [x] **2. Split up `audioEngine.ts`.** Channels, routing, monitoring, recording, metronome, latency compensation and automation all lived in one class, and separate modules would be easier to test. (`f88f484`: routing, latency, metronome, inputs and the rest are now modules in `src/engine/`)
 - [x] **3. Build the live sound and the export from one shared routing description.** `audioEngine.ts` and `bounce.ts` each wired tracks, groups, routing, sidechains, monitoring and delay compensation separately. Every routing feature had to be built twice, which is how the export could drift from what you hear. (`39d80f7`: `mixGraph.ts`)
 - [x] **4. Make undo cheaper.** Each undo or redo tore down every track in the engine and rebuilt it, NAM and IR included, which could cause dropouts and pauses with heavy effects. (`4760168`: only what differs is rebuilt)
@@ -80,12 +80,17 @@ That is already ahead of most browser DAWs, such as BandLab or Soundtrap.
 
 - [ ] **10. A real mixer view:** vertical channel strips with faders, meters, sends, inserts and Audio to/from, side by side. Today mixing happens in track headers and the FX rack.
 - [x] **11. Meters with peak hold and dB scales,** a master loudness meter (LUFS), and a clip warning on every track. (`67ea045`)
-- [x] **12. Faster effect handling:** drag effects between tracks, copy an effect chain to another track, and save a whole chain as a preset (Ableton Racks / FX Chains).
-  - Effects and presets could already be dragged from the browser onto the rack, and there were factory chains (`src/effects/chains.ts`). (`bfa84ac`)
+  - The meters on tracks, buses and the master show dB (-60 to +6, `tracks/meterScale.ts`): each side's RMS with its peaks over it, the loudest peak held 1.5 s, and a clip light that stays on until it's clicked (`tracks/Meter.tsx`). The engine reads them with its own `LevelMeter` (`engine/levelMeter.ts`) instead of Tone's Meter.
+  - The master row shows momentary, short-term and integrated LUFS and the loudest sample (`LoudnessReadout`, `engine/loudness.ts`: BS.1770-4 K-weighting and EBU R128 gating). It starts afresh when playback starts from a stop or a recording starts.
+  - Not yet: with the native engine on in the desktop app, the meters and the loudness still read the browser's audio, which is silent then.
+- [x] **12. Faster effect handling:** drag effects between tracks, copy an effect chain to another track, and save a whole chain as a preset (Ableton Racks / FX Chains). (`bfa84ac`)
+  - Effects and presets could already be dragged from the browser onto the rack, and there were factory chains (`src/effects/chains.ts`).
   - A card dragged onto another track's header, a bus or the master moves there; with Ctrl (or Alt, or Cmd) held, a copy goes. Effects and chains from the browser can be dropped there too, and a chain into a gap in the rack (`studio/rack/effectDrag.ts`, `effectActions.transfer`).
   - A card's menu copies it or the whole chain, and pastes after it; the rack's own menu pastes at the end (`state/effectClipboard.ts`, `effectActions.paste`).
   - The rack's Save chain keeps the whole chain under a name, in this browser for every project, listed first under the browser's Chains (`effects/userChains.ts`). A file you loaded yourself stays with its project, so a saved chain keeps only Dawn's cabinets.
-- [x] **13. Pre/post choice for sends,** and better visual routing feedback, for example highlighting where a track goes when you hover over it. ("Audio from" already has pre/post FX; sends don't.) (`66c9526`)
+- [x] **13. Pre/post choice for sends,** and better visual routing feedback, for example highlighting where a track goes when you hover over it. (`66c9526`)
+  - Each send that's on has a Post/Pre switch on the Sends card (`ChannelConfig.preSends`). A pre-fader send is taken after the track's effects, mute and solo, but before its fader and pan, in both engines.
+  - Hovering a track lights up where its audio goes (its group or target track, the master, the buses it sends to, the tracks taking it as their input) and what plays into it; hovering a bus, the tracks sending to it (`tracks/routeHighlight.ts`).
 
 ### Recording
 
@@ -111,11 +116,18 @@ That is already ahead of most browser DAWs, such as BandLab or Soundtrap.
 ### Visual and comfort
 
 - [ ] **23. One consistent style for windows.** Effect windows, the Keys window and the Drum Rack each look and behave differently.
-- [x] **24. Light theme and adjustable UI size,** for laptop screens and 1440p/4K monitors. (`f873b07`; the size is the desktop app's window zoom, and in a browser its own zoom)
-- [x] **25. Remember the layout:** panel sizes, folded tracks, the open FX rack and zoom, per project. (`c1968f7`: the zoom, the scroll, the open rack, its fold and the automation lane; folded tracks and heights were already kept. No panel has a size to keep: the rack's cards are a fixed height)
+  - Partly: since item 24 they share the dark device look (`.device-skin`) in either theme. Several effect windows have no `role="dialog"`.
+- [x] **24. Light theme and adjustable UI size,** for laptop screens and 1440p/4K monitors. (`f873b07`)
+  - Preferences > Appearance picks System, Dark or Light. The colors are roles in `globals.css`, retuned for the light theme; effect and instrument windows and rack cards keep their dark device look in either.
+  - The size is the desktop app's window zoom. In a browser, its own zoom does it (Preferences says how): CSS `zoom` put pointer positions off.
+- [x] **25. Remember the layout:** panel sizes, folded tracks, the open FX rack and zoom, per project. (`c1968f7`)
+  - A project keeps its zoom, its scroll, the selected track or the open bus or master rack, the rack's fold and the automation lane (`ProjectLayout`). Folded tracks and heights were already kept. A template or an older project opens with the standard layout.
+  - No panel has a size to keep: a resizable rack was tried and dropped, as its cards are a fixed height.
 - [ ] **26. Detach or second-screen windows** for the mixer and piano roll (Ableton 12, Logic).
 
 ### Accessibility and settings
 
 - [ ] **27. Keyboard navigation of the timeline, screen-reader labels, and focus handling in dialogs.**
-- [x] **28. A real Preferences window** (audio device, buffer size, default count-in, autosave, theme) instead of settings scattered across popovers. (`405b1b6`; the theme came with item 24)
+- [x] **28. A real Preferences window** (audio device, buffer size, default count-in, autosave, theme) instead of settings scattered across popovers. (`405b1b6`)
+  - The gear in the header or Ctrl/Cmd+, opens it (`dialogs/PreferencesWindow.tsx`). Audio: the desktop's native engine, or the browser's output device and buffer size, and delay compensation. Then Recording, Metronome, Projects (autosave into a project's folder every 1-10 minutes, the default count-in) and Appearance (item 24).
+  - Autosave into a real project folder hasn't been tried end to end yet.
