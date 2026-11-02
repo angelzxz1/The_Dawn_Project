@@ -81,7 +81,7 @@ That is already ahead of most browser DAWs, such as BandLab or Soundtrap.
 - [ ] **10. A real mixer view:** vertical channel strips with faders, meters, sends, inserts and Audio to/from, side by side. Today mixing happens in track headers and the FX rack.
 - [x] **11. Meters with peak hold and dB scales,** a master loudness meter (LUFS), and a clip warning on every track. (`67ea045`)
 - [x] **12. Faster effect handling:** drag effects between tracks, copy an effect chain to another track, and save a whole chain as a preset (Ableton Racks / FX Chains).
-  - Effects and presets could already be dragged from the browser onto the rack, and there were factory chains (`src/effects/chains.ts`). (commit to come)
+  - Effects and presets could already be dragged from the browser onto the rack, and there were factory chains (`src/effects/chains.ts`). (`bfa84ac`)
   - A card dragged onto another track's header, a bus or the master moves there; with Ctrl (or Alt, or Cmd) held, a copy goes. Effects and chains from the browser can be dropped there too, and a chain into a gap in the rack (`studio/rack/effectDrag.ts`, `effectActions.transfer`).
   - A card's menu copies it or the whole chain, and pastes after it; the rack's own menu pastes at the end (`state/effectClipboard.ts`, `effectActions.paste`).
   - The rack's Save chain keeps the whole chain under a name, in this browser for every project, listed first under the browser's Chains (`effects/userChains.ts`). A file you loaded yourself stays with its project, so a saved chain keeps only Dawn's cabinets.

@@ -1,14 +1,66 @@
-# Handoff: the native engine (stage 3 done, what's next)
+# Handoff: where The Dawn Project stands
 
-Where the desktop app's native audio engine stands, how the work is done,
-and what comes next. Written 2026-10-18, at `main` = `95727ac` (PR #13
-merged).
+Read this first in a new session. It says where the project is, how the
+work is done and what comes next, then keeps the technical notes (the
+native engine's techniques, and what each finished item changed).
+Updated 2026-11-02, at `main` = `bfa84ac`, working tree clean.
+
+## Start here
+
+- **Where we are:** Phase 6 (mixing) of `nextSteps.md`. Steps 1-20 are
+  done (step 6, NAM in the engine, was dropped). The last three, all on
+  2026-11-01:
+  - step 18, better meters (`67ea045`);
+  - step 19, pre/post sends and routing highlights (`66c9526`);
+  - step 20, moving, copying and saving effect chains (`bfa84ac`).
+- **Next: step 21, Part 2 #23, one style for every window** (the effect
+  windows, Keys, the Drum Rack). It comes before the mixer view (22),
+  detached windows (23) and plugin windows (30). Several effect windows
+  have no `role="dialog"`; give them one as part of it. Wait for the user
+  to say "go" before starting a step: they ask for each one ("Lets go with
+  step N").
+- **What's left after that,** in order (the full list, with sizes, is in
+  `nextSteps.md`; a summary is under "The road ahead" below): the mixer
+  view, detached windows, sidechains and automation in the engine,
+  recording (monitoring modes, punch in/out, input channels, then live
+  input through the engine), plugins (CLAP, VST3, plugin instruments,
+  AU), shipping (export through the engine, native dialogs, signed
+  installers), an accessibility pass, and last the desktop's driver,
+  device and inputs picker, which waits for ASIO.
+- **Known loose ends:**
+  - With the native engine on, the meters and the loudness readout still
+    read the browser's audio, which is silent then. The engine has to
+    send its levels (with Phase 7 or 8).
+  - `e2e/recording.spec.ts` and two piano-roll tests have failed now and
+    then under load and pass when run again. Nothing to fix so far.
+  - Autosave into a real project folder hasn't been tried end to end (the
+    tests can't pick a folder).
+  - `scripts/fix-export-segments.mjs` works around a Next export bug on
+    Windows; drop it once Next fixes it (see the item log).
+  - The next release's "What's new" (`src/content/whatsNew.ts`) has to be
+    written: everything since section markers (`23dbe29`) is new.
+
+### Each step, the routine
+
+1. Read the step in `nextSteps.md` and its item in `IMPROVEMENTS.md`, then
+   the code it touches. For Next-specific code, read
+   `node_modules/next/dist/docs/` first (`AGENTS.md`).
+2. Build it in both engines where it's about sound (the browser's
+   `src/engine/`, the native `crates/dawn-engine/`), with unit, component
+   and e2e tests.
+3. Run the checks (below).
+4. Tick it off in three places: `nextSteps.md` ("Done <date>", with a
+   line on what changed from the plan), `IMPROVEMENTS.md` (`[x]`, then
+   "(commit to come)", filled in with the hash once the user has
+   committed), and this file (an entry in the item log, and "Start here").
+5. Leave everything uncommitted. Report what was done and the test
+   results (failures included), and give the commit command.
 
 ## The project, briefly
 
 The Dawn Project is a browser DAW, also built as a desktop app.
 
-- **Web app:** Next.js 16 (static export), TypeScript, Tailwind v4,
+- **Web app:** Next.js 16 (static export), React, TypeScript, Tailwind v4,
   Tone.js. `AGENTS.md` says this Next.js has breaking changes: read
   `node_modules/next/dist/docs/` before writing Next-specific code.
 - **Desktop app:** Tauri 2 (`src-tauri/`). It shows the same studio in a
@@ -19,8 +71,25 @@ The Dawn Project is a browser DAW, also built as a desktop app.
   - `crates/dawn-engine`: the engine. Plain Rust, no dependencies.
   - `crates/dawn-plugins`: VST3/CLAP plugin scanning.
   - `crates/dawn-test-plugin`: a test plugin.
-  - `src-tauri`: the desktop app.
+  - `src-tauri`: the desktop app (crate `dawn-desktop`).
 - **Repo:** `angelzxz1/The_Dawn_Proyect`. Default branch `main`.
+- **Where things are in the studio:**
+  - `src/studio/Daw.tsx`: the studio, which wires everything together.
+  - `src/state/`: the project store (`projectStore`: `push` for an undo
+    step, then `set`/`get`) and the actions on it (`trackActions`,
+    `effectActions`, `clipActions`...).
+  - `src/project/`: the project's types, `projectSchema.ts`
+    (`normalizeProject`, which every saved field goes through), templates.
+  - `src/engine/`: the browser engine (`audioEngine.ts`), `engineSync.ts`
+    (makes the engine follow the project, the same calls for playback and
+    the bounce), and `native/describe.ts` (what's sent to the native
+    engine).
+  - `src/effects/`, `src/instruments/`: each device's model, kernel and UI.
+- **Docs:**
+  - `IMPROVEMENTS.md`: the improvement items, ticked with their commits.
+  - `nextSteps.md`: the order to do what's left. It's local only (in
+    `.gitignore`), so if it's missing, "The road ahead" below has it.
+  - `docs/desktop.md`: the desktop app and porting kernels.
 
 ## Goals and the user's decisions
 
@@ -31,14 +100,21 @@ The Dawn Project is a browser DAW, also built as a desktop app.
   continues. The stages:
   1. Playback through the device. Done.
   2. Instruments. Done (PRs #7, #8).
-  3. Effects. Every effect with its own DSP kernel is done (PRs #9–#13),
-     and every one built from Web Audio nodes. The NAM Amp stays out
-     (below).
-  4. Sidechains and automation. Delay compensation was planned here and
-     was brought forward into stage 3 (PR #11).
-  5. Live input and recording.
+  3. Effects. Done: every effect, its own DSP kernel or built from Web
+     Audio nodes (PRs #9–#13, then `fd0e076` to `cd4775f`). The NAM Amp
+     stays out (below).
+  4. Sidechains and automation (Phase 7). Delay compensation was planned
+     here and was brought forward into stage 3 (PR #11).
+  5. Live input and recording (Phase 8).
   6. Then the plugins: P2 CLAP effects, P3 VST3 effects, P4 plugin
-     instruments, P5 Audio Units.
+     instruments, P5 Audio Units (Phase 9).
+
+  The studio's UX items (Phases 3-6) fit between the stages, since they
+  don't wait on the engine. Where both need a feature, the studio settles
+  the model first and the engine ports it.
+- **NAM (2026-10-31):** not in the native engine. On the desktop, NAM
+  models play through NAM's own plugin once VST3 plugins run; the
+  built-in NAM Amp stays a browser effect.
 - **ASIO: decided later.** The options:
   - Steinberg's ASIO licence agreement, signed by the owner (my
     recommendation, since `LICENSE.md` keeps Dawn proprietary). It's
@@ -52,8 +128,8 @@ The Dawn Project is a browser DAW, also built as a desktop app.
 
   On 2026-10-30 the user said they'll take this up once they consider
   the DAW finished. Keep ASIO off (cargo feature `asio`) until they
-  confirm Steinberg has signed.
-
+  confirm Steinberg has signed. The desktop driver/device/inputs picker
+  (step 38) is the very last step, so it's built with ASIO in it.
 - **Standing constraint (the user's words):** "Remove any github links or
   sponsors or any link related to github as well any message saying
   github. All feedback will be done via discord." This applies to app and
@@ -62,51 +138,96 @@ The Dawn Project is a browser DAW, also built as a desktop app.
 
 ## How the work is done (conventions)
 
-**Branch:**
+**Branch and commits:**
 
-- For now (since 2026-10-29), work on `main`: the user said "Let's work
-  for now on main always. I'll let you now when we'll create a new
-  branch." Leave the changes uncommitted and give the user the commit
-  command; they commit it themselves.
-- Before that, work went on `claude/busy-rubin-wagwyi`, restarted from
-  main after each merge.
+- Work on `main` (since 2026-10-29): the user said "Let's work for now on
+  main always. I'll let you now when we'll create a new branch." Don't
+  branch until they say so.
+- Don't commit. The user commits; give them the command, in PowerShell,
+  with several `-m` flags: a short title, a paragraph on what changed (in
+  the user's terms), and the attribution:
 
-**Commits** end with:
+  ```powershell
+  git add -A
+  git commit -m "Title" -m "What it does." -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+  ```
 
-```
-angelzxz1
-```
+- Before 2026-10-29, work went through PRs from `claude/busy-rubin-wagwyi`
+  (one per stage, merged when CI was green). That's paused.
 
-**One PR per stage or batch:**
+**Checks before handing a step over:**
 
-- Subscribe to the PR's activity and set a `send_later` check-in (about
-  50 minutes).
-- Merge when CI is green and `mergeable_state` is clean. The MCP merge
-  needs the full 40-character `expectedHeadSha`.
-- After merging: unsubscribe, delete the check-in, restart the branch.
-
-**Checks before every push:**
-
-- `cargo fmt --all --check`
-- `cargo clippy --workspace --all-targets -- -D warnings`
-- `cargo test --workspace`
-- `npx tsc --noEmit`
-- `npm run lint`
-- `npx vitest run` (620 unit and component tests on 2026-10-30). The
+- `npx tsc --noEmit` and `npm run lint` (both clean).
+- `npx vitest run`: 771 unit and component tests on 2026-11-01, in the
+  projects `unit` (Node), `components` (Chromium) and `web-audio`. The
   component tests have a 30 s limit (`vitest.config.ts`), and the slow
   unit tests their own; no `--testTimeout` needed.
-- `npx playwright test` (149 tests, 1 skipped). It serves `out/`, so run
-  `npm run build` first or it tests the last build. On Windows on 2026-10-30,
-  four site page tests failed on 404s for resources `serve` didn't find
-  (`site.spec.ts`). The credits one was checked on `main` without the day's
-  changes and failed the same way.
+- `npm run build`, then `npx playwright test --workers=2`: 174 tests, 1
+  skipped, all passing on 2026-11-02 (about 10 minutes). It serves `out/`,
+  so build first or it tests the last build. Use 2 workers: a full run
+  with more was once stopped because the computer ran low on memory. Run a
+  single spec while working (`npx playwright test e2e/<name>.spec.ts`).
+- When the Rust changes: `cargo fmt --all --check`,
+  `cargo clippy --workspace --all-targets -- -D warnings`,
+  `cargo test --workspace`. In PowerShell put cargo on the path first:
+  `$env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"`.
 
 CI (`.github/workflows/ci.yml`) runs `cargo test -p dawn-engine -p dawn-plugins`,
 clippy and fmt. `desktop.yml` builds on Windows, macOS and Linux.
 
+**Gotchas:**
+
+- Playwright's `getByTitle("Stop")` (and `getByRole` names) match any
+  substring, ignoring case. A new tooltip with "stop", "play", "close" and
+  the like in it breaks tests that look for those buttons (a loudness
+  tooltip with "stop" in it broke 19 tests in step 18). Check new titles
+  against the e2e tests.
+- The shell is Windows (PowerShell, with Git Bash for the Bash tool). A
+  heredoc with an apostrophe in it fails in Bash, so put multi-line edit
+  scripts (Python, `assert s.count(a) == 1` before each replace) in the
+  session's scratchpad and run them from there.
+- The repo isn't Prettier-formatted: don't run `prettier --write`.
+- `next dev` re-adds the block in `AGENTS.md`; leave it be.
+
 **Writing style for code and docs:** plain, short sentences in the
 codebase's voice. Comments say what something is for. Match the
-surrounding comment density.
+surrounding comment density. Reports to the user are plain too: what
+changed, in their terms, then the tests.
+
+## The road ahead
+
+A summary of `nextSteps.md` from step 21 on (sizes: S a session, M a few,
+L a stage of its own).
+
+- **Phase 6, mixing (the rest):**
+  - 21. Part 2 #23, one style for every window (M). Next.
+  - 22. Part 2 #10, the mixer view: channel strips with faders, meters
+    (`Meter`'s `scale` shows the dB marks), sends with pre/post, inserts,
+    Audio to/from (L).
+  - 23. Part 2 #26, detached or second-screen windows for the mixer and
+    the piano roll: Tauri windows on the desktop, pop-outs in the browser
+    (L).
+- **Phase 7, native stage 4:** 24, sidechains in the engine
+  (`mixGraph.ts` `resolveSidechains`, `keyDelay`; then `describe.ts`
+  stops leaving sidechained effects out). 25, automation in the engine
+  (points with a `curve`, bent by `curveShape`).
+- **Phase 8, recording, then native stage 5:** 26, monitoring modes per
+  track (In, Auto, Off; #14). 27, punch-in and punch-out in the loop
+  (#15). 28, input channels on multi-input interfaces (#17). 29, live
+  input and recording through the engine.
+- **Phase 9, plugins:** 30, CLAP effects (windows in #23's style, state
+  saved). 31, VST3 effects (NAM's own plugin first). 32, plugin
+  instruments. 33, Audio Units.
+- **Phase 10, shipping:** 34, export through the engine. 35, native file
+  dialogs. 36, signed installers.
+- **Throughout:** 37, Part 2 #27, accessibility (labels and focus as each
+  piece is built, a full pass after Phase 6).
+- **Last:** 38, the desktop's driver type, then device, then its inputs,
+  as Ableton does, once ASIO can be turned on. The user's words: the
+  desktop version "will ask for the controller or driver and will show the
+  inputs for the driver or controller like in ableton, where you choose
+  asio as the driver type and then the audio device, which in my case is
+  UMC Asio Driver." The browser keeps listing every input.
 
 ## Key techniques
 
@@ -247,7 +368,7 @@ Temporary, never committed:
    - The probe scripts lived in the old container's scratchpad and are
      gone. Rebuild them from this description.
 
-## Files touched this session (stage 3)
+## Files touched in stage 3 (PRs #10-#13)
 
 **PR #10 (Gate, Glue, Parametric EQ, multiband effects):**
 
@@ -292,28 +413,33 @@ Temporary, never committed:
 - `tests/effects.rs`: the every-type chain test now feeds a 220 Hz tone,
   because the amp blocks DC
 
-## Current state
+## The native engine today
 
-- `main` = `claude/busy-rubin-wagwyi` = `95727ac`. Nothing is open, and no
-  check-ins are scheduled.
-- **The native engine plays:**
+- **It plays:**
   - audio clips;
   - every instrument (piano, Drum Rack, synth), from clips and live keys;
-  - the mix: volume, pan, mute, solo, groups, sends, buses;
-  - effects `PORTED` = chorus, compressor, delay, distortion (the
-    Saturator), eq3, filter, gate, glue, irLoader, limiter, mbDynamics,
-    multiband, paramEq, pitchShift, reverb, tubeAmp, tuner, utility;
-  - delay compensation, the master limiter and the metronome.
-- **The panel lists what it doesn't play:**
+  - the mix: volume, pan, mute, solo, groups, sends (post- or pre-fader,
+    `Send.pre`), buses;
+  - every effect but the NAM Amp: `PORTED` = chorus, compressor, delay,
+    distortion (the Saturator), eq3, filter, gate, glue, irLoader,
+    limiter, mbDynamics, multiband, paramEq, pitchShift, reverb, tubeAmp,
+    tuner, utility;
+  - delay compensation, the master limiter and the metronome (its four
+    click sounds).
+- **The Audio panel lists what it doesn't play:**
   - instruments it lacks;
-  - effects: those not ported, plus sidechained ones;
+  - effects: the NAM Amp, plus sidechained ones;
   - tracks with automation.
-- **Not yet in the engine:** sidechains, automation, recording. The NAM
-  Amp won't be (below).
+- **Not yet in the engine:** sidechains and automation (Phase 7),
+  recording (Phase 8), sending its meter levels back to the studio. The
+  NAM Amp won't be (NAM's own plugin will play it).
 
-## Next steps
+## The native engine plan, stage by stage
 
-1. **The Web Audio-node effects.** Their parity can't be checked in node,
+Notes on each stage's work, done and to come (the order is in "The road
+ahead" above).
+
+1. **The Web Audio-node effects (done).** Their parity can't be checked in node,
    because the nodes don't run there, so their fixtures are rendered in
    Chromium: `src/test/webAudioParity.ts` plays the test signal through
    the studio's own nodes in an OfflineAudioContext, in Vitest's
@@ -444,12 +570,16 @@ Temporary, never committed:
    state saved), P3 VST3 effects, P4 plugin instruments, P5 Audio Units.
 6. **Export** through the engine, native file dialogs, signed installers.
 
-**Smaller items:**
+## Item log: the studio's improvements
+
+What each finished `IMPROVEMENTS.md` item changed, and where, roughly in
+the order they were done, with the fixes made along the way.
 
 - **IMPROVEMENTS.md** (checked against the code on 2026-10-29). It has
   checkboxes, and each finished item names the commit that did it.
   - Part 1 (code) is all done.
-  - Part 2 (UX) items 1–9 are done. Item 8 (2026-10-31): an Adaptive
+  - Part 2 (UX): items 1–9, 11–13, 16, 18–22, 24, 25 and 28 are done.
+    Item 8 (2026-10-31): an Adaptive
     snap setting that follows the zoom, and clips snapping to other
     clips' edges (`clipSnap.ts`; Alt drags free). Item 9 (2026-10-31):
     automation segments bend (`AutomationPoint.curve`, `curveShape` in
@@ -539,7 +669,7 @@ Temporary, never committed:
     autosaves the working copy a moment later. The FX rack's fold moved
     from FxRack to the studio. A resizable rack was tried and dropped: its
     cards are a fixed height, so a taller rack was empty space.
-  - Item 11 (2026-11-01): the meters show dB (-60 to +6,
+  - Item 11 (2026-11-01, `67ea045`): the meters show dB (-60 to +6,
     `tracks/meterScale.ts`), each side's RMS with its peaks over it, the
     loudest peak held 1.5 s, and a clip light that stays on until it's
     clicked (`tracks/Meter.tsx`, on tracks, buses and the master). The
@@ -556,7 +686,7 @@ Temporary, never committed:
     1 kHz tone as -23 LUFS. In the desktop app with the native engine
     on, the meters still read the browser's audio, which is silent then:
     the engine needs to send its levels (with Phase 7 or 8).
-  - Item 13 (2026-11-01): a send can be taken before the fader
+  - Item 13 (2026-11-01, `66c9526`): a send can be taken before the fader
     (`ChannelConfig.preSends`, bus ids; `trackActions.setSendPre`, one undo
     step): after the track's effects and its mute and solo, but not its
     fader or pan. The browser engine taps it after `muteGain`
@@ -569,7 +699,7 @@ Temporary, never committed:
     (its group or target track, the master, the buses it sends to, pre or
     post, the tracks taking it as their input) and what plays into it;
     hovering a bus, the tracks sending to it (`tracks/routeHighlight.ts`).
-  - Item 12 (2026-11-01): faster effect handling. A rack's card dragged
+  - Item 12 (2026-11-01, `bfa84ac`): faster effect handling. A rack's card dragged
     onto another track's header, a bus or the master moves there, or with
     Ctrl/Alt/Cmd held is copied (`studio/rack/effectDrag.ts` carries it:
     `RACK_EFFECTS_MIME` is `{ host, ids }`; `effectActions.transfer`, one
@@ -582,7 +712,7 @@ Temporary, never committed:
     listed first under Chains with a delete button; only factory cabinets
     are kept with it, since other files belong to their project.
   - Items 10, 14, 15, 17, 23, 26 and 27 are open. Next in `nextSteps.md`
-    is Phase 6, step 21 (23, one style for every window).
+    is Phase 6, step 21 (#23, one style for every window).
   - Fixed 2026-10-31: on Windows, Next's static export wrote each page's
     prefetch files as folders (`__next.!KHNpdGUp/__PAGE__.txt`, from a
     backslash it doesn't turn into a dot) where its router asks for
@@ -600,33 +730,19 @@ Temporary, never committed:
     `inputSource(channelId)`, `getInputPeak(channelId)`), closing those no
     track uses. Measuring the latency listens on the armed track's
     device.
-  - The user's last step (`nextSteps.md` 38, after Steinberg's email
-    makes ASIO possible): the desktop app picks a driver type, then a
-    device, and each track's Input lists only that device's inputs, as
-    Ableton does. The browser keeps listing every input.
   - On 2026-10-31 the user asked for one loop switch: the arrangement
     toolbar's "Loop" stays; the transport bar's and the small one above
     the tempo lane are gone. The automation lane's row is now as wide as
     the song (it stopped at the view's width once scrolled).
   - `e2e/recording.spec.ts` failed now and then with several workers on
     2026-10-31 (each test's time swinging 14-36 s); with one worker, and
-    in most runs, it passes.
+    in most runs, it passes. On 2026-11-01 two piano-roll tests (the
+    Draw/Select switch, Follow) failed once in a full run and passed 12
+    of 12 when repeated: load, not a bug.
   - The project document now has `markers` (in beats). The native engine
     ignores them; they only move the playhead and the loop.
-- **The order of what's left** is in `nextSteps.md`, which is kept
-  locally (it's in `.gitignore`). Phase 2's first two steps (the Convolver:
-  the Reverb and the IR Loader, 2026-10-30; the Tuner, 2026-10-31) are
-  done, and NAM was dropped from it (above), so Phase 2 is done. Phase 3
-  (editing) has begun: steps 7-11 (Part 2 #8, snapping; #9,
-  drawing tools; #22, silent states; #16, the count-in and click sounds;
-  #21, the podcast template) were done on 2026-10-31, so Phase 3 is done;
-  Phase 4 (steps 12-14: Part 2 #19, menus and tooltips; #18, the command
-  palette and cheat sheet; #20, previews, favorites and recent items) was
-  done on 2026-10-31. Phase 5 has begun: step 15 (#28, Preferences) was
-  done on 2026-11-01, and steps 16 (#24, the light theme and UI size) and
-  17 (#25, the layout per project) too, so Phase 5 is done. Phase 6 has
-  begun: steps 18 (#11, better meters), 19 (#13, pre/post sends and
-  routing highlights) and 20 (#12, faster effect handling) were done on
-  2026-11-01; next is step 21 (#23). Phase 1 (housekeeping) was done on 2026-10-30: the slow tests got longer limits, a flaky ClipBlock
-  double-click test clicks twice in one go, and the JS multiband kernels
-  read the band count and their key per sample, as the Rust ports do.
+- **Phases done** (of `nextSteps.md`): 1, housekeeping (2026-10-30); 2,
+  the engine's effects (2026-10-31; NAM dropped from it); 3, editing; 4,
+  finding things (both 2026-10-31); 5, settings and look (2026-11-01).
+  Phase 6, mixing, has steps 18-20 done (2026-11-01); next is step 21
+  (#23).
