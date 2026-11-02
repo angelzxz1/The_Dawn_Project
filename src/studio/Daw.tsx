@@ -61,7 +61,7 @@ import { useStudioTheme, useUiScale } from "@/studio/shell/theme";
 import { routeHighlights, type Hovered } from "@/studio/tracks/routeHighlight";
 import { ShortcutSheet } from "@/studio/shell/ShortcutSheet";
 import { trackActions } from "@/state/trackActions";
-import { effectActions } from "@/state/effectActions";
+import { effectActions, effectsOf } from "@/state/effectActions";
 import { clipActions, isMidiClip, rebuildMidiPart } from "@/state/clipActions";
 import { rangeActions, tracksOf, type TimeSelection } from "@/state/rangeActions";
 import { clipEditActions } from "@/state/clipEditActions";
@@ -89,6 +89,9 @@ import { SIDECHAIN_TAP_LABELS } from "@/effects/sidechain/sidechainModel";
 import { AudioStatus } from "@/studio/transport/AudioStatus";
 import { LatencyHint } from "@/studio/transport/LatencyHint";
 import { EffectBrowser } from "@/studio/rack/EffectBrowser";
+import type { EffectDrop } from "@/studio/rack/effectDrag";
+import { copiedEffects, copyEffects, subscribeCopiedEffects } from "@/state/effectClipboard";
+import { findChain, saveUserChain } from "@/effects/userChains";
 import { PluginBrowser } from "@/studio/rack/PluginBrowser";
 import { plugins as pluginList } from "@/engine/native/plugins";
 import { isDesktopApp } from "@/services/desktop";
@@ -132,7 +135,7 @@ import { communityLink, shouldAskAfterExport, supportLinks } from "@/services/su
 import type { ProjectTemplate } from "@/project/templates";
 import { grooveById, grooveHits, grooveKit, type Groove } from "@/library/grooves";
 import { getAudioPrefs } from "@/engine/audioPrefs";
-import { defaultParams, type EffectType } from "@/effects/registry";
+import { defaultParams, EFFECT_LABELS, type EffectType } from "@/effects/registry";
 import type { ScaleSetting } from "@/project/scales";
 import { DEFAULT_KEY } from "@/project/chords";
 import { nativeEngine } from "@/engine/native/nativeEngine";
@@ -2096,6 +2099,31 @@ export function Daw() {
     noticeRef.current = flashProjectNotice;
   }, [flashProjectNotice]);
 
+  /** Effects dropped on a track, a bus or the master (its header, its chip,
+   * or a gap in its rack): added from the browser, or moved or copied from
+   * another rack. Says what it did, since that chain may not be in view. */
+  const handleDropEffects = (hostId: string, drop: EffectDrop, atIndex?: number) => {
+    const doc = projectStore.get();
+    const hostName = hostId === "master" ? doc.masterName : doc.channels.find((c) => c.id === hostId)?.name ?? doc.buses.find((b) => b.id === hostId)?.name ?? "";
+    if (drop.kind === "effect") {
+      if (!effectActions.add(hostId, drop.type, atIndex, drop.preset)) return;
+      noteUsed(drop.preset ? pickKey("preset", drop.preset) : pickKey("effect", drop.type));
+      flashProjectNotice(`Added ${EFFECT_LABELS[drop.type]} to ${hostName}`);
+    } else if (drop.kind === "chain") {
+      const chain = findChain(drop.chain);
+      if (!chain) return;
+      effectActions.addChain(hostId, chain, atIndex);
+      flashProjectNotice(`Added the ${chain.name} chain to ${hostName}`);
+    } else {
+      const moved = effectsOf(drop.host).filter((e) => drop.ids.includes(e.id));
+      const count = effectActions.transfer(drop.host, drop.ids, hostId, atIndex, drop.copy);
+      if (count === 0) return;
+      const what = count === 1 ? EFFECT_LABELS[moved[0].type] : `${count} effects`;
+      flashProjectNotice(`${drop.copy ? "Copied" : "Moved"} ${what} to ${hostName}`);
+    }
+  };
+  const copiedCount = useSyncExternalStore(subscribeCopiedEffects, () => copiedEffects().length, () => 0);
+
   const handleInstallPack = useCallback(async (file: File): Promise<{ ok: boolean; message: string }> => {
     if (file.size > 400 * 1024 * 1024) return { ok: false, message: `"${file.name}" is too large to be a Dawn pack.` };
     const result = await installPack(new Uint8Array(await file.arrayBuffer()), audioEngine.sampleRate);
@@ -2271,6 +2299,7 @@ export function Daw() {
     pick: handlePickTrack,
     toggleTakes: takeActions.toggleShowTakes,
     hover: (id) => setHovered(id ? { kind: "track", id } : null),
+    dropEffects: (id, drop) => handleDropEffects(id, drop),
   });
   const laneActions = useStableActions<TrackLaneActions>({
     selectTrack: (id) => {
@@ -2358,7 +2387,7 @@ export function Daw() {
       <RecoveryNotice />
       <EffectBrowser
         onAddEffect={handleSidebarAddEffect}
-        onAddChain={fxChannel ? (chain) => effectActions.addChain(fxChannel.id, chain) : undefined}
+        onAddChain={fxChannel || fxBus || fxMasterOpen ? (chain) => effectActions.addChain(fxHostId, chain) : undefined}
         onPreviewEffect={handlePreviewEffect}
         onPreviewTone={(tone) => audioEngine.previewEffect({ type: toneEffect(tone), fileId: tone.id }, { kind: "pluck" })}
         onStopPreview={() => audioEngine.stopPreview()}
@@ -2947,6 +2976,7 @@ export function Daw() {
         onRemoveBus={handleRemoveBus}
         route={routeLights}
         onHoverBus={(id) => setHovered(id ? { kind: "bus", id } : null)}
+        onDropEffects={(hostId, drop) => handleDropEffects(hostId, drop)}
       />
 
       <NoteInputWindow
@@ -3058,6 +3088,18 @@ export function Daw() {
           onRemoveEffect={(effectId) => effectActions.remove(fxHostId, effectId)}
           onMoveEffect={(effectId, toIndex) => effectActions.move(fxHostId, effectId, toIndex)}
           onDuplicateEffect={(effectId) => effectActions.duplicate(fxHostId, effectId)}
+          onDropEffects={(drop, atIndex) => handleDropEffects(fxHostId, drop, atIndex)}
+          onCopyEffects={(ids) => {
+            const list = rackEffects.filter((e) => ids.includes(e.id));
+            copyEffects(list);
+            flashProjectNotice(list.length === 1 ? `Copied ${EFFECT_LABELS[list[0].type]}` : `Copied ${list.length} effects`);
+          }}
+          onPasteEffects={(atIndex) => effectActions.paste(fxHostId, atIndex)}
+          copiedCount={copiedCount}
+          onSaveChain={(name) => {
+            const chain = saveUserChain(name, rackEffects);
+            if (chain) flashProjectNotice(`Saved the chain "${chain.name}"`);
+          }}
           onBypassToggle={(effectId) => effectActions.toggleBypass(fxHostId, effectId)}
           onParamDragStart={pushHistory}
           onParamChange={(effectId, key, value) => effectActions.setParam(fxHostId, effectId, key, value)}

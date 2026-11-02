@@ -14,6 +14,7 @@ vi.mock("@/engine/audioEngine", () => ({
     setEffectParam: (_host: string, id: string, key: string, value: number) => engine.calls.push(`param ${id} ${key}=${value}`),
     setEffectBypass: (_host: string, id: string, bypass: boolean) => engine.calls.push(`bypass ${id} ${bypass}`),
     setEffectSidechain: (_host: string, id: string) => engine.calls.push(`sidechain ${id}`),
+    removeEffect: (host: string, id: string) => engine.calls.push(`remove ${id} from ${host}`),
     setEffectFile: (_host: string, id: string, file: string | null) => {
       engine.calls.push(`file ${id} ${file}`);
       return Promise.resolve(null);
@@ -22,6 +23,7 @@ vi.mock("@/engine/audioEngine", () => ({
 }));
 
 import { effectActions } from "./effectActions";
+import { copyEffects } from "./effectClipboard";
 import { projectStore } from "./projectStore";
 
 const compressor: EffectInstance = {
@@ -37,7 +39,11 @@ const eq: EffectInstance = { id: "fx-b", type: "eq3", params: {}, bypass: false 
 beforeEach(() => {
   engine.calls = [];
   const doc = projectStore.get();
-  projectStore.load({ ...doc, channels: [{ ...doc.channels[0], id: "vox" }], channelEffects: { vox: [compressor, eq] } }, [], []);
+  projectStore.load(
+    { ...doc, channels: [{ ...doc.channels[0], id: "vox" }, { ...doc.channels[0], id: "kick" }], channelEffects: { vox: [compressor, eq], kick: [] } },
+    [],
+    []
+  );
 });
 
 describe("effect actions", () => {
@@ -57,5 +63,49 @@ describe("effect actions", () => {
     effectActions.duplicate("vox", "fx-gone");
     expect(engine.calls).toEqual([]);
     expect(projectStore.get().channelEffects.vox).toHaveLength(2);
+  });
+
+  it("moves effects to another track, in their order, as one undo step", () => {
+    projectStore.set("channelEffects", (prev) => ({ ...prev, kick: [{ id: "fx-k", type: "gate", params: {}, bypass: false }] }));
+    expect(effectActions.transfer("vox", ["fx-b", "fx-a"], "kick", 0)).toBe(2);
+    const { vox, kick } = projectStore.get().channelEffects;
+    expect(vox).toEqual([]);
+    expect(kick.map((e) => e.type)).toEqual(["compressor", "eq3", "gate"]);
+    // Its sidechain listened to the kick: on the kick it can't.
+    expect(kick[0].sidechain).toBeUndefined();
+    expect(kick[0].params).toEqual(compressor.params);
+    expect(engine.calls).toContain("remove fx-a from vox");
+
+    projectStore.undo();
+    expect(projectStore.get().channelEffects.vox.map((e) => e.id)).toEqual(["fx-a", "fx-b"]);
+    expect(projectStore.get().channelEffects.kick.map((e) => e.id)).toEqual(["fx-k"]);
+  });
+
+  it("copies effects to another track, leaving them where they were", () => {
+    projectStore.set("channelEffects", (prev) => ({ ...prev, kick: [] }));
+    effectActions.transfer("vox", ["fx-a"], "master", undefined, true);
+    expect(projectStore.get().channelEffects.vox).toHaveLength(2);
+    expect(projectStore.get().masterEffects.at(-1)).toEqual({ ...compressor, id: expect.stringMatching(/^fx-new-/) });
+    expect(engine.calls).not.toContain("remove fx-a from vox");
+  });
+
+  it("moving onto its own chain does nothing (that's reordering)", () => {
+    expect(effectActions.transfer("vox", ["fx-a"], "vox")).toBe(0);
+    expect(engine.calls).toEqual([]);
+  });
+
+  it("pastes what was copied, where it's asked", () => {
+    copyEffects([compressor, eq]);
+    expect(effectActions.paste("vox", 1)).toBe(2);
+    expect(projectStore.get().channelEffects.vox.map((e) => e.type)).toEqual(["compressor", "compressor", "eq3", "eq3"]);
+    expect(engine.calls.filter((c) => c.startsWith("add"))).toEqual(["add compressor at 1", "add eq3 at 2"]);
+  });
+
+  it("adds a chain where it's dropped, bypassed steps bypassed", () => {
+    effectActions.addChain("vox", { id: "c", name: "C", description: "", steps: [{ type: "gate" }, { type: "reverb", bypass: true }] }, 1);
+    const list = projectStore.get().channelEffects.vox;
+    expect(list.map((e) => e.type)).toEqual(["compressor", "gate", "reverb", "eq3"]);
+    expect(list[2].bypass).toBe(true);
+    expect(engine.calls.filter((c) => c.startsWith("add"))).toEqual(["add gate at 1", "add reverb at 2"]);
   });
 });

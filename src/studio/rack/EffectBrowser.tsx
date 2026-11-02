@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
-import { ChevronRight, Clock, Drum, Link2, Plug, Search, Sliders, Star, X } from "lucide-react";
+import { ChevronRight, Clock, Drum, Link2, Plug, Search, Sliders, Star, Trash2, X } from "lucide-react";
 import { EFFECT_CHAINS, type EffectChain } from "@/effects/chains";
 import { EFFECT_GROUPS, EFFECT_LABELS, type EffectType } from "@/effects/registry";
 import { findPreset, presetsFor, type EffectPreset } from "@/effects/presets";
+import { deleteUserChain, subscribeUserChains, userChains } from "@/effects/userChains";
 import { useUserPresets } from "@/effects/ui/PresetMenu";
 import { parsePick, pickKey, usePicks } from "@/library/browserPicks";
 import { browserTones, PREVIEW_SOURCE, toneEffect } from "@/library/previews";
@@ -12,11 +13,9 @@ import { bundledTones, type ToneEntry } from "@/library/tones";
 import { installedPacks, subscribePacks } from "@/project/packStore";
 import { PreviewButton, StarButton, usePreviewing } from "./BrowserItem";
 
-/** The MIME type used to carry an effect type through HTML5 drag-and-drop
- * from this sidebar to the FX rack - shared with FxRack.tsx. */
-export const EFFECT_DRAG_MIME = "application/x-dawn-effect-type";
-/** Carried alongside EFFECT_DRAG_MIME when a preset is dragged: its id. */
-export const PRESET_DRAG_MIME = "application/x-dawn-effect-preset";
+// What a drag from here carries (effectDrag.ts), for the rack and the tracks.
+import { CHAIN_DRAG_MIME, EFFECT_DRAG_MIME, PRESET_DRAG_MIME } from "./effectDrag";
+export { EFFECT_DRAG_MIME, PRESET_DRAG_MIME };
 
 interface EffectBrowserProps {
   /** Adds the effect (with a preset loaded, if given) to whatever
@@ -108,6 +107,7 @@ export function EffectBrowser({
   const [openDevices, setOpenDevices] = useState<Set<EffectType>>(new Set());
   const [query, setQuery] = useState("");
   const user = useUserPresets();
+  const savedChains = useSyncExternalStore(subscribeUserChains, userChains, userChains);
   const picks = usePicks();
   const favorites = new Set(picks.favorites);
   const { playing, play } = usePreviewing(onStopPreview);
@@ -141,6 +141,36 @@ export function EffectBrowser({
   });
 
   const chains = EFFECT_CHAINS.filter((c) => !q || matches(c.name, q) || matches("chains", q));
+  const yours = savedChains.filter((c) => !q || matches(c.name, q) || matches("chains", q));
+  const chainRow = (c: EffectChain, own: boolean) => (
+    <div key={c.id} className="group flex min-w-0 items-center">
+      <button
+        type="button"
+        draggable
+        onDragStart={(e) => {
+          e.dataTransfer.setData(CHAIN_DRAG_MIME, c.id);
+          e.dataTransfer.effectAllowed = "copy";
+        }}
+        onClick={() => onAddChain?.(c)}
+        title={`${c.description} Click to add it to the selected track, or drag it into the rack or onto a track.`}
+        className="flex min-w-0 flex-1 cursor-grab items-center gap-1.5 rounded border border-transparent px-1.5 py-1 text-left text-[11px] text-muted hover:border-accent hover:bg-surface-raised hover:text-accent active:cursor-grabbing"
+      >
+        <Link2 size={10} className="shrink-0" />
+        <span className="truncate">{c.name}</span>
+      </button>
+      {own && (
+        <button
+          type="button"
+          onClick={() => deleteUserChain(c.id)}
+          aria-label={`Delete the chain ${c.name}`}
+          title="Delete this chain (from every project)"
+          className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-muted opacity-0 hover:text-record focus:opacity-100 group-hover:opacity-100"
+        >
+          <Trash2 size={10} />
+        </button>
+      )}
+    </div>
+  );
 
   const previewEffect = (type: EffectType, presetId?: string) =>
     onPreviewEffect && PREVIEW_SOURCE[type] ? () => play(pickKey(presetId ? "preset" : "effect", presetId ?? type), () => onPreviewEffect(type, presetId)) : undefined;
@@ -308,7 +338,7 @@ export function EffectBrowser({
                 <div className="flex flex-col">{g.rows}</div>
               </section>
             ))}
-            {onAddChain && chains.length > 0 && (
+            {onAddChain && chains.length + yours.length > 0 && (
               <div>
                 <button
                   type="button"
@@ -320,23 +350,19 @@ export function EffectBrowser({
                 </button>
                 {(q || !collapsedGroups.has("Chains")) && (
                   <div className="ml-3 flex flex-col gap-0.5 border-l border-border pl-1">
-                    {chains.map((c) => (
-                      <button
-                        key={c.id}
-                        type="button"
-                        onClick={() => onAddChain(c)}
-                        title={`${c.description} Click to add it to the selected track.`}
-                        className="flex min-w-0 items-center gap-1.5 rounded border border-transparent px-1.5 py-1 text-left text-[11px] text-muted hover:border-accent hover:bg-surface-raised hover:text-accent"
-                      >
-                        <Link2 size={10} className="shrink-0" />
-                        <span className="truncate">{c.name}</span>
-                      </button>
-                    ))}
+                    {yours.length > 0 && (
+                      <section aria-label="Your chains" className="flex flex-col gap-0.5">
+                        <div className="px-1.5 pt-0.5 text-[9.5px] font-semibold uppercase tracking-wide text-muted/70">Yours</div>
+                        {yours.map((c) => chainRow(c, true))}
+                        {chains.length > 0 && <div className="px-1.5 pt-1 text-[9.5px] font-semibold uppercase tracking-wide text-muted/70">Factory</div>}
+                      </section>
+                    )}
+                    {chains.map((c) => chainRow(c, false))}
                   </div>
                 )}
               </div>
             )}
-            {view.length === 0 && chains.length === 0 && <p className="px-1 py-2 text-[11px] text-muted">Nothing matches “{query.trim()}”.</p>}
+            {view.length === 0 && chains.length + yours.length === 0 && <p className="px-1 py-2 text-[11px] text-muted">Nothing matches “{query.trim()}”.</p>}
             {view.map((group) => {
               const isCollapsed = !q && collapsedGroups.has(group.name);
               return (

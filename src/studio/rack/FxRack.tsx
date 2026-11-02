@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, ChevronUp, GripVertical, SlashSquare } from "lucide-react";
+import { BookmarkPlus, ChevronDown, ChevronUp, GripVertical, SlashSquare } from "lucide-react";
 import { ValueBar } from "@/studio/tracks/ValueBar";
-import { EFFECT_DRAG_MIME, PRESET_DRAG_MIME } from "./EffectBrowser";
-import { effectMenuItems } from "./effectMenu";
+import { carriesEffects, readEffectDrop, startRackDrag, type EffectDrop } from "./effectDrag";
+import { effectMenuItems, rackMenuItems } from "./effectMenu";
 import { ContextMenu } from "@/studio/shell/ContextMenu";
 import { PresetMenu, type PresetChange } from "@/effects/ui/PresetMenu";
 import { sidechainSourceName, type SidechainSource } from "@/effects/sidechain/SidechainPanel";
@@ -50,6 +50,17 @@ interface FxRackProps {
   onAddEffect: (type: EffectType, atIndex?: number, presetId?: string) => void;
   onRemoveEffect: (effectId: string) => void;
   onMoveEffect: (effectId: string, toIndex: number) => void;
+  /** Something else dropped at a place in the chain: a chain from the
+   * browser, another rack's cards, or a card with Ctrl held (a copy). */
+  onDropEffects?: (drop: EffectDrop, atIndex: number) => void;
+  /** Copies effects, to paste on any chain. */
+  onCopyEffects?: (effectIds: string[]) => void;
+  /** Pastes what was copied at a place in the chain. */
+  onPasteEffects?: (atIndex: number) => void;
+  /** How many effects are copied (0: none). */
+  copiedCount?: number;
+  /** Saves the whole chain under a name, for any track. */
+  onSaveChain?: (name: string) => void;
   /** Adds a copy of an effect right after it (its menu's Duplicate). */
   onDuplicateEffect?: (effectId: string) => void;
   onBypassToggle: (effectId: string) => void;
@@ -84,8 +95,6 @@ interface FxRackProps {
   onCollapsedChange?: (collapsed: boolean) => void;
 }
 
-const REORDER_DRAG_MIME = "application/x-dawn-effect-reorder";
-
 const INSTRUMENT_OPTIONS: { type: InstrumentType | null; label: string; icon: React.ReactNode }[] = [
   { type: null, label: "None", icon: <SlashSquare size={12} /> },
   ...INSTRUMENT_TYPES.map((type) => {
@@ -116,6 +125,7 @@ function DropGap({
     <div
       data-drop-gap={index}
       onDragOver={(e) => {
+        if (!carriesEffects(e)) return;
         e.preventDefault();
         onDragOverGap(index);
       }}
@@ -160,6 +170,11 @@ export function FxRack({
   onAddEffect,
   onRemoveEffect,
   onMoveEffect,
+  onDropEffects,
+  onCopyEffects,
+  onPasteEffects,
+  copiedCount = 0,
+  onSaveChain,
   onDuplicateEffect,
   onBypassToggle,
   onParamChange,
@@ -181,16 +196,23 @@ export function FxRack({
 }: FxRackProps) {
   const [dragOverGap, setDragOverGap] = useState<number | null>(null);
   /** The effect whose right-click menu is open, and where. */
-  const [menu, setMenu] = useState<{ effectId: string; x: number; y: number } | null>(null);
+  const [menu, setMenu] = useState<{ effectId: string | null; x: number; y: number } | null>(null);
+  /** The name being typed for the chain to save (null: not saving). */
+  const [chainName, setChainName] = useState<string | null>(null);
   const isBus = channelType === undefined;
 
   const handleDropAt = (index: number, e: React.DragEvent) => {
     setDragOverGap(null);
-    const newType = e.dataTransfer.getData(EFFECT_DRAG_MIME) as EffectType | "";
-    const reorderId = e.dataTransfer.getData(REORDER_DRAG_MIME);
-    const presetId = e.dataTransfer.getData(PRESET_DRAG_MIME);
-    if (newType) onAddEffect(newType, index, presetId || undefined);
-    else if (reorderId) onMoveEffect(reorderId, index);
+    const drop = readEffectDrop(e);
+    if (!drop) return;
+    if (drop.kind === "effect") onAddEffect(drop.type, index, drop.preset);
+    else if (drop.kind === "rack" && drop.host === (hostId ?? "") && !drop.copy) drop.ids.forEach((id) => onMoveEffect(id, index));
+    else onDropEffects?.(drop, index);
+  };
+
+  const saveChain = () => {
+    if (chainName !== null && chainName.trim()) onSaveChain?.(chainName.trim());
+    setChainName(null);
   };
 
   return (
@@ -209,12 +231,51 @@ export function FxRack({
           {collapsed ? <ChevronUp size={12} className="shrink-0 text-muted" /> : <ChevronDown size={12} className="shrink-0 text-muted" />}
           <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: color.accent }} />
           <span className="shrink-0 text-xs font-medium">FX — {channelName}</span>
-          {!collapsed && (
+          {!collapsed && chainName === null && (
             <span className="truncate text-[10px] text-muted">
-              drag a device from the sidebar into the rack, or drag a card to reorder it
+              drag a device from the sidebar into the rack; drag a card to reorder it, or onto another track to move it (Ctrl: copy)
             </span>
           )}
         </button>
+        {onSaveChain && effects.length > 0 && !collapsed &&
+          (chainName === null ? (
+            <button
+              type="button"
+              onClick={() => setChainName(channelName)}
+              title="Save this chain of effects under a name, to add to any track (it shows in the browser's Chains)"
+              className="mr-2 flex shrink-0 items-center gap-1 rounded border border-border px-1.5 py-0.5 text-[10px] text-muted hover:border-accent hover:text-accent"
+            >
+              <BookmarkPlus size={11} />
+              Save chain
+            </button>
+          ) : (
+            <form
+              className="mr-2 flex shrink-0 items-center gap-1"
+              onSubmit={(e) => {
+                e.preventDefault();
+                saveChain();
+              }}
+            >
+              <input
+                autoFocus
+                aria-label="Chain name"
+                value={chainName}
+                maxLength={60}
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => setChainName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") setChainName(null);
+                }}
+                className="w-40 rounded border border-accent bg-surface px-1 py-0.5 text-[11px] outline-none"
+              />
+              <button type="submit" className="rounded bg-accent px-1.5 py-0.5 text-[10px] font-medium text-on-accent">
+                Save
+              </button>
+              <button type="button" onClick={() => setChainName(null)} className="rounded px-1 py-0.5 text-[10px] text-muted hover:text-foreground">
+                Cancel
+              </button>
+            </form>
+          ))}
         {inputOptions && onInputChange && (
           <label
             className="mr-3 flex shrink-0 items-center gap-1.5 text-[10px] text-muted"
@@ -270,7 +331,15 @@ export function FxRack({
       </div>
 
       {!collapsed && (
-      <div className="flex flex-1 items-stretch gap-0 overflow-x-auto p-2">
+      <div
+        className="flex flex-1 items-stretch gap-0 overflow-x-auto p-2"
+        onContextMenu={(e) => {
+          // A card's own menu (or a knob's) comes first.
+          if (e.defaultPrevented || !onPasteEffects) return;
+          e.preventDefault();
+          setMenu({ effectId: null, x: e.clientX, y: e.clientY });
+        }}
+      >
         {channelType === "midi" && (
           <div
             role="group"
@@ -338,10 +407,7 @@ export function FxRack({
               >
                 <div
                   draggable
-                  onDragStart={(e) => {
-                    e.dataTransfer.setData(REORDER_DRAG_MIME, fx.id);
-                    e.dataTransfer.effectAllowed = "move";
-                  }}
+                  onDragStart={(e) => startRackDrag(e, hostId ?? "", [fx.id])}
                   title="Drag to reorder"
                   className="flex w-3 shrink-0 cursor-grab items-center justify-center rounded-l hover:bg-black/10 active:cursor-grabbing"
                 >
@@ -400,7 +466,9 @@ export function FxRack({
 
         {effects.length === 0 && (
           <div
-            onDragOver={(e) => e.preventDefault()}
+            onDragOver={(e) => {
+              if (carriesEffects(e)) e.preventDefault();
+            }}
             onDrop={(e) => handleDropAt(0, e)}
             className="flex w-56 shrink-0 items-center justify-center rounded border border-dashed border-border text-[11px] text-muted"
           >
@@ -413,14 +481,21 @@ export function FxRack({
             x={menu.x}
             y={menu.y}
             onClose={() => setMenu(null)}
-            items={effectMenuItems(effects, menu.effectId, {
-              open: (id) => onOpenEffectWindow?.(id),
-              toggleBypass: onBypassToggle,
-              move: onMoveEffect,
-              duplicate: (id) => onDuplicateEffect?.(id),
-              reset: onPresetChange ? (id, params) => onPresetChange(id, { params, preset: undefined }) : undefined,
-              remove: onRemoveEffect,
-            })}
+            items={
+              menu.effectId === null
+                ? rackMenuItems(effects.length, { paste: onPasteEffects, copied: copiedCount })
+                : effectMenuItems(effects, menu.effectId, {
+                    open: (id) => onOpenEffectWindow?.(id),
+                    toggleBypass: onBypassToggle,
+                    move: onMoveEffect,
+                    duplicate: (id) => onDuplicateEffect?.(id),
+                    reset: onPresetChange ? (id, params) => onPresetChange(id, { params, preset: undefined }) : undefined,
+                    remove: onRemoveEffect,
+                    copy: onCopyEffects,
+                    paste: onPasteEffects,
+                    copied: copiedCount,
+                  })
+            }
           />
         )}
 

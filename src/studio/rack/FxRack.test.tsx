@@ -9,6 +9,7 @@ import { userEvent } from "@vitest/browser/context";
 import type { ComponentProps } from "react";
 import { FxRack } from "./FxRack";
 import { EFFECT_DRAG_MIME, PRESET_DRAG_MIME } from "./EffectBrowser";
+import { CHAIN_DRAG_MIME, RACK_EFFECTS_MIME } from "./effectDrag";
 import { TRACK_COLOR_PALETTE } from "@/project/colors";
 import { defaultParams, type EffectInstance, type EffectType } from "@/effects/registry";
 import { INSTRUMENT_LABELS } from "@/instruments/registry";
@@ -178,6 +179,69 @@ describe("the effect cards", () => {
     await expect.element(screen.getByTitle("Remove effect")).not.toBeInTheDocument();
     await screen.getByTitle("Expand the FX rack").click();
     expect(onCollapsedChange).toHaveBeenLastCalledWith(false);
+  });
+});
+
+describe("effects from elsewhere, copying and chains", () => {
+  test("a chain from the browser, another rack's card, and a card dropped with Ctrl go to the studio where they're dropped", async () => {
+    const onDropEffects = vi.fn();
+    const { screen, onMoveEffect } = renderRack({ hostId: "lead", effects: [effect("a", "reverb"), effect("b", "delay")], onDropEffects });
+    drop(gap(1), carrying({ [CHAIN_DRAG_MIME]: "clean-guitar" }));
+    expect(onDropEffects).toHaveBeenLastCalledWith({ kind: "chain", chain: "clean-guitar" }, 1);
+    drop(gap(0), carrying({ [RACK_EFFECTS_MIME]: JSON.stringify({ host: "bass", ids: ["x"] }) }));
+    expect(onDropEffects).toHaveBeenLastCalledWith({ kind: "rack", host: "bass", ids: ["x"], copy: false }, 0);
+
+    const data = new DataTransfer();
+    screen.getByTitle("Drag to reorder").nth(0).element().dispatchEvent(new DragEvent("dragstart", { bubbles: true, dataTransfer: data }));
+    gap(2).dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: data, ctrlKey: true }));
+    expect(onDropEffects).toHaveBeenLastCalledWith({ kind: "rack", host: "lead", ids: ["a"], copy: true }, 2);
+    expect(onMoveEffect).not.toHaveBeenCalled();
+  });
+
+  test("a card's menu copies it or the whole chain, and pastes after it; the rack's own menu pastes at the end", async () => {
+    const onCopyEffects = vi.fn();
+    const onPasteEffects = vi.fn();
+    const { screen } = renderRack({ effects: [effect("a", "reverb"), effect("b", "delay")], onCopyEffects, onPasteEffects, copiedCount: 0 });
+    const menuOf = (card: number) => screen.getByTitle("Drag to reorder").nth(card).click({ button: "right" });
+    await menuOf(0);
+    await expect.element(screen.getByRole("button", { name: "Paste (nothing copied yet)" })).toBeDisabled();
+    await screen.getByRole("button", { name: "Copy the whole chain (2)" }).click();
+    expect(onCopyEffects).toHaveBeenLastCalledWith(["a", "b"]);
+    await menuOf(1);
+    await screen.getByRole("button", { name: "Copy", exact: true }).click();
+    expect(onCopyEffects).toHaveBeenLastCalledWith(["b"]);
+
+    screen.rerender(
+      <FxRack channelName="Lead" channelType="midi" color={TRACK_COLOR_PALETTE[0]} instrument="synth" effects={[effect("a", "reverb"), effect("b", "delay")]} bpm={120} onAddEffect={vi.fn()} onRemoveEffect={vi.fn()} onMoveEffect={vi.fn()} onBypassToggle={vi.fn()} onParamChange={vi.fn()} onCopyEffects={onCopyEffects} onPasteEffects={onPasteEffects} copiedCount={2} />
+    );
+    await menuOf(0);
+    await screen.getByRole("button", { name: "Paste 2 effects after this" }).click();
+    expect(onPasteEffects).toHaveBeenLastCalledWith(1);
+    // Outside the cards: the rack's own menu.
+    const gapAtEnd = gap(2) as HTMLElement;
+    gapAtEnd.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: 10, clientY: 10 }));
+    await screen.getByRole("button", { name: "Paste 2 effects at the end" }).click();
+    expect(onPasteEffects).toHaveBeenLastCalledWith(2);
+  });
+
+  test("the chain is saved under the name typed, or not at all with Escape", async () => {
+    const onSaveChain = vi.fn();
+    const { screen } = renderRack({ effects: [effect("a", "reverb")], onSaveChain });
+    await screen.getByRole("button", { name: "Save chain" }).click();
+    const name = screen.getByRole("textbox", { name: "Chain name" });
+    await expect.element(name).toHaveValue("Lead");
+    await userEvent.fill(name, "Wide lead");
+    await userEvent.keyboard("{Enter}");
+    expect(onSaveChain).toHaveBeenCalledWith("Wide lead");
+    await screen.getByRole("button", { name: "Save chain" }).click();
+    await userEvent.keyboard("{Escape}");
+    await expect.element(screen.getByRole("textbox", { name: "Chain name" })).not.toBeInTheDocument();
+    expect(onSaveChain).toHaveBeenCalledTimes(1);
+  });
+
+  test("an empty rack has nothing to save", async () => {
+    const { screen } = renderRack({ onSaveChain: vi.fn() });
+    await expect.element(screen.getByRole("button", { name: "Save chain" })).not.toBeInTheDocument();
   });
 });
 

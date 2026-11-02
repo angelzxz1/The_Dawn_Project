@@ -569,9 +569,20 @@ Temporary, never committed:
     (its group or target track, the master, the buses it sends to, pre or
     post, the tracks taking it as their input) and what plays into it;
     hovering a bus, the tracks sending to it (`tracks/routeHighlight.ts`).
-  - Items 10, 12, 14, 15, 17, 23, 26 and 27 are open; 12 is partly there.
-    Next in `nextSteps.md` is Phase 6, step 20 (12, faster effect
-    handling).
+  - Item 12 (2026-11-01): faster effect handling. A rack's card dragged
+    onto another track's header, a bus or the master moves there, or with
+    Ctrl/Alt/Cmd held is copied (`studio/rack/effectDrag.ts` carries it:
+    `RACK_EFFECTS_MIME` is `{ host, ids }`; `effectActions.transfer`, one
+    undo step; a copied sidechain that would listen to its new host is
+    dropped). The browser's effects and chains drop there too, and a chain
+    into a gap in the rack; the studio says what went where. A card's menu
+    copies it or the whole chain and pastes (`state/effectClipboard.ts`,
+    in memory, across projects). The rack's Save chain keeps a chain under
+    a name in localStorage (`effects/userChains.ts`, like user presets),
+    listed first under Chains with a delete button; only factory cabinets
+    are kept with it, since other files belong to their project.
+  - Items 10, 14, 15, 17, 23, 26 and 27 are open. Next in `nextSteps.md`
+    is Phase 6, step 21 (23, one style for every window).
   - Fixed 2026-10-31: on Windows, Next's static export wrote each page's
     prefetch files as folders (`__next.!KHNpdGUp/__PAGE__.txt`, from a
     backslash it doesn't turn into a dot) where its router asks for
@@ -614,7 +625,8 @@ Temporary, never committed:
   done on 2026-10-31. Phase 5 has begun: step 15 (#28, Preferences) was
   done on 2026-11-01, and steps 16 (#24, the light theme and UI size) and
   17 (#25, the layout per project) too, so Phase 5 is done. Phase 6 has
-  begun: steps 18 (#11, better meters) and 19 (#13, pre/post sends and
-  routing highlights) were done on 2026-11-01; next is step 20 (#12). Phase 1 (housekeeping) was done on 2026-10-30: the slow tests got longer limits, a flaky ClipBlock
+  begun: steps 18 (#11, better meters), 19 (#13, pre/post sends and
+  routing highlights) and 20 (#12, faster effect handling) were done on
+  2026-11-01; next is step 21 (#23). Phase 1 (housekeeping) was done on 2026-10-30: the slow tests got longer limits, a flaky ClipBlock
   double-click test clicks twice in one go, and the JS multiband kernels
   read the band count and their key per sample, as the Rust ports do.

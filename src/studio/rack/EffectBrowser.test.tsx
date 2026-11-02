@@ -9,8 +9,15 @@ import { EFFECT_LABELS } from "@/effects/registry";
 import { FACTORY_PRESETS } from "@/effects/presets";
 import { FACTORY_CAB_TONES } from "@/library/tones";
 import { noteUsed, pickKey, resetPicks } from "@/library/browserPicks";
+import { defaultParams } from "@/effects/registry";
+import { resetUserChainCache, saveUserChain, userChains } from "@/effects/userChains";
+import { CHAIN_DRAG_MIME } from "./effectDrag";
 
-beforeEach(() => resetPicks());
+beforeEach(() => {
+  resetPicks();
+  localStorage.removeItem("dawn-effect-chains-v1");
+  resetUserChainCache();
+});
 
 const REVERB = EFFECT_LABELS.reverb;
 const reverbPreset = FACTORY_PRESETS.find((p) => p.type === "reverb")!;
@@ -77,5 +84,24 @@ describe("favorites and recent items", () => {
     const { screen } = renderBrowser();
     const recent = screen.getByRole("region", { name: "Recent" });
     await expect.element(recent).toHaveTextContent(`${EFFECT_LABELS.delay}${REVERB}: ${reverbPreset.name}`);
+  });
+});
+
+describe("chains", () => {
+  test("yours come first, to add, drag or delete", async () => {
+    const mine = saveUserChain("My vocal", [{ id: "a", type: "compressor", params: defaultParams("compressor"), bypass: false }])!;
+    const onAddChain = vi.fn();
+    const screen = render(<EffectBrowser onAddEffect={vi.fn()} onAddChain={onAddChain} />);
+    const yours = screen.getByRole("region", { name: "Your chains" });
+    await yours.getByRole("button", { name: "My vocal", exact: true }).click();
+    expect(onAddChain).toHaveBeenCalledWith(mine);
+
+    const data = new DataTransfer();
+    yours.getByRole("button", { name: "My vocal", exact: true }).element().dispatchEvent(new DragEvent("dragstart", { bubbles: true, dataTransfer: data }));
+    expect(data.getData(CHAIN_DRAG_MIME)).toBe(mine.id);
+
+    await yours.getByRole("button", { name: "Delete the chain My vocal" }).click();
+    await expect.element(screen.getByRole("region", { name: "Your chains" })).not.toBeInTheDocument();
+    expect(userChains()).toEqual([]);
   });
 });

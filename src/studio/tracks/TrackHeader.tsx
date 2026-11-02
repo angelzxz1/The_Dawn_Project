@@ -26,6 +26,8 @@ import { INSTRUMENT_LABELS } from "@/instruments/registry";
 import { TRACK_COLOR_PALETTE, type TrackColor, type TrackColorPick } from "@/project/colors";
 import { CustomColorButton } from "./CustomColorButton";
 import type { RouteRole } from "./routeHighlight";
+import { carriesEffects, readEffectDrop, type EffectDrop } from "@/studio/rack/effectDrag";
+import { EffectDropMark, effectDropHint, type EffectDropHint } from "./EffectDropMark";
 import { TRACK_HEADER_WIDTH, TRACK_ROW_HEIGHT } from "@/studio/timeline/layout";
 
 /** From these heights (px) the header shows its controls row (input,
@@ -119,6 +121,9 @@ export interface TrackHeaderActions {
   /** The pointer came onto a track's header (its routing lights up), or
    * left it (null). */
   hover(id: string | null): void;
+  /** Effects dropped on the header: from the browser, or another track's
+   * rack (moved, or copied with Ctrl held). */
+  dropEffects(id: string, drop: EffectDrop): void;
 }
 
 interface TrackHeaderProps {
@@ -324,6 +329,8 @@ export const TrackHeader = memo(function TrackHeader({
   const audioInputRef = useRef<HTMLInputElement>(null);
   const [editingName, setEditingName] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
+  /** Effects are being dragged over it: what dropping them would do. */
+  const [effectsOver, setEffectsOver] = useState<EffectDropHint | null>(null);
   const isMidi = channel.type === "midi";
   const isGroup = channel.type === "group";
   // Monitoring the audio interface with nothing coming in.
@@ -353,6 +360,23 @@ export const TrackHeader = memo(function TrackHeader({
       onContextMenu={onContextMenu}
       onPointerEnter={() => actions.hover(id)}
       onPointerLeave={() => actions.hover(null)}
+      onDragOver={(e) => {
+        if (!carriesEffects(e)) return;
+        e.preventDefault();
+        const hint = effectDropHint(e);
+        e.dataTransfer.dropEffect = hint === "move" ? "move" : "copy";
+        if (hint !== effectsOver) setEffectsOver(hint);
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setEffectsOver(null);
+      }}
+      onDrop={(e) => {
+        setEffectsOver(null);
+        const drop = readEffectDrop(e);
+        if (!drop) return;
+        e.preventDefault();
+        actions.dropEffects(id, drop);
+      }}
       data-route={route ?? undefined}
       style={{ width: TRACK_HEADER_WIDTH, height: rowHeight }}
       title="Ctrl/Cmd-click to pick several tracks, then Ctrl+G to group them"
@@ -363,6 +387,7 @@ export const TrackHeader = memo(function TrackHeader({
       }`}
     >
       {groupColor && <div className="pointer-events-none absolute inset-y-0 left-0 w-1.5" style={{ background: groupColor.accent, opacity: 0.7 }} />}
+      {effectsOver && <EffectDropMark hint={effectsOver} />}
       {route && (
         <span
           className={`pointer-events-none absolute bottom-0.5 right-1 z-10 rounded px-1 text-[8.5px] font-semibold uppercase leading-[12px] tracking-wide ${

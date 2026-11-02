@@ -1,6 +1,7 @@
 // What you can do to an effects chain - on a track, a bus or the master
 // ("master") alike: add (with a preset, or a whole chain), remove, move,
-// tweak, bypass, load a preset, a file or a sidechain. Each changes the
+// move or copy to another chain, paste, tweak, bypass, load a preset, a
+// file or a sidechain. Each changes the
 // audio engine and the project together, as one undo step where it's an
 // edit (a knob turn records its step when the drag starts).
 
@@ -13,6 +14,7 @@ import { findPreset, paramsFromPreset } from "@/effects/presets";
 import type { SidechainRouting } from "@/effects/sidechain/sidechainModel";
 import { track } from "@/services/telemetry";
 import type { PresetChange } from "@/effects/ui/PresetMenu";
+import { copiedEffects } from "./effectClipboard";
 import { projectStore } from "./projectStore";
 
 /** A track's, a bus's or the master's effects, as the project has them. */
@@ -45,6 +47,36 @@ function withPreset(hostId: string, created: EffectInstance, presetId: string | 
   return { ...created, params, preset: { id: preset.id, name: preset.name } };
 }
 
+/** Adds copies of effects to a host, in their order, at `atIndex` (or the
+ * end): their settings, preset, file, bypass and sidechain (unless it
+ * would listen to the host itself). No undo step. Returns the copies. */
+function place(hostId: string, sources: EffectInstance[], atIndex?: number): EffectInstance[] {
+  const count = effectsOf(hostId).length;
+  const at = atIndex !== undefined && atIndex >= 0 && atIndex <= count ? atIndex : count;
+  const copies: EffectInstance[] = [];
+  sources.forEach((source) => {
+    const added = audioEngine.addEffect(hostId, source.type, undefined, at + copies.length);
+    if (!added) return;
+    Object.entries(source.params).forEach(([key, value]) => {
+      if (value !== added.params[key]) audioEngine.setEffectParam(hostId, added.id, key, value);
+    });
+    if (source.bypass) audioEngine.setEffectBypass(hostId, added.id, true);
+    const sidechain = source.sidechain && source.sidechain.source !== hostId ? { ...source.sidechain } : undefined;
+    if (sidechain) audioEngine.setEffectSidechain(hostId, added.id, sidechain);
+    if (source.file) void audioEngine.setEffectFile(hostId, added.id, source.file.id);
+    const copy: EffectInstance = { ...source, id: added.id, params: { ...source.params } };
+    if (sidechain) copy.sidechain = sidechain;
+    else delete copy.sidechain;
+    copies.push(copy);
+  });
+  updateEffects(hostId, (prev) => {
+    const list = [...prev];
+    list.splice(Math.min(at, list.length), 0, ...copies);
+    return list;
+  });
+  return copies;
+}
+
 export const effectActions = {
   /** Adds an effect at `atIndex` (or the end), optionally with a preset
    * and a file (a cabinet, an amp model) loaded. Returns its id. */
@@ -66,12 +98,15 @@ export const effectActions = {
     return created.id;
   },
 
-  /** Adds a ready-made chain (see chains.ts) to the end, as one undo step. */
-  addChain(hostId: string, chain: EffectChain): void {
+  /** Adds a chain (a ready-made one from chains.ts, or one you saved) at
+   * `atIndex` or the end, as one undo step. */
+  addChain(hostId: string, chain: EffectChain, atIndex?: number): void {
     projectStore.push();
+    const count = effectsOf(hostId).length;
+    const at = atIndex !== undefined && atIndex >= 0 && atIndex <= count ? atIndex : count;
     const added: EffectInstance[] = [];
     chain.steps.forEach((step) => {
-      const fx = audioEngine.addEffect(hostId, step.type);
+      const fx = audioEngine.addEffect(hostId, step.type, undefined, at + added.length);
       if (!fx) return;
       let created = withPreset(hostId, fx, step.preset);
       if (step.params) {
@@ -82,9 +117,17 @@ export const effectActions = {
         created = { ...created, file: step.file };
         void audioEngine.setEffectFile(hostId, created.id, step.file.id);
       }
+      if (step.bypass) {
+        audioEngine.setEffectBypass(hostId, created.id, true);
+        created = { ...created, bypass: true };
+      }
       added.push(created);
     });
-    updateEffects(hostId, (prev) => [...prev, ...added]);
+    updateEffects(hostId, (prev) => {
+      const list = [...prev];
+      list.splice(Math.min(at, list.length), 0, ...added);
+      return list;
+    });
   },
 
   remove(hostId: string, effectId: string): void {
@@ -98,27 +141,32 @@ export const effectActions = {
   duplicate(hostId: string, effectId: string): void {
     const index = effectsOf(hostId).findIndex((e) => e.id === effectId);
     if (index === -1) return;
-    const source = effectsOf(hostId)[index];
     projectStore.push();
-    const added = audioEngine.addEffect(hostId, source.type, undefined, index + 1);
-    if (!added) return;
-    Object.entries(source.params).forEach(([key, value]) => {
-      if (value !== added.params[key]) audioEngine.setEffectParam(hostId, added.id, key, value);
-    });
-    if (source.bypass) audioEngine.setEffectBypass(hostId, added.id, true);
-    if (source.sidechain) audioEngine.setEffectSidechain(hostId, added.id, source.sidechain);
-    if (source.file) void audioEngine.setEffectFile(hostId, added.id, source.file.id);
-    const copy: EffectInstance = {
-      ...source,
-      id: added.id,
-      params: { ...source.params },
-      ...(source.sidechain ? { sidechain: { ...source.sidechain } } : {}),
-    };
-    updateEffects(hostId, (prev) => {
-      const list = [...prev];
-      list.splice(index + 1, 0, copy);
-      return list;
-    });
+    place(hostId, [effectsOf(hostId)[index]], index + 1);
+  },
+
+  /** Moves effects (in their chain's order) to another track, bus or the
+   * master, at `atIndex` or the end - or, with `copy`, adds copies there
+   * and leaves them be. One undo step. Returns how many went. */
+  transfer(fromHost: string, effectIds: string[], toHost: string, atIndex?: number, copy = false): number {
+    const sources = effectsOf(fromHost).filter((e) => effectIds.includes(e.id));
+    if (sources.length === 0 || (fromHost === toHost && !copy)) return 0;
+    projectStore.push();
+    const copies = place(toHost, sources, atIndex);
+    if (!copy) {
+      sources.forEach((e) => audioEngine.removeEffect(fromHost, e.id));
+      updateEffects(fromHost, (list) => list.filter((e) => !effectIds.includes(e.id)));
+    }
+    return copies.length;
+  },
+
+  /** Adds what was copied (effectClipboard.ts) at `atIndex` or the end, as
+   * one undo step. Returns how many were added. */
+  paste(hostId: string, atIndex?: number): number {
+    const copied = copiedEffects();
+    if (copied.length === 0) return 0;
+    projectStore.push();
+    return place(hostId, copied, atIndex).length;
   },
 
   /** Moves an effect to a position in its chain (dragging a card). */

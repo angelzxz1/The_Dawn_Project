@@ -109,7 +109,7 @@ export function Meter({ source, scale = false }: MeterProps) {
         <button
           type="button"
           aria-label={clipped ? "Clipped - click to reset" : "Clip light"}
-          title={clipped ? `Went over 0 dB (loudest ${formatDb(maxRef.current)} dB): turn it down. Click to reset.` : "Lights up if the level goes over 0 dB"}
+          title={clipped ? "Went over 0 dB (the meter says how loud it got): turn it down. Click to reset." : "Lights up if the level goes over 0 dB"}
           onClick={() => {
             setClipped(false);
             maxRef.current = -Infinity;

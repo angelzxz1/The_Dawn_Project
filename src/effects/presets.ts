@@ -38,7 +38,8 @@ function isViewKey(type: EffectType, key: string): boolean {
   return (type === "paramEq" || type === "multiband") && (key === "scale" || key === "analyzer");
 }
 
-const clampToSpec = (type: EffectType, key: string, v: number): number | null => {
+/** A setting kept within its range; null if the effect has no such setting. */
+export const clampToSpec = (type: EffectType, key: string, v: number): number | null => {
   const spec = paramSpecs(type).find((s) => s.key === key);
   if (!spec || typeof v !== "number" || !Number.isFinite(v)) return null;
   return Math.min(spec.max, Math.max(spec.min, v));

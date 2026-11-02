@@ -8,6 +8,8 @@ import { projectSetter, projectStore, useProjectValue } from "@/state/projectSto
 import { Meter } from "./Meter";
 import { LoudnessReadout } from "./LoudnessReadout";
 import type { RouteHighlight } from "./routeHighlight";
+import { carriesEffects, readEffectDrop, type EffectDrop } from "@/studio/rack/effectDrag";
+import { EffectDropMark, effectDropHint, type EffectDropHint } from "./EffectDropMark";
 import { ValueBar } from "./ValueBar";
 
 const setMasterName = projectSetter("masterName");
@@ -27,12 +29,37 @@ interface MasterBusRowProps {
   route?: RouteHighlight | null;
   /** The pointer came onto a bus (null: left it). */
   onHoverBus?: (busId: string | null) => void;
+  /** Effects dropped on the master ("master") or a bus. */
+  onDropEffects?: (hostId: string, drop: EffectDrop) => void;
+}
+
+/** Drag-and-drop props that take effects onto a host, marking it while
+ * they're over it. */
+function effectDropProps(hostId: string, over: { id: string; hint: EffectDropHint } | null, setOver: (o: { id: string; hint: EffectDropHint } | null) => void, onDrop?: (hostId: string, drop: EffectDrop) => void) {
+  return {
+    onDragOver: (e: React.DragEvent) => {
+      if (!onDrop || !carriesEffects(e)) return;
+      e.preventDefault();
+      const hint = effectDropHint(e);
+      if (over?.id !== hostId || over.hint !== hint) setOver({ id: hostId, hint });
+    },
+    onDragLeave: (e: React.DragEvent) => {
+      if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOver(null);
+    },
+    onDrop: (e: React.DragEvent) => {
+      setOver(null);
+      const drop = readEffectDrop(e);
+      if (!drop || !onDrop) return;
+      e.preventDefault();
+      onDrop(hostId, drop);
+    },
+  };
 }
 
 /** The master (name, meter, pan, volume, limiter, FX) and the send/return
  * buses, in one row so the tracks keep the room. The buses scroll sideways
  * when there are many. */
-export function MasterBusRow({ limiterThreshold, onLimiterThresholdChange, onOpenMasterFx, onOpenBusFx, onRemoveBus, route = null, onHoverBus }: MasterBusRowProps) {
+export function MasterBusRow({ limiterThreshold, onLimiterThresholdChange, onOpenMasterFx, onOpenBusFx, onRemoveBus, route = null, onHoverBus, onDropEffects }: MasterBusRowProps) {
   const masterName = useProjectValue("masterName");
   const masterVolume = useProjectValue("masterVolume");
   const masterPan = useProjectValue("masterPan");
@@ -42,14 +69,18 @@ export function MasterBusRow({ limiterThreshold, onLimiterThresholdChange, onOpe
   const [editingMasterName, setEditingMasterName] = useState(false);
   const [masterNameDraft, setMasterNameDraft] = useState("Master");
   const busRowRef = useRef<HTMLDivElement>(null);
+  /** The master or bus that effects are being dragged over. */
+  const [effectsOver, setEffectsOver] = useState<{ id: string; hint: EffectDropHint } | null>(null);
 
   return (
     <div className="flex shrink-0 items-center gap-3 rounded-lg border border-border bg-surface px-3 py-1.5">
       <div
-        className="relative flex shrink-0 items-center gap-2"
+        className="relative flex shrink-0 items-center gap-2 rounded"
+        {...effectDropProps("master", effectsOver, setEffectsOver, onDropEffects)}
         data-route={route?.master ? "to" : undefined}
         title="Master output: every track routes through here before the speakers."
       >
+        {effectsOver?.id === "master" && <EffectDropMark hint={effectsOver.hint} />}
         {route?.master && (
           <span className="pointer-events-none absolute -top-2.5 left-0 z-10 rounded bg-accent px-1 text-[8.5px] font-semibold uppercase leading-[12px] tracking-wide text-on-accent">
             receives
@@ -168,8 +199,10 @@ export function MasterBusRow({ limiterThreshold, onLimiterThresholdChange, onOpe
             data-route={sent ? "to" : undefined}
             onPointerEnter={() => onHoverBus?.(bus.id)}
             onPointerLeave={() => onHoverBus?.(null)}
+            {...effectDropProps(bus.id, effectsOver, setEffectsOver, onDropEffects)}
             className={`relative flex shrink-0 items-center gap-1 rounded border bg-surface-raised px-1.5 py-1 ${sent ? "border-accent ring-1 ring-accent/60" : "border-border"}`}
           >
+            {effectsOver?.id === bus.id && <EffectDropMark hint={effectsOver.hint} />}
             {sent && (
               <span
                 title={sent.pre ? "Sent before the track's fader" : "Sent after the track's fader"}

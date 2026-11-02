@@ -15,6 +15,8 @@ export interface ChainStep {
   params?: Record<string, number>;
   /** The file it loads (a factory cabinet). */
   file?: EffectFileRef;
+  /** Added turned off (a chain you saved with it bypassed). */
+  bypass?: boolean;
 }
 
 export interface EffectChain {

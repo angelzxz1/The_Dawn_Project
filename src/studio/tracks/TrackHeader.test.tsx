@@ -9,7 +9,8 @@ import type { ComponentProps } from "react";
 import { TrackHeader, type TrackHeaderActions } from "./TrackHeader";
 import { TRACK_COLOR_PALETTE } from "@/project/colors";
 import type { ChannelConfig } from "@/project/types";
-import { FOLDED_ROW_HEIGHT } from "@/studio/timeline/layout";
+import { FOLDED_ROW_HEIGHT } from "@/studio/timeline/layout";import { EFFECT_DRAG_MIME, RACK_EFFECTS_MIME } from "@/studio/rack/effectDrag";
+
 
 const engine = vi.hoisted(() => ({ levels: [0, 0] as [number, number], input: null as number | null }));
 const reading = () => ({ peak: engine.levels, rms: engine.levels });
@@ -30,6 +31,7 @@ const ACTIONS = [
   "select", "rename", "renameDone", "setVolume", "setPan", "adjustStart", "toggleMute", "toggleSolo", "toggleArm",
   "toggleMonitor", "openFx", "importMidi", "exportMidi", "importAudio", "clear", "remove", "contextMenu",
   "recolor", "move", "toggleAutomation", "setInputDevice", "requestInputDevices", "toggleFold", "pick", "resizeHeight", "hover",
+  "dropEffects",
 ] as const satisfies readonly (keyof TrackHeaderActions)[];
 
 type Actions = { [K in keyof TrackHeaderActions]: Mock<TrackHeaderActions[K]> };
@@ -336,5 +338,42 @@ describe("a silent track", () => {
   test("its FX button counts the bypassed effects", async () => {
     const { screen } = renderHeader({ channel: channel({ type: "audio", instrument: null }), effectsCount: 3, bypassedCount: 1 });
     await expect.element(screen.getByTitle("FX (3, 1 bypassed) — instrument & effects")).toBeVisible();
+  });
+});
+
+describe("effects dragged onto a track", () => {
+  const over = (target: Element, data: DataTransfer, init: DragEventInit = {}) => {
+    for (const type of ["dragenter", "dragover"]) target.dispatchEvent(new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: data, ...init }));
+  };
+
+  test("another rack's card moves here, or with Ctrl held is copied, and the header says which", async () => {
+    const { screen, actions } = renderHeader();
+    const header = screen.getByRole("group", { name: "Track Bass" }).element();
+    const data = new DataTransfer();
+    data.setData(RACK_EFFECTS_MIME, JSON.stringify({ host: "lead", ids: ["fx-1"] }));
+    over(header, data);
+    await expect.element(screen.getByText("FX: move here")).toBeVisible();
+    over(header, data, { ctrlKey: true });
+    await expect.element(screen.getByText("FX: copy here")).toBeVisible();
+    header.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: data, ctrlKey: true }));
+    expect(actions.dropEffects).toHaveBeenCalledWith("bass", { kind: "rack", host: "lead", ids: ["fx-1"], copy: true });
+    await expect.element(screen.getByText("FX: copy here")).not.toBeInTheDocument();
+  });
+
+  test("an effect from the browser is added; anything else isn't taken", async () => {
+    const { screen, actions } = renderHeader();
+    const header = screen.getByRole("group", { name: "Track Bass" }).element();
+    const data = new DataTransfer();
+    data.setData(EFFECT_DRAG_MIME, "reverb");
+    over(header, data);
+    await expect.element(screen.getByText("FX: add here")).toBeVisible();
+    header.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: data }));
+    expect(actions.dropEffects).toHaveBeenCalledWith("bass", { kind: "effect", type: "reverb", preset: undefined });
+
+    const text = new DataTransfer();
+    text.setData("text/plain", "hello");
+    const event = new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: text });
+    header.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
   });
 });
