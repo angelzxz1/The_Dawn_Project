@@ -55,7 +55,7 @@ test("the computer keyboard plays the armed track, and a held key lets go when t
   await studio.open("Beat");
   await studio.header("Bass").getByTitle("Arm this channel for recording and note input").click();
   await page.getByRole("button", { name: /Keys/ }).first().click();
-  const keys = page.getByRole("dialog", { name: "Bass — keys" });
+  const keys = page.getByRole("dialog", { name: "Keys — Bass" });
   await expect(keys).toBeVisible();
   const lit = keys.locator("div.bg-accent");
   await expect(lit).toHaveCount(0);
@@ -72,7 +72,7 @@ test("the keys name the chord being played, in E Major until a scale is picked",
   await studio.open("Beat");
   await studio.header("Bass").getByTitle("Arm this channel for recording and note input").click();
   await page.getByRole("button", { name: /Keys/ }).first().click();
-  const readout = page.getByRole("dialog", { name: "Bass — keys" }).getByTestId("chord-readout");
+  const readout = page.getByRole("dialog", { name: "Keys — Bass" }).getByTestId("chord-readout");
   await expect(readout).toHaveText("Chords in E Major");
 
   // E, G# and B from the Q row.

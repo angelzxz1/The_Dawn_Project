@@ -1,13 +1,10 @@
 "use client";
 
-import { Power, X } from "lucide-react";
+import { PluginWindow } from "@/effects/ui/PluginChrome";
 import { PluginKnob } from "@/ui/PluginKnob";
 import { DelayGraph } from "./DelayGraph";
-import { PluginIcon } from "@/effects/ui/PluginIcon";
 import { paramSpecs } from "@/effects/registry";
 import { snapToDivision, formatDivision } from "./delayDivisions";
-import { fraunces, spaceGrotesk } from "@/ui/pluginFonts";
-import { WindowPresetMenu } from "@/effects/ui/PresetMenu";
 
 interface DelayWindowProps {
   channelName: string;
@@ -81,168 +78,131 @@ export function DelayWindow({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div
-        className={`${spaceGrotesk.className} flex w-[760px] flex-col gap-4 rounded-2xl shadow-2xl`}
-        style={{ background: "#1B1C22", border: "1px solid #2E2F37", padding: "18px 22px 20px" }}
-      >
-        <div className="flex h-[30px] items-center justify-between">
-          <div className="flex items-center gap-2">
-            <PluginIcon />
-            <h2 className={`${fraunces.className} text-[19px] font-semibold text-[#F4EDE2]`} style={{ letterSpacing: "-0.2px" }}>
-              Delay
-            </h2>
-            <span className="text-xs text-muted">— {channelName}</span>
-            <div className="ml-3">
-              <WindowPresetMenu />
-            </div>
-          </div>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              title={bypass ? "Enable effect" : "Bypass effect"}
-              onClick={onBypassToggle}
-              className="flex h-[30px] w-[30px] items-center justify-center rounded-lg"
-              style={{ background: "#23242B", border: "1px solid #2E2F37" }}
-            >
-              <Power size={16} color={bypass ? "#5A5B64" : "#E6AD5E"} />
-            </button>
-            <button
-              type="button"
-              title="Close"
-              onClick={onClose}
-              className="flex h-[30px] w-[30px] items-center justify-center rounded-lg"
-            >
-              <X size={14} color="#9A9AA4" />
-            </button>
-          </div>
-        </div>
+    <PluginWindow title="Delay" channelName={channelName} bypass={bypass} onBypassToggle={onBypassToggle} onClose={onClose} width={760}>
+      <DelayGraph
+        delayTimeL={delayTimeL}
+        delayTimeR={delayTimeR}
+        feedback={feedback}
+        wet={wet}
+        pingPong={pingPongOn}
+        filterOn={filterOn}
+        lowCut={lowCut}
+        highCut={highCut}
+      />
 
-        <DelayGraph
-          delayTimeL={delayTimeL}
-          delayTimeR={delayTimeR}
-          feedback={feedback}
-          wet={wet}
-          pingPong={pingPongOn}
-          filterOn={filterOn}
-          lowCut={lowCut}
-          highCut={highCut}
+      <div className="flex justify-between px-1 pt-1">
+        <PluginKnob
+          label={timeLSpec.label}
+          value={delayTimeL}
+          min={timeLSpec.min}
+          max={timeLSpec.max}
+          defaultValue={timeLSpec.default}
+          mode="log"
+          size={54}
+          showReadout
+          onChange={(v) => changeTime("delayTimeL", v)}
+          onDragStart={onParamDragStart}
+          formatValue={timeFormat}
         />
-
-        <div className="flex justify-between px-1 pt-1">
-          <PluginKnob
-            label={timeLSpec.label}
-            value={delayTimeL}
-            min={timeLSpec.min}
-            max={timeLSpec.max}
-            defaultValue={timeLSpec.default}
-            mode="log"
-            size={54}
-            showReadout
-            onChange={(v) => changeTime("delayTimeL", v)}
-            onDragStart={onParamDragStart}
-            formatValue={timeFormat}
-          />
-          <PluginKnob
-            label={timeRSpec.label}
-            value={delayTimeR}
-            min={timeRSpec.min}
-            max={timeRSpec.max}
-            defaultValue={timeRSpec.default}
-            mode="log"
-            size={54}
-            showReadout
-            disabled={linkOn}
-            onChange={(v) => changeTime("delayTimeR", v)}
-            onDragStart={onParamDragStart}
-            formatValue={timeFormat}
-          />
-          <PluginKnob
-            label={feedbackSpec.label}
-            value={feedback}
-            min={feedbackSpec.min}
-            max={feedbackSpec.max}
-            defaultValue={feedbackSpec.default}
-            mode="linear"
-            size={54}
-            showReadout
-            onChange={(v) => onParamChange("feedback", v)}
-            onDragStart={onParamDragStart}
-            formatValue={feedbackSpec.format}
-          />
-          <PluginKnob
-            label={lowCutSpec.label}
-            value={lowCut}
-            min={lowCutSpec.min}
-            max={lowCutSpec.max}
-            defaultValue={lowCutSpec.default}
-            mode="log"
-            size={54}
-            showReadout
-            onChange={(v) => onParamChange("lowCut", v)}
-            onDragStart={onParamDragStart}
-            formatValue={lowCutSpec.format}
-          />
-          <PluginKnob
-            label={highCutSpec.label}
-            value={highCut}
-            min={highCutSpec.min}
-            max={highCutSpec.max}
-            defaultValue={highCutSpec.default}
-            mode="log"
-            size={54}
-            showReadout
-            onChange={(v) => onParamChange("highCut", v)}
-            onDragStart={onParamDragStart}
-            formatValue={highCutSpec.format}
-          />
-          <PluginKnob
-            label={wetSpec.label}
-            value={wet}
-            min={wetSpec.min}
-            max={wetSpec.max}
-            defaultValue={wetSpec.default}
-            mode="linear"
-            size={54}
-            showReadout
-            onChange={(v) => onParamChange("wet", v)}
-            onDragStart={onParamDragStart}
-            formatValue={wetSpec.format}
-          />
-        </div>
-
-        <div style={{ height: 1, background: "#2E2F37" }} />
-
-        <div className="flex items-center justify-between">
-          <div className="flex overflow-hidden rounded-lg" style={{ border: "1px solid #2E2F37" }}>
-            <button
-              type="button"
-              onClick={() => toggle("sync", syncOn)}
-              className="px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-wide"
-              style={{ background: syncOn ? "#F4EDE2" : "transparent", color: syncOn ? "#14151A" : "#6E6E78" }}
-            >
-              Sync
-            </button>
-            <button
-              type="button"
-              onClick={() => toggle("sync", syncOn)}
-              className="px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-wide"
-              style={{ background: !syncOn ? "#F4EDE2" : "transparent", color: !syncOn ? "#14151A" : "#6E6E78" }}
-            >
-              Time
-            </button>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <TogglePill label="Link" on={linkOn} onClick={() => toggle("link", linkOn)} />
-            <TogglePill label="Ping-Pong" on={pingPongOn} onClick={() => toggle("pingPong", pingPongOn)} />
-            <TogglePill label="Freeze" on={freezeOn} onClick={() => toggle("freeze", freezeOn)} />
-            <TogglePill label="Filter" on={filterOn} onClick={() => toggle("filterOn", filterOn)} />
-          </div>
-
-          <span className="font-mono text-[11px] text-muted">@ {Math.round(bpm)} BPM</span>
-        </div>
+        <PluginKnob
+          label={timeRSpec.label}
+          value={delayTimeR}
+          min={timeRSpec.min}
+          max={timeRSpec.max}
+          defaultValue={timeRSpec.default}
+          mode="log"
+          size={54}
+          showReadout
+          disabled={linkOn}
+          onChange={(v) => changeTime("delayTimeR", v)}
+          onDragStart={onParamDragStart}
+          formatValue={timeFormat}
+        />
+        <PluginKnob
+          label={feedbackSpec.label}
+          value={feedback}
+          min={feedbackSpec.min}
+          max={feedbackSpec.max}
+          defaultValue={feedbackSpec.default}
+          mode="linear"
+          size={54}
+          showReadout
+          onChange={(v) => onParamChange("feedback", v)}
+          onDragStart={onParamDragStart}
+          formatValue={feedbackSpec.format}
+        />
+        <PluginKnob
+          label={lowCutSpec.label}
+          value={lowCut}
+          min={lowCutSpec.min}
+          max={lowCutSpec.max}
+          defaultValue={lowCutSpec.default}
+          mode="log"
+          size={54}
+          showReadout
+          onChange={(v) => onParamChange("lowCut", v)}
+          onDragStart={onParamDragStart}
+          formatValue={lowCutSpec.format}
+        />
+        <PluginKnob
+          label={highCutSpec.label}
+          value={highCut}
+          min={highCutSpec.min}
+          max={highCutSpec.max}
+          defaultValue={highCutSpec.default}
+          mode="log"
+          size={54}
+          showReadout
+          onChange={(v) => onParamChange("highCut", v)}
+          onDragStart={onParamDragStart}
+          formatValue={highCutSpec.format}
+        />
+        <PluginKnob
+          label={wetSpec.label}
+          value={wet}
+          min={wetSpec.min}
+          max={wetSpec.max}
+          defaultValue={wetSpec.default}
+          mode="linear"
+          size={54}
+          showReadout
+          onChange={(v) => onParamChange("wet", v)}
+          onDragStart={onParamDragStart}
+          formatValue={wetSpec.format}
+        />
       </div>
-    </div>
+
+      <div style={{ height: 1, background: "#2E2F37" }} />
+
+      <div className="flex items-center justify-between">
+        <div className="flex overflow-hidden rounded-lg" style={{ border: "1px solid #2E2F37" }}>
+          <button
+            type="button"
+            onClick={() => toggle("sync", syncOn)}
+            className="px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-wide"
+            style={{ background: syncOn ? "#F4EDE2" : "transparent", color: syncOn ? "#14151A" : "#6E6E78" }}
+          >
+            Sync
+          </button>
+          <button
+            type="button"
+            onClick={() => toggle("sync", syncOn)}
+            className="px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-wide"
+            style={{ background: !syncOn ? "#F4EDE2" : "transparent", color: !syncOn ? "#14151A" : "#6E6E78" }}
+          >
+            Time
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <TogglePill label="Link" on={linkOn} onClick={() => toggle("link", linkOn)} />
+          <TogglePill label="Ping-Pong" on={pingPongOn} onClick={() => toggle("pingPong", pingPongOn)} />
+          <TogglePill label="Freeze" on={freezeOn} onClick={() => toggle("freeze", freezeOn)} />
+          <TogglePill label="Filter" on={filterOn} onClick={() => toggle("filterOn", filterOn)} />
+        </div>
+
+        <span className="font-mono text-[11px] text-muted">@ {Math.round(bpm)} BPM</span>
+      </div>
+    </PluginWindow>
   );
 }

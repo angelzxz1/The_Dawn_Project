@@ -12,7 +12,6 @@ import type { EffectInstance } from "@/effects/registry";
 import { track } from "@/services/telemetry";
 import { effectActions } from "@/state/effectActions";
 import { projectStore } from "@/state/projectStore";
-import { useShortcuts } from "@/ui/shortcuts";
 
 /** A drag or edit gesture starts: one undo step for all of it. */
 const startEdit = () => projectStore.push();
@@ -34,9 +33,6 @@ export function EffectWindow({
   sidechainSources: SidechainSource[];
   onClose: () => void;
 }) {
-  // Escape closes any effect's window (not while typing in one of its
-  // fields; a menu open in it closes first).
-  useShortcuts("window", [{ keys: "escape", label: "Close", run: onClose }]);
   const { Window } = EFFECT_UI[effect.type];
   return (
     <EffectPresetContext.Provider value={{ effect, bpm, onChange: (change) => effectActions.changePreset(hostId, effect.id, change) }}>

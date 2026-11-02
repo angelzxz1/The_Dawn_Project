@@ -1,15 +1,12 @@
 "use client";
 
-import { Power, X } from "lucide-react";
+import { PluginWindow } from "@/effects/ui/PluginChrome";
 import { PluginKnob, type KnobMode } from "@/ui/PluginKnob";
-import { PluginIcon } from "@/effects/ui/PluginIcon";
 import { GateGraph } from "./GateGraph";
 import { paramSpecs, type ParamSpec } from "@/effects/registry";
 import { HYSTERESIS_DB } from "./gateModel";
 import { SidechainPanel, type SidechainSource } from "@/effects/sidechain/SidechainPanel";
 import type { SidechainRouting } from "@/effects/sidechain/sidechainModel";
-import { fraunces, spaceGrotesk } from "@/ui/pluginFonts";
-import { WindowPresetMenu } from "@/effects/ui/PresetMenu";
 
 interface GateWindowProps {
   hostId: string;
@@ -62,86 +59,49 @@ export function GateWindow({
   const value = (key: string) => gateParam(params, key);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div
-        className={`${spaceGrotesk.className} flex w-[880px] flex-col gap-4 rounded-2xl shadow-2xl`}
-        style={{ background: "#1B1C22", border: "1px solid #2E2F37", padding: "18px 22px 20px" }}
-      >
-        <div className="flex h-[30px] items-center justify-between">
-          <div className="flex items-center gap-2">
-            <PluginIcon />
-            <h2 className={`${fraunces.className} text-[19px] font-semibold text-[#F4EDE2]`} style={{ letterSpacing: "-0.2px" }}>
-              Noise Gate
-            </h2>
-            <span className="text-xs text-muted">— {channelName}</span>
-            <div className="ml-3">
-              <WindowPresetMenu />
-            </div>
-          </div>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              title={bypass ? "Enable effect" : "Bypass effect"}
-              onClick={onBypassToggle}
-              className="flex h-[30px] w-[30px] items-center justify-center rounded-lg"
-              style={{ background: "#23242B", border: "1px solid #2E2F37" }}
-            >
-              <Power size={16} color={bypass ? "#5A5B64" : "#E6AD5E"} />
-            </button>
-            <button
-              type="button"
-              title="Close"
-              onClick={onClose}
-              className="flex h-[30px] w-[30px] items-center justify-center rounded-lg"
-            >
-              <X size={14} color="#9A9AA4" />
-            </button>
-          </div>
-        </div>
+    <PluginWindow title="Noise Gate" channelName={channelName} bypass={bypass} onBypassToggle={onBypassToggle} onClose={onClose} width={880}>
+      <GateGraph hostId={hostId} effectId={effectId} thresholdDb={value("threshold")} />
 
-        <GateGraph hostId={hostId} effectId={effectId} thresholdDb={value("threshold")} />
-
-        <div className="flex justify-around px-1 pt-1">
-          {GATE_KNOBS.map(({ key, mode }) => {
-            const spec = gateSpec(key);
-            return (
-              <PluginKnob
-                key={key}
-                label={spec.label}
-                value={value(key)}
-                min={spec.min}
-                max={spec.max}
-                defaultValue={spec.default}
-                mode={mode}
-                size={54}
-                showReadout
-                onChange={(v) => onParamChange(key, v)}
-                onDragStart={onParamDragStart}
-                formatValue={spec.format}
-              />
-            );
-          })}
-        </div>
-
-        <SidechainPanel
-          type="gate"
-          hostId={hostId}
-          effectId={effectId}
-          params={params}
-          routing={sidechain}
-          sources={sidechainSources}
-          onRoutingChange={onSidechainChange}
-          onParamChange={onParamChange}
-          onParamDragStart={onParamDragStart}
-        />
-
-        <div style={{ height: 1, background: "#2E2F37" }} />
-
-        <p className="text-[12px] leading-snug text-muted">
-          Opens above the threshold and closes once the level falls {HYSTERESIS_DB} dB below it, after Hold. For a
-          guitar, put it before the amp: set Threshold just above the hiss you hear when you&apos;re not playing.
-        </p>
+      <div className="flex justify-around px-1 pt-1">
+        {GATE_KNOBS.map(({ key, mode }) => {
+          const spec = gateSpec(key);
+          return (
+            <PluginKnob
+              key={key}
+              label={spec.label}
+              value={value(key)}
+              min={spec.min}
+              max={spec.max}
+              defaultValue={spec.default}
+              mode={mode}
+              size={54}
+              showReadout
+              onChange={(v) => onParamChange(key, v)}
+              onDragStart={onParamDragStart}
+              formatValue={spec.format}
+            />
+          );
+        })}
       </div>
-    </div>
+
+      <SidechainPanel
+        type="gate"
+        hostId={hostId}
+        effectId={effectId}
+        params={params}
+        routing={sidechain}
+        sources={sidechainSources}
+        onRoutingChange={onSidechainChange}
+        onParamChange={onParamChange}
+        onParamDragStart={onParamDragStart}
+      />
+
+      <div style={{ height: 1, background: "#2E2F37" }} />
+
+      <p className="text-[12px] leading-snug text-muted">
+        Opens above the threshold and closes once the level falls {HYSTERESIS_DB} dB below it, after Hold. For a
+        guitar, put it before the amp: set Threshold just above the hiss you hear when you&apos;re not playing.
+      </p>
+    </PluginWindow>
   );
 }

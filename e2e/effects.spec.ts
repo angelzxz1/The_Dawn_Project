@@ -11,7 +11,7 @@ for (const type of EFFECT_TYPES) {
     await studio.open("Empty Project");
     await studio.select("Audio 1");
     await studio.addEffect(label);
-    const close = page.getByTitle("Close", { exact: true });
+    const close = page.getByTitle("Close (Esc)", { exact: true });
     await studio.openLastEffect();
     await expect(close).toHaveCount(1);
     await close.click();

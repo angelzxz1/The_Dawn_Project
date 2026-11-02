@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Headphones, Power, Trash2, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Headphones, Power, Trash2 } from "lucide-react";
+import { PluginWindow } from "@/effects/ui/PluginChrome";
 import { PluginKnob, type KnobMode } from "@/ui/PluginKnob";
-import { PluginIcon } from "@/effects/ui/PluginIcon";
 import { Segmented } from "@/effects/ui/PluginSegmented";
 import { MultibandGraph, mbBandColor } from "./MultibandGraph";
 import { formatHz } from "@/effects/parametric-eq/ParamEqGraph";
@@ -28,8 +28,6 @@ import {
 } from "./multibandModel";
 import { SidechainPanel, type SidechainSource } from "@/effects/sidechain/SidechainPanel";
 import type { SidechainRouting } from "@/effects/sidechain/sidechainModel";
-import { fraunces, spaceGrotesk } from "@/ui/pluginFonts";
-import { WindowPresetMenu } from "@/effects/ui/PresetMenu";
 
 interface MultibandWindowProps {
   hostId: string;
@@ -154,12 +152,9 @@ export function MultibandWindow({
   const selected = Math.min(selectedRaw, count - 1);
   const [solo, setSolo] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const rootRef = useRef<HTMLDivElement>(null);
   const meters = useMeters(hostId, effectId);
   const band = mbBandFromParams(params, selected);
   const edges = [MB_MIN_FREQ, ...crossovers, MB_MAX_FREQ];
-
-  useEffect(() => rootRef.current?.focus(), []);
 
   // Solo follows the selected band, and never outlives the window.
   useEffect(() => {
@@ -208,257 +203,225 @@ export function MultibandWindow({
   const color = mbBandColor(selected);
   const mode = MB_MODES[Math.round(band.mode)] ?? "compress";
 
+  // Delete or Backspace removes the selected band.
+  const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if ((e.key === "Delete" || e.key === "Backspace") && count > 1) {
+      e.preventDefault();
+      e.stopPropagation();
+      removeBand(selected);
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div
-        ref={rootRef}
-        tabIndex={-1}
-        onKeyDown={(e) => {
-          if ((e.key === "Delete" || e.key === "Backspace") && count > 1) {
-            e.preventDefault();
-            e.stopPropagation();
-            removeBand(selected);
-          }
-        }}
-        className={`${spaceGrotesk.className} flex w-[1060px] max-w-full flex-col gap-3 rounded-2xl shadow-2xl outline-none`}
-        style={{ background: "#1B1C22", border: "1px solid #2E2F37", padding: "18px 22px 18px" }}
-      >
-        <div className="flex h-[30px] items-center justify-between">
-          <div className="flex items-center gap-2">
-            <PluginIcon />
-            <h2 className={`${fraunces.className} text-[19px] font-semibold text-[#F4EDE2]`} style={{ letterSpacing: "-0.2px" }}>
-              Multiband Compressor
-            </h2>
-            <span className="text-xs text-muted">— {channelName}</span>
-            <div className="ml-3">
-              <WindowPresetMenu />
-            </div>
+    <PluginWindow title="Multiband Compressor" channelName={channelName} bypass={bypass} onBypassToggle={onBypassToggle} onClose={onClose} width={1060} gap={12} onPanelKeyDown={onKeyDown}>
+      <div className="relative" style={{ border: "1px solid #2E2F37", borderRadius: 10, overflow: "hidden" }}>
+        <MultibandGraph
+          params={params}
+          width={GRAPH_W}
+          height={GRAPH_H}
+          hostId={hostId}
+          effectId={effectId}
+          selected={selected}
+          onSelect={setSelected}
+          onCrossoverChange={(k, freq) => onParamChange(`x${k + 1}`, freq)}
+          onBandGainChange={(b, gain) => set(b, "Gain", gain)}
+          onThresholdNudge={(b, delta) => {
+            const t = mbBandFromParams(params, b).thresh + delta;
+            set(b, "Thresh", Math.round(Math.max(-60, Math.min(0, t)) * 10) / 10);
+          }}
+          onSplit={split}
+          onRemoveCrossover={(k) => removeBand(k + 1)}
+          onToggleBypass={toggleBypass}
+          onGestureStart={onParamDragStart}
+        />
+        {notice && (
+          <div className="pointer-events-none absolute left-1/2 top-9 -translate-x-1/2 rounded-md px-3 py-1 text-[12px] text-[#F4EDE2]" style={{ background: "#2E2F37" }}>
+            {notice}
           </div>
-          <div className="flex items-center gap-1">
+        )}
+      </div>
+
+      {/* Bands */}
+      <div className="flex gap-1.5" role="tablist" aria-label="Bands">
+        {Array.from({ length: count }, (_, b) => {
+          const bb = mbBandFromParams(params, b);
+          const gain = meters?.gainDb[b] ?? 0;
+          return (
             <button
+              key={b}
               type="button"
-              title={bypass ? "Enable effect" : "Bypass effect"}
-              onClick={onBypassToggle}
-              className="flex h-[30px] w-[30px] items-center justify-center rounded-lg"
-              style={{ background: "#23242B", border: "1px solid #2E2F37" }}
-            >
-              <Power size={16} color={bypass ? "#5A5B64" : "#E6AD5E"} />
-            </button>
-            <button type="button" title="Close" onClick={onClose} className="flex h-[30px] w-[30px] items-center justify-center rounded-lg">
-              <X size={14} color="#9A9AA4" />
-            </button>
-          </div>
-        </div>
-
-        <div className="relative" style={{ border: "1px solid #2E2F37", borderRadius: 10, overflow: "hidden" }}>
-          <MultibandGraph
-            params={params}
-            width={GRAPH_W}
-            height={GRAPH_H}
-            hostId={hostId}
-            effectId={effectId}
-            selected={selected}
-            onSelect={setSelected}
-            onCrossoverChange={(k, freq) => onParamChange(`x${k + 1}`, freq)}
-            onBandGainChange={(b, gain) => set(b, "Gain", gain)}
-            onThresholdNudge={(b, delta) => {
-              const t = mbBandFromParams(params, b).thresh + delta;
-              set(b, "Thresh", Math.round(Math.max(-60, Math.min(0, t)) * 10) / 10);
-            }}
-            onSplit={split}
-            onRemoveCrossover={(k) => removeBand(k + 1)}
-            onToggleBypass={toggleBypass}
-            onGestureStart={onParamDragStart}
-          />
-          {notice && (
-            <div className="pointer-events-none absolute left-1/2 top-9 -translate-x-1/2 rounded-md px-3 py-1 text-[12px] text-[#F4EDE2]" style={{ background: "#2E2F37" }}>
-              {notice}
-            </div>
-          )}
-        </div>
-
-        {/* Bands */}
-        <div className="flex gap-1.5" role="tablist" aria-label="Bands">
-          {Array.from({ length: count }, (_, b) => {
-            const bb = mbBandFromParams(params, b);
-            const gain = meters?.gainDb[b] ?? 0;
-            return (
-              <button
-                key={b}
-                type="button"
-                role="tab"
-                aria-selected={selected === b}
-                onClick={() => setSelected(b)}
-                className="flex min-w-0 flex-1 flex-col gap-1.5 rounded-lg px-2.5 py-2 text-left"
-                style={{
-                  background: selected === b ? "#23242B" : "transparent",
-                  border: `1px solid ${selected === b ? mbBandColor(b) : "#2E2F37"}`,
-                  opacity: bb.bypass >= 0.5 ? 0.5 : 1,
-                }}
-              >
-                <div className="flex items-center gap-1.5">
-                  <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9.5px] font-bold" style={{ background: mbBandColor(b), color: "#101115" }}>
-                    {b + 1}
-                  </span>
-                  <span className="truncate font-mono text-[10.5px] text-muted">
-                    {formatHz(edges[b]).replace(" ", "")}–{formatHz(edges[b + 1]).replace(" ", "")}
-                  </span>
-                  <span className="ml-auto font-mono text-[10.5px]" style={{ color: Math.abs(gain) >= 0.1 ? "#F4EDE2" : "#5A5B64" }}>
-                    {gain > 0.05 ? "+" : ""}
-                    {gain.toFixed(1)}
-                  </span>
-                </div>
-                <GainMeter gainDb={gain} color={mbBandColor(b)} />
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Selected band */}
-        <div className="flex items-center gap-4 rounded-xl px-4 py-3" style={{ background: "#14151A", border: "1px solid #2E2F37" }}>
-          <div className="flex shrink-0 flex-col gap-2">
-            <div className="flex items-center gap-2">
-              <span className="flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold" style={{ background: color, color: "#101115" }}>
-                {selected + 1}
-              </span>
-              <span className="font-mono text-[12px] text-[#F4EDE2]">
-                {formatHz(edges[selected])} – {formatHz(edges[selected + 1])}
-              </span>
-            </div>
-            <Segmented
-              label="Band mode"
-              options={MB_MODES.map((m, i) => ({ value: i, label: MB_MODE_LABELS[m] }))}
-              value={Math.round(band.mode)}
-              onSelect={(v) => {
-                onParamDragStart?.();
-                set(selected, "Mode", v);
+              role="tab"
+              aria-selected={selected === b}
+              onClick={() => setSelected(b)}
+              className="flex min-w-0 flex-1 flex-col gap-1.5 rounded-lg px-2.5 py-2 text-left"
+              style={{
+                background: selected === b ? "#23242B" : "transparent",
+                border: `1px solid ${selected === b ? mbBandColor(b) : "#2E2F37"}`,
+                opacity: bb.bypass >= 0.5 ? 0.5 : 1,
               }}
-            />
-            <p className="w-[250px] text-[11px] leading-snug text-muted">
-              {mode === "compress"
-                ? "Turns this band down when it goes above the threshold."
-                : mode === "expand"
-                  ? "Turns this band down when it falls below the threshold."
-                  : "Brings this band up when it falls below the threshold."}
-            </p>
-          </div>
-
-          <TransferCurve band={band} color={color} levelDb={meters?.levelDb[selected] ?? -Infinity} gainDb={meters?.gainDb[selected] ?? 0} />
-
-          <div className="flex flex-1 justify-around">
-            {KNOBS.map(({ field, label, mode: knobMode }) => {
-              const s = spec(mbKey(selected, field));
-              return (
-                <PluginKnob
-                  key={field}
-                  label={label}
-                  value={params[s.key] ?? s.default}
-                  min={s.min}
-                  max={s.max}
-                  defaultValue={s.default}
-                  mode={knobMode}
-                  size={44}
-                  showReadout
-                  onChange={(v) => onParamChange(s.key, v)}
-                  onDragStart={onParamDragStart}
-                  formatValue={s.format}
-                />
-              );
-            })}
-          </div>
-
-          <div className="flex shrink-0 flex-col gap-1.5">
-            <button
-              type="button"
-              onClick={() => setSolo((v) => !v)}
-              aria-pressed={solo}
-              title="Solo - hear only this band"
-              className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide"
-              style={solo ? { background: "rgba(230,173,94,0.18)", color: "#E6AD5E", border: "1px solid #E6AD5E" } : { color: "#9A9AA4", border: "1px solid #2E2F37" }}
             >
-              <Headphones size={12} /> Solo
+              <div className="flex items-center gap-1.5">
+                <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9.5px] font-bold" style={{ background: mbBandColor(b), color: "#101115" }}>
+                  {b + 1}
+                </span>
+                <span className="truncate font-mono text-[10.5px] text-muted">
+                  {formatHz(edges[b]).replace(" ", "")}–{formatHz(edges[b + 1]).replace(" ", "")}
+                </span>
+                <span className="ml-auto font-mono text-[10.5px]" style={{ color: Math.abs(gain) >= 0.1 ? "#F4EDE2" : "#5A5B64" }}>
+                  {gain > 0.05 ? "+" : ""}
+                  {gain.toFixed(1)}
+                </span>
+              </div>
+              <GainMeter gainDb={gain} color={mbBandColor(b)} />
             </button>
-            <button
-              type="button"
-              onClick={() => toggleBypass(selected)}
-              aria-pressed={band.bypass >= 0.5}
-              title="Bypass this band (Alt-click its handle)"
-              className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide"
-              style={{ color: band.bypass >= 0.5 ? "#5A5B64" : "#E6AD5E", border: "1px solid #2E2F37" }}
-            >
-              <Power size={12} /> {band.bypass >= 0.5 ? "Off" : "On"}
-            </button>
-            <button
-              type="button"
-              onClick={() => removeBand(selected)}
-              disabled={count <= 1}
-              title="Remove this band - its neighbour takes over its range (Delete key)"
-              className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide disabled:opacity-40"
-              style={{ color: "#FF7A7A", border: "1px solid #2E2F37" }}
-            >
-              <Trash2 size={12} /> Remove
-            </button>
+          );
+        })}
+      </div>
+
+      {/* Selected band */}
+      <div className="flex items-center gap-4 rounded-xl px-4 py-3" style={{ background: "#14151A", border: "1px solid #2E2F37" }}>
+        <div className="flex shrink-0 flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold" style={{ background: color, color: "#101115" }}>
+              {selected + 1}
+            </span>
+            <span className="font-mono text-[12px] text-[#F4EDE2]">
+              {formatHz(edges[selected])} – {formatHz(edges[selected + 1])}
+            </span>
           </div>
+          <Segmented
+            label="Band mode"
+            options={MB_MODES.map((m, i) => ({ value: i, label: MB_MODE_LABELS[m] }))}
+            value={Math.round(band.mode)}
+            onSelect={(v) => {
+              onParamDragStart?.();
+              set(selected, "Mode", v);
+            }}
+          />
+          <p className="w-[250px] text-[11px] leading-snug text-muted">
+            {mode === "compress"
+              ? "Turns this band down when it goes above the threshold."
+              : mode === "expand"
+                ? "Turns this band down when it falls below the threshold."
+                : "Brings this band up when it falls below the threshold."}
+          </p>
         </div>
 
-        <div className="flex items-center gap-4">
-          {(["mix", "output"] as const).map((key) => {
-            const s = spec(key);
+        <TransferCurve band={band} color={color} levelDb={meters?.levelDb[selected] ?? -Infinity} gainDb={meters?.gainDb[selected] ?? 0} />
+
+        <div className="flex flex-1 justify-around">
+          {KNOBS.map(({ field, label, mode: knobMode }) => {
+            const s = spec(mbKey(selected, field));
             return (
               <PluginKnob
-                key={key}
-                label={s.label}
-                value={params[key] ?? s.default}
+                key={field}
+                label={label}
+                value={params[s.key] ?? s.default}
                 min={s.min}
                 max={s.max}
                 defaultValue={s.default}
-                mode={key === "output" ? "bipolar" : "linear"}
-                size={36}
-                layout="inline"
+                mode={knobMode}
+                size={44}
                 showReadout
-                onChange={(v) => onParamChange(key, v)}
+                onChange={(v) => onParamChange(s.key, v)}
                 onDragStart={onParamDragStart}
                 formatValue={s.format}
               />
             );
           })}
-          <span className="text-[11px] font-bold uppercase tracking-wide text-muted">Analyzer</span>
-          <Segmented
-            label="Analyzer"
-            options={[
-              { value: 0, label: "Off" },
-              { value: 1, label: "Post" },
-              { value: 2, label: "Pre + Post" },
-            ]}
-            value={Math.round(params.analyzer ?? 2)}
-            onSelect={(v) => onParamChange("analyzer", v)}
-          />
-          <span className="text-[11px] font-bold uppercase tracking-wide text-muted">Range</span>
-          <Segmented
-            label="Display range"
-            options={[6, 12, 24, 48].map((v) => ({ value: v, label: `±${v}` }))}
-            value={Math.round(params.scale ?? 24)}
-            onSelect={(v) => onParamChange("scale", v)}
-          />
-          <span className="ml-auto text-right text-[11px] leading-snug text-muted" title="Double-click the graph to split a band there. Drag a crossover to move it; right-click or double-click it to remove it. Drag a band's handle for its gain, scroll over a band for its threshold, Alt-click a handle to bypass the band.">
-            Double-click to split · right-click a crossover to remove
-            <br />
-            scroll over a band for its threshold · {count}/{MB_MAX_BANDS} bands
-          </span>
         </div>
 
-        <SidechainPanel
-          type="multiband"
-          hostId={hostId}
-          effectId={effectId}
-          params={params}
-          routing={sidechain}
-          sources={sidechainSources}
-          onRoutingChange={onSidechainChange}
-          onParamChange={onParamChange}
-          onParamDragStart={onParamDragStart}
-        />
+        <div className="flex shrink-0 flex-col gap-1.5">
+          <button
+            type="button"
+            onClick={() => setSolo((v) => !v)}
+            aria-pressed={solo}
+            title="Solo - hear only this band"
+            className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide"
+            style={solo ? { background: "rgba(230,173,94,0.18)", color: "#E6AD5E", border: "1px solid #E6AD5E" } : { color: "#9A9AA4", border: "1px solid #2E2F37" }}
+          >
+            <Headphones size={12} /> Solo
+          </button>
+          <button
+            type="button"
+            onClick={() => toggleBypass(selected)}
+            aria-pressed={band.bypass >= 0.5}
+            title="Bypass this band (Alt-click its handle)"
+            className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide"
+            style={{ color: band.bypass >= 0.5 ? "#5A5B64" : "#E6AD5E", border: "1px solid #2E2F37" }}
+          >
+            <Power size={12} /> {band.bypass >= 0.5 ? "Off" : "On"}
+          </button>
+          <button
+            type="button"
+            onClick={() => removeBand(selected)}
+            disabled={count <= 1}
+            title="Remove this band - its neighbour takes over its range (Delete key)"
+            className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide disabled:opacity-40"
+            style={{ color: "#FF7A7A", border: "1px solid #2E2F37" }}
+          >
+            <Trash2 size={12} /> Remove
+          </button>
+        </div>
       </div>
-    </div>
+
+      <div className="flex items-center gap-4">
+        {(["mix", "output"] as const).map((key) => {
+          const s = spec(key);
+          return (
+            <PluginKnob
+              key={key}
+              label={s.label}
+              value={params[key] ?? s.default}
+              min={s.min}
+              max={s.max}
+              defaultValue={s.default}
+              mode={key === "output" ? "bipolar" : "linear"}
+              size={36}
+              layout="inline"
+              showReadout
+              onChange={(v) => onParamChange(key, v)}
+              onDragStart={onParamDragStart}
+              formatValue={s.format}
+            />
+          );
+        })}
+        <span className="text-[11px] font-bold uppercase tracking-wide text-muted">Analyzer</span>
+        <Segmented
+          label="Analyzer"
+          options={[
+            { value: 0, label: "Off" },
+            { value: 1, label: "Post" },
+            { value: 2, label: "Pre + Post" },
+          ]}
+          value={Math.round(params.analyzer ?? 2)}
+          onSelect={(v) => onParamChange("analyzer", v)}
+        />
+        <span className="text-[11px] font-bold uppercase tracking-wide text-muted">Range</span>
+        <Segmented
+          label="Display range"
+          options={[6, 12, 24, 48].map((v) => ({ value: v, label: `±${v}` }))}
+          value={Math.round(params.scale ?? 24)}
+          onSelect={(v) => onParamChange("scale", v)}
+        />
+        <span className="ml-auto text-right text-[11px] leading-snug text-muted" title="Double-click the graph to split a band there. Drag a crossover to move it; right-click or double-click it to remove it. Drag a band's handle for its gain, scroll over a band for its threshold, Alt-click a handle to bypass the band.">
+          Double-click to split · right-click a crossover to remove
+          <br />
+          scroll over a band for its threshold · {count}/{MB_MAX_BANDS} bands
+        </span>
+      </div>
+
+      <SidechainPanel
+        type="multiband"
+        hostId={hostId}
+        effectId={effectId}
+        params={params}
+        routing={sidechain}
+        sources={sidechainSources}
+        onRoutingChange={onSidechainChange}
+        onParamChange={onParamChange}
+        onParamDragStart={onParamDragStart}
+      />
+    </PluginWindow>
   );
 }

@@ -2981,7 +2981,7 @@ export function Daw() {
 
       <NoteInputWindow
         open={noteInputOpen}
-        title={armedChannel && armedChannel.type !== "audio" ? `${armedChannel.name} — keys` : "Keys"}
+        channelName={armedChannel && armedChannel.type !== "audio" ? armedChannel.name : undefined}
         onClose={() => toggleNoteInput(false)}
       >
         {!armedChannel || armedChannel.type === "audio" ? (

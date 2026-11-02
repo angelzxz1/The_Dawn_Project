@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight, ClipboardPaste, Copy, FileAudio, RotateCcw, Save, Trash2, Upload, Waves, X } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, ClipboardPaste, Copy, FileAudio, RotateCcw, Save, Trash2, Upload, Waves } from "lucide-react";
 import { audioEngine } from "@/engine/audioEngine";
 import { loadDrumSample } from "./drumRack";
 import {
@@ -20,8 +20,8 @@ import {
 } from "./drumParams";
 import { allDrumKits, deleteDrumKit, saveDrumKit, serverDrumKits, subscribeDrumKits, type DrumKitPreset } from "./drumKits";
 import { newEffectFileId, registerEffectFile } from "@/effects/effectFiles";
-import { fraunces, spaceGrotesk } from "@/ui/pluginFonts";
 import { PluginKnob } from "@/ui/PluginKnob";
+import { DeviceWindow } from "@/ui/DeviceWindow";
 import { useShortcuts } from "@/ui/shortcuts";
 
 // The Drum Rack's window: 16 pads (C1 at the bottom left, like Ableton),
@@ -118,8 +118,6 @@ export function DrumRackWindow({ channelId, channelName, kit, onChange, onClose,
     };
   }, [channelId]);
 
-  useShortcuts("window", [{ keys: "escape", label: "Close", run: onClose }]);
-
   const loadFile = (pad: number, file: File) => {
     if (!file.type.startsWith("audio/") && !/\.(wav|aiff?|mp3|ogg|flac|m4a)$/i.test(file.name)) return;
     const id = newEffectFileId();
@@ -141,51 +139,63 @@ export function DrumRackWindow({ channelId, channelName, kit, onChange, onClose,
   const audition = (i: number) => audioEngine.auditionDrumPad(channelId, i);
 
   return (
-    <div className="device-skin fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4">
-      <div
-        role="dialog"
-        aria-label={`Drum Rack - ${channelName}`}
-        className={`${spaceGrotesk.className} flex max-h-full w-[1000px] max-w-full flex-col gap-3 overflow-auto rounded-2xl p-4 shadow-2xl`}
-        style={{ background: C.bg, border: `1px solid ${C.border}`, color: C.text }}
-      >
-        <Header channelName={channelName} kit={kit} update={update} begin={begin} onClose={onClose} />
-        <div className="flex gap-3">
-          <PadGrid kit={kit} selected={selected} lit={lit} onSelect={(i) => { setSelected(i); audition(i); }} onDropFile={loadFile} />
-          <PadEditor
-            index={selected}
-            pad={kit.pads[selected]}
-            setPad={(edit) => setPad(selected, edit)}
-            begin={begin}
-            onLoadFile={(f) => loadFile(selected, f)}
-            onAudition={() => audition(selected)}
-          />
-        </div>
-        <p className="text-[10.5px]" style={{ color: C.dim }}>
-          Click a pad to hear and edit it · drop audio files onto pads · play with A S D F G H J K L ; and Q W E R T Y · pads in the same choke group cut each other off
-        </p>
+    <DeviceWindow
+      title="Drum Rack"
+      subtitle={channelName}
+      mark={<DrumMark />}
+      tools={<KitBar kit={kit} update={update} begin={begin} />}
+      actions={
+        <PluginKnob
+          label="Volume"
+          value={kit.volume}
+          min={LEVEL_MIN}
+          max={LEVEL_MAX}
+          defaultValue={0}
+          mode="linear"
+          size={30}
+          layout="inline"
+          onDragStart={begin}
+          formatValue={fmtDb}
+          onChange={(v) => update((k) => (k.volume = v))}
+        />
+      }
+      onClose={onClose}
+      width={1012}
+      background={C.bg}
+      gap={12}
+    >
+      <div className="flex gap-3">
+        <PadGrid kit={kit} selected={selected} lit={lit} onSelect={(i) => { setSelected(i); audition(i); }} onDropFile={loadFile} />
+        <PadEditor
+          index={selected}
+          pad={kit.pads[selected]}
+          setPad={(edit) => setPad(selected, edit)}
+          begin={begin}
+          onLoadFile={(f) => loadFile(selected, f)}
+          onAudition={() => audition(selected)}
+        />
       </div>
-    </div>
+      <p className="text-[10.5px]" style={{ color: C.dim }}>
+        Click a pad to hear and edit it · drop audio files onto pads · play with A S D F G H J K L ; and Q W E R T Y · pads in the same choke group cut each other off
+      </p>
+    </DeviceWindow>
   );
 }
 
-// --- header ---
+// --- kits, in the title row ---
 
 function useKits(): DrumKitPreset[] {
   return useSyncExternalStore(subscribeDrumKits, allDrumKits, serverDrumKits);
 }
 
-function Header({
-  channelName,
+function KitBar({
   kit,
   update,
   begin,
-  onClose,
 }: {
-  channelName: string;
   kit: DrumKitParams;
   update: (edit: (k: DrumKitParams) => void) => void;
   begin: () => void;
-  onClose: () => void;
 }) {
   const kits = useKits();
   const [open, setOpen] = useState(false);
@@ -202,60 +212,33 @@ function Header({
   };
   const btn = "flex h-7 w-6 items-center justify-center rounded-md hover:bg-white/5";
   return (
-    <header className="flex items-center gap-3">
-      <DrumMark />
-      <div className="flex flex-col leading-none">
-        <h2 className={`${fraunces.className} text-[19px] font-semibold`}>Drum Rack</h2>
-        <span className="mt-0.5 text-[10px]" style={{ color: C.muted }}>
-          {channelName}
-        </span>
-      </div>
-      <div className="relative ml-2 flex items-center gap-0.5 rounded-lg px-1" style={{ border: `1px solid ${C.border}`, background: C.panel }}>
-        <button type="button" title="Previous kit" className={btn} onClick={() => step(-1)}>
-          <ChevronLeft size={14} color={C.muted} />
-        </button>
-        <button type="button" title="Browse kits" onClick={() => setOpen((o) => !o)} className="flex h-7 w-44 items-center justify-between px-1.5 text-[12.5px] font-semibold">
-          <span className="truncate">{kit.kit ?? "Custom"}</span>
-          <ChevronDown size={13} color={C.muted} />
-        </button>
-        <button type="button" title="Next kit" className={btn} onClick={() => step(1)}>
-          <ChevronRight size={14} color={C.muted} />
-        </button>
-        <button type="button" title="Save this kit" className={btn} onClick={() => setSaving(true)}>
-          <Save size={13} color={C.muted} />
-        </button>
-        {open && <KitList kits={kits} current={kit.kit} onLoad={load} onClose={() => setOpen(false)} />}
-        {saving && (
-          <SaveKit
-            initial={kit.kit && !kits.find((k) => k.factory && k.name === kit.kit) ? kit.kit : ""}
-            onSave={(name) => {
-              const saved = saveDrumKit(name, kit);
-              update((k) => (k.kit = saved.name));
-              setSaving(false);
-            }}
-            onClose={() => setSaving(false)}
-          />
-        )}
-      </div>
-      <div className="ml-auto flex items-center gap-3">
-        <PluginKnob
-          label="Volume"
-          value={kit.volume}
-          min={LEVEL_MIN}
-          max={LEVEL_MAX}
-          defaultValue={0}
-          mode="linear"
-          size={30}
-          layout="inline"
-          onDragStart={begin}
-          formatValue={fmtDb}
-          onChange={(v) => update((k) => (k.volume = v))}
+    <div className="relative flex items-center gap-0.5 rounded-lg px-1" style={{ border: `1px solid ${C.border}`, background: C.panel }}>
+      <button type="button" title="Previous kit" className={btn} onClick={() => step(-1)}>
+        <ChevronLeft size={14} color={C.muted} />
+      </button>
+      <button type="button" title="Browse kits" onClick={() => setOpen((o) => !o)} className="flex h-7 w-44 items-center justify-between px-1.5 text-[12.5px] font-semibold">
+        <span className="truncate">{kit.kit ?? "Custom"}</span>
+        <ChevronDown size={13} color={C.muted} />
+      </button>
+      <button type="button" title="Next kit" className={btn} onClick={() => step(1)}>
+        <ChevronRight size={14} color={C.muted} />
+      </button>
+      <button type="button" title="Save this kit" className={btn} onClick={() => setSaving(true)}>
+        <Save size={13} color={C.muted} />
+      </button>
+      {open && <KitList kits={kits} current={kit.kit} onLoad={load} onClose={() => setOpen(false)} />}
+      {saving && (
+        <SaveKit
+          initial={kit.kit && !kits.find((k) => k.factory && k.name === kit.kit) ? kit.kit : ""}
+          onSave={(name) => {
+            const saved = saveDrumKit(name, kit);
+            update((k) => (k.kit = saved.name));
+            setSaving(false);
+          }}
+          onClose={() => setSaving(false)}
         />
-        <button type="button" title="Close (Esc)" onClick={onClose} className="flex h-7 w-7 items-center justify-center rounded-lg hover:bg-white/5">
-          <X size={15} color={C.muted} />
-        </button>
-      </div>
-    </header>
+      )}
+    </div>
   );
 }
 

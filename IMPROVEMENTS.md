@@ -1,11 +1,11 @@
 # Improvements
 
-Checked against the code and the commit history on 2026-10-29, and again on 2026-11-02; item 7 of Part 2 was added on 2026-10-30, items 8, 9, 16, 18, 19, 20, 21 and 22 on 2026-10-31, items 11, 12, 13, 24, 25 and 28 on 2026-11-01.
+Checked against the code and the commit history on 2026-10-29, and again on 2026-11-02; item 7 of Part 2 was added on 2026-10-30, items 8, 9, 16, 18, 19, 20, 21 and 22 on 2026-10-31, items 11, 12, 13, 24, 25 and 28 on 2026-11-01, item 23 on 2026-11-02.
 
 - `[x]` is done; the commit that did it is in brackets.
 - `[ ]` is still open; "Partly" says what already exists.
 
-**Summary:** Part 1 is all done. In Part 2, items 1–9, 11–13, 16, 18–22, 24, 25 and 28 are done; 10, 14, 15, 17, 23, 26 and 27 are open.
+**Summary:** Part 1 is all done. In Part 2, items 1–9, 11–13, 16, 18–25 and 28 are done; 10, 14, 15, 17, 26 and 27 are open.
 
 ## Part 1: Code improvements
 
@@ -115,8 +115,11 @@ That is already ahead of most browser DAWs, such as BandLab or Soundtrap.
 
 ### Visual and comfort
 
-- [ ] **23. One consistent style for windows.** Effect windows, the Keys window and the Drum Rack each look and behave differently.
-  - Partly: since item 24 they share the dark device look (`.device-skin`) in either theme. Several effect windows have no `role="dialog"`.
+- [x] **23. One consistent style for windows.** Effect windows, the Keys window and the Drum Rack each look and behave differently. (commit to come)
+  - Every device window has one frame (`src/ui/DeviceWindow.tsx`): the effects, the Drum Rack, the synth and the Keys window. A dark panel in either theme, then a title row: the device's mark, its name, the track it's on, its own tools (presets, kits, tabs), and on the right its readouts, bypass for an effect, and close ("Close (Esc)").
+  - They behave alike: each is a dialog named "Device — Track", Escape closes it, focus goes in when it opens, Tab stays inside, and focus goes back to where it was when it closes. Before, 14 of the 19 effect windows had no `role="dialog"`.
+  - The Keys window floats in the same frame instead of being modal, since you play while working: dragged by its title row, opened where it was left, and Escape is left to the studio.
+  - The synth and the Drum Rack keep their own panel colors inside the frame.
 - [x] **24. Light theme and adjustable UI size,** for laptop screens and 1440p/4K monitors. (`f873b07`)
   - Preferences > Appearance picks System, Dark or Light. The colors are roles in `globals.css`, retuned for the light theme; effect and instrument windows and rack cards keep their dark device look in either.
   - The size is the desktop app's window zoom. In a browser, its own zoom does it (Preferences says how): CSS `zoom` put pointer positions off.

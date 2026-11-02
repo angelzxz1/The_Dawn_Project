@@ -4,6 +4,7 @@ import { Maximize2, Power, X } from "lucide-react";
 import { PluginIcon } from "./PluginIcon";
 import { fraunces, spaceGrotesk } from "@/ui/pluginFonts";
 import { WindowPresetMenu } from "./PresetMenu";
+import { DeviceWindow } from "@/ui/DeviceWindow";
 
 /** The top row of a compact FX rack card: icon, name, a short status, and
  * expand / bypass / remove. */
@@ -52,8 +53,8 @@ export function RackCardHeader({
   );
 }
 
-/** A plugin's full window: the dimmed backdrop, the panel with its title
- * row (bypass, close), and the content. Escape closes it. */
+/** An effect's full window: the device frame (ui/DeviceWindow.tsx) with the
+ * effect's presets and its bypass in the title row. Escape closes it. */
 export function PluginWindow({
   title,
   channelName,
@@ -61,6 +62,9 @@ export function PluginWindow({
   onBypassToggle,
   onClose,
   width,
+  gap,
+  panelRef,
+  onPanelKeyDown,
   children,
 }: {
   title: string;
@@ -69,45 +73,26 @@ export function PluginWindow({
   onBypassToggle: () => void;
   onClose: () => void;
   width: number;
+  gap?: number;
+  panelRef?: React.RefObject<HTMLDivElement | null>;
+  onPanelKeyDown?: (e: React.KeyboardEvent<HTMLDivElement>) => void;
   children: React.ReactNode;
 }) {
   return (
-    <div className="device-skin fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div
-        className={`${spaceGrotesk.className} flex max-w-full flex-col gap-4 rounded-2xl shadow-2xl`}
-        style={{ width, background: "#1B1C22", border: "1px solid #2E2F37", padding: "18px 22px 20px" }}
-        role="dialog"
-        aria-label={title}
-      >
-        <div className="flex h-[30px] items-center justify-between">
-          <div className="flex items-center gap-2">
-            <PluginIcon />
-            <h2 className={`${fraunces.className} text-[19px] font-semibold text-[#F4EDE2]`} style={{ letterSpacing: "-0.2px" }}>
-              {title}
-            </h2>
-            <span className="text-xs text-muted">— {channelName}</span>
-            <div className="ml-3">
-              <WindowPresetMenu />
-            </div>
-          </div>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              title={bypass ? "Enable effect" : "Bypass effect"}
-              onClick={onBypassToggle}
-              className="flex h-[30px] w-[30px] items-center justify-center rounded-lg"
-              style={{ background: "#23242B", border: "1px solid #2E2F37" }}
-            >
-              <Power size={16} color={bypass ? "#5A5B64" : "#E6AD5E"} />
-            </button>
-            <button type="button" title="Close" onClick={onClose} className="flex h-[30px] w-[30px] items-center justify-center rounded-lg">
-              <X size={14} color="#9A9AA4" />
-            </button>
-          </div>
-        </div>
-        {children}
-      </div>
-    </div>
+    <DeviceWindow
+      title={title}
+      subtitle={channelName}
+      mark={<PluginIcon />}
+      tools={<WindowPresetMenu />}
+      bypass={{ on: bypass, toggle: onBypassToggle }}
+      onClose={onClose}
+      width={width}
+      gap={gap}
+      panelRef={panelRef}
+      onPanelKeyDown={onPanelKeyDown}
+    >
+      {children}
+    </DeviceWindow>
   );
 }
 

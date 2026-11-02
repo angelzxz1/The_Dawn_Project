@@ -1,14 +1,11 @@
 "use client";
 
-import { Power, X } from "lucide-react";
+import { PluginWindow } from "@/effects/ui/PluginChrome";
 import { PluginKnob, type KnobMode } from "@/ui/PluginKnob";
-import { PluginIcon } from "@/effects/ui/PluginIcon";
 import { NamDisplay } from "./NamDisplay";
 import { NamFileSlot, useNamModel } from "./NamFileSlot";
 import { paramSpecs, type EffectFileRef, type ParamSpec } from "@/effects/registry";
 import { normalizationDb } from "./namModel";
-import { fraunces, spaceGrotesk } from "@/ui/pluginFonts";
-import { WindowPresetMenu } from "@/effects/ui/PresetMenu";
 import { TonePicker } from "@/studio/rack/TonePicker";
 
 interface NamAmpWindowProps {
@@ -116,112 +113,75 @@ export function NamAmpWindow({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div
-        className={`${spaceGrotesk.className} flex w-[880px] flex-col gap-4 rounded-2xl shadow-2xl`}
-        style={{ background: "#1B1C22", border: "1px solid #2E2F37", padding: "18px 22px 20px" }}
-      >
-        <div className="flex h-[30px] items-center justify-between">
-          <div className="flex items-center gap-2">
-            <PluginIcon />
-            <h2 className={`${fraunces.className} text-[19px] font-semibold text-[#F4EDE2]`} style={{ letterSpacing: "-0.2px" }}>
-              NAM Amp
-            </h2>
-            <span className="text-xs text-muted">— {channelName}</span>
-            <div className="ml-3">
-              <WindowPresetMenu />
+    <PluginWindow title="NAM Amp" channelName={channelName} bypass={bypass} onBypassToggle={onBypassToggle} onClose={onClose} width={880}>
+      <NamDisplay
+        hostId={hostId}
+        effectId={effectId}
+        model={model}
+        fileName={file?.name}
+        bass={value("bass")}
+        middle={value("middle")}
+        treble={value("treble")}
+        normalizeDb={normalizeDb}
+      />
+
+      <div className="flex items-center gap-6">
+        <div className="w-[280px] shrink-0">
+          <NamFileSlot file={file} model={model} onLoad={onLoadFile} onClear={onClearFile} />
+          {onPickFile && (
+            <div className="mt-2">
+              <TonePicker kind="amp" currentId={file?.id} onPick={onPickFile} onLoadFile={onLoadFile} />
             </div>
-          </div>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              title={bypass ? "Enable effect" : "Bypass effect"}
-              onClick={onBypassToggle}
-              className="flex h-[30px] w-[30px] items-center justify-center rounded-lg"
-              style={{ background: "#23242B", border: "1px solid #2E2F37" }}
-            >
-              <Power size={16} color={bypass ? "#5A5B64" : "#E6AD5E"} />
-            </button>
-            <button
-              type="button"
-              title="Close"
-              onClick={onClose}
-              className="flex h-[30px] w-[30px] items-center justify-center rounded-lg"
-            >
-              <X size={14} color="#9A9AA4" />
-            </button>
-          </div>
+          )}
         </div>
-
-        <NamDisplay
-          hostId={hostId}
-          effectId={effectId}
-          model={model}
-          fileName={file?.name}
-          bass={value("bass")}
-          middle={value("middle")}
-          treble={value("treble")}
-          normalizeDb={normalizeDb}
-        />
-
-        <div className="flex items-center gap-6">
-          <div className="w-[280px] shrink-0">
-            <NamFileSlot file={file} model={model} onLoad={onLoadFile} onClear={onClearFile} />
-            {onPickFile && (
-              <div className="mt-2">
-                <TonePicker kind="amp" currentId={file?.id} onPick={onPickFile} onLoadFile={onLoadFile} />
-              </div>
-            )}
-          </div>
-          <div className="flex flex-1 justify-around">
-            {NAM_AMP_KNOBS.map(({ key, mode }) => {
-              const spec = namAmpSpec(key);
-              return (
-                <PluginKnob
-                  key={key}
-                  label={spec.label}
-                  value={value(key)}
-                  min={spec.min}
-                  max={spec.max}
-                  defaultValue={spec.default}
-                  mode={mode}
-                  size={50}
-                  showReadout
-                  onChange={(v) => onParamChange(key, v)}
-                  onDragStart={onParamDragStart}
-                  formatValue={spec.format}
-                />
-              );
-            })}
-          </div>
-        </div>
-
-        <div style={{ height: 1, background: "#2E2F37" }} />
-
-        <div className="flex items-center gap-3">
-          <span className="text-[12px] font-bold uppercase tracking-wide" style={{ color: "#8A8A94" }}>
-            Normalize
-          </span>
-          <Segmented label="Normalize" options={["Off", "On"]} selected={normalize ? 1 : 0} onSelect={(i) => pick("normalize", i)} />
-          <span className="ml-3 text-[12px] font-bold uppercase tracking-wide" style={{ color: "#8A8A94" }}>
-            Size
-          </span>
-          <Segmented
-            label="Model size"
-            options={["Lite", "Full"]}
-            selected={value("size") >= 0.5 ? 1 : 0}
-            disabled={!info?.isA2}
-            onSelect={(i) => pick("size", i)}
-          />
-          <span className="ml-auto max-w-[300px] text-right text-[12px] leading-snug text-muted">
-            {!info?.isA2
-              ? "Size applies to A2 models, which include a lighter Lite version."
-              : value("size") >= 0.5
-                ? "Full: the capture at its best accuracy."
-                : "Lite: the same capture at lower resolution, several times lighter on the CPU."}
-          </span>
+        <div className="flex flex-1 justify-around">
+          {NAM_AMP_KNOBS.map(({ key, mode }) => {
+            const spec = namAmpSpec(key);
+            return (
+              <PluginKnob
+                key={key}
+                label={spec.label}
+                value={value(key)}
+                min={spec.min}
+                max={spec.max}
+                defaultValue={spec.default}
+                mode={mode}
+                size={50}
+                showReadout
+                onChange={(v) => onParamChange(key, v)}
+                onDragStart={onParamDragStart}
+                formatValue={spec.format}
+              />
+            );
+          })}
         </div>
       </div>
-    </div>
+
+      <div style={{ height: 1, background: "#2E2F37" }} />
+
+      <div className="flex items-center gap-3">
+        <span className="text-[12px] font-bold uppercase tracking-wide" style={{ color: "#8A8A94" }}>
+          Normalize
+        </span>
+        <Segmented label="Normalize" options={["Off", "On"]} selected={normalize ? 1 : 0} onSelect={(i) => pick("normalize", i)} />
+        <span className="ml-3 text-[12px] font-bold uppercase tracking-wide" style={{ color: "#8A8A94" }}>
+          Size
+        </span>
+        <Segmented
+          label="Model size"
+          options={["Lite", "Full"]}
+          selected={value("size") >= 0.5 ? 1 : 0}
+          disabled={!info?.isA2}
+          onSelect={(i) => pick("size", i)}
+        />
+        <span className="ml-auto max-w-[300px] text-right text-[12px] leading-snug text-muted">
+          {!info?.isA2
+            ? "Size applies to A2 models, which include a lighter Lite version."
+            : value("size") >= 0.5
+              ? "Full: the capture at its best accuracy."
+              : "Lite: the same capture at lower resolution, several times lighter on the CPU."}
+        </span>
+      </div>
+    </PluginWindow>
   );
 }

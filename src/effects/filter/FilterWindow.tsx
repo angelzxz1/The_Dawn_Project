@@ -1,8 +1,7 @@
 "use client";
 
-import { Power, X } from "lucide-react";
+import { PluginWindow } from "@/effects/ui/PluginChrome";
 import { PluginKnob, type KnobMode } from "@/ui/PluginKnob";
-import { PluginIcon } from "@/effects/ui/PluginIcon";
 import { FilterGraph } from "./FilterGraph";
 import { paramSpecs, type ParamSpec } from "@/effects/registry";
 import {
@@ -14,8 +13,6 @@ import {
   filterUsesSlope,
   slopeIndexFromParam,
 } from "./filterModel";
-import { fraunces, spaceGrotesk } from "@/ui/pluginFonts";
-import { WindowPresetMenu } from "@/effects/ui/PresetMenu";
 
 interface FilterWindowProps {
   channelName: string;
@@ -117,95 +114,58 @@ export function FilterWindow({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div
-        className={`${spaceGrotesk.className} flex w-[880px] flex-col gap-4 rounded-2xl shadow-2xl`}
-        style={{ background: "#1B1C22", border: "1px solid #2E2F37", padding: "18px 22px 20px" }}
-      >
-        <div className="flex h-[30px] items-center justify-between">
-          <div className="flex items-center gap-2">
-            <PluginIcon />
-            <h2 className={`${fraunces.className} text-[19px] font-semibold text-[#F4EDE2]`} style={{ letterSpacing: "-0.2px" }}>
-              Filter
-            </h2>
-            <span className="text-xs text-muted">— {channelName}</span>
-            <div className="ml-3">
-              <WindowPresetMenu />
-            </div>
-          </div>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              title={bypass ? "Enable effect" : "Bypass effect"}
-              onClick={onBypassToggle}
-              className="flex h-[30px] w-[30px] items-center justify-center rounded-lg"
-              style={{ background: "#23242B", border: "1px solid #2E2F37" }}
-            >
-              <Power size={16} color={bypass ? "#5A5B64" : "#E6AD5E"} />
-            </button>
-            <button
-              type="button"
-              title="Close"
-              onClick={onClose}
-              className="flex h-[30px] w-[30px] items-center justify-center rounded-lg"
-            >
-              <X size={14} color="#9A9AA4" />
-            </button>
-          </div>
-        </div>
+    <PluginWindow title="Filter" channelName={channelName} bypass={bypass} onBypassToggle={onBypassToggle} onClose={onClose} width={880}>
+      <FilterGraph
+        mode={mode}
+        frequency={value("frequency")}
+        q={value("Q")}
+        gainDb={value("gain")}
+        slopeIndex={slopeIndex}
+        wet={value("wet")}
+        lfoDepth={value("lfoDepth")}
+      />
 
-        <FilterGraph
-          mode={mode}
-          frequency={value("frequency")}
-          q={value("Q")}
-          gainDb={value("gain")}
-          slopeIndex={slopeIndex}
-          wet={value("wet")}
-          lfoDepth={value("lfoDepth")}
-        />
-
-        <div className="flex justify-around px-1 pt-1">
-          {FILTER_KNOBS.map(({ key, mode: knobMode }) => {
-            const spec = filterSpec(key);
-            return (
-              <PluginKnob
-                key={key}
-                label={spec.label}
-                value={value(key)}
-                min={spec.min}
-                max={spec.max}
-                defaultValue={spec.default}
-                mode={knobMode}
-                size={54}
-                showReadout
-                disabled={key === "gain" && !filterUsesGain(mode)}
-                onChange={(v) => onParamChange(key, v)}
-                onDragStart={onParamDragStart}
-                formatValue={spec.format}
-              />
-            );
-          })}
-        </div>
-
-        <div style={{ height: 1, background: "#2E2F37" }} />
-
-        <div className="flex items-center gap-3">
-          <Segmented
-            label="Filter type"
-            options={FILTER_MODES.map((m) => m.label)}
-            selected={FILTER_MODES.findIndex((m) => m.mode === mode)}
-            onSelect={(i) => pick("mode", i)}
-          />
-          <Segmented
-            label="Slope, dB per octave"
-            options={FILTER_SLOPES.map(String)}
-            selected={slopeIndex}
-            disabled={!filterUsesSlope(mode)}
-            onSelect={(i) => pick("slope", i)}
-          />
-          <span className="ml-auto font-mono text-[12px] text-muted">{lfoSummary(params)}</span>
-        </div>
+      <div className="flex justify-around px-1 pt-1">
+        {FILTER_KNOBS.map(({ key, mode: knobMode }) => {
+          const spec = filterSpec(key);
+          return (
+            <PluginKnob
+              key={key}
+              label={spec.label}
+              value={value(key)}
+              min={spec.min}
+              max={spec.max}
+              defaultValue={spec.default}
+              mode={knobMode}
+              size={54}
+              showReadout
+              disabled={key === "gain" && !filterUsesGain(mode)}
+              onChange={(v) => onParamChange(key, v)}
+              onDragStart={onParamDragStart}
+              formatValue={spec.format}
+            />
+          );
+        })}
       </div>
-    </div>
+
+      <div style={{ height: 1, background: "#2E2F37" }} />
+
+      <div className="flex items-center gap-3">
+        <Segmented
+          label="Filter type"
+          options={FILTER_MODES.map((m) => m.label)}
+          selected={FILTER_MODES.findIndex((m) => m.mode === mode)}
+          onSelect={(i) => pick("mode", i)}
+        />
+        <Segmented
+          label="Slope, dB per octave"
+          options={FILTER_SLOPES.map(String)}
+          selected={slopeIndex}
+          disabled={!filterUsesSlope(mode)}
+          onSelect={(i) => pick("slope", i)}
+        />
+        <span className="ml-auto font-mono text-[12px] text-muted">{lfoSummary(params)}</span>
+      </div>
+    </PluginWindow>
   );
 }

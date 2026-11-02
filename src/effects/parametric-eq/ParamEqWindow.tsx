@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Headphones, Power, Trash2, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Headphones, Power, Trash2 } from "lucide-react";
+import { PluginWindow } from "@/effects/ui/PluginChrome";
 import { PluginKnob } from "@/ui/PluginKnob";
-import { PluginIcon } from "@/effects/ui/PluginIcon";
 import { Segmented } from "@/effects/ui/PluginSegmented";
 import { ParamEqGraph, eqBandColor } from "./ParamEqGraph";
 import { audioEngine } from "@/engine/audioEngine";
@@ -23,8 +23,6 @@ import {
   type EqBand,
   type EqShape,
 } from "./paramEqModel";
-import { fraunces, spaceGrotesk } from "@/ui/pluginFonts";
-import { WindowPresetMenu } from "@/effects/ui/PresetMenu";
 
 interface ParamEqWindowProps {
   hostId: string;
@@ -86,12 +84,9 @@ export function ParamEqWindow({
     return first === -1 ? null : first;
   });
   const [solo, setSolo] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
   const band: EqBand | null = selected !== null && bands[selected]?.on ? bands[selected] : null;
   const shape = band ? EQ_SHAPES[band.shape] : null;
   const activeCount = bands.filter((b) => b.on !== 0).length;
-
-  useEffect(() => rootRef.current?.focus(), []);
 
   // Solo follows the selected band, and never outlives the window.
   useEffect(() => {
@@ -150,218 +145,186 @@ export function ParamEqWindow({
     );
   };
 
+  // Delete or Backspace removes the selected band.
+  const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if ((e.key === "Delete" || e.key === "Backspace") && band && selected !== null) {
+      e.preventDefault();
+      e.stopPropagation();
+      removeBand(selected);
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div
-        ref={rootRef}
-        tabIndex={-1}
-        onKeyDown={(e) => {
-          if ((e.key === "Delete" || e.key === "Backspace") && band && selected !== null) {
-            e.preventDefault();
-            e.stopPropagation();
-            removeBand(selected);
-          }
-        }}
-        className={`${spaceGrotesk.className} flex w-[1060px] max-w-full flex-col gap-3 rounded-2xl shadow-2xl outline-none`}
-        style={{ background: "#1B1C22", border: "1px solid #2E2F37", padding: "18px 22px 18px" }}
-      >
-        <div className="flex h-[30px] items-center justify-between">
-          <div className="flex items-center gap-2">
-            <PluginIcon />
-            <h2 className={`${fraunces.className} text-[19px] font-semibold text-[#F4EDE2]`} style={{ letterSpacing: "-0.2px" }}>
-              Parametric EQ
-            </h2>
-            <span className="text-xs text-muted">— {channelName}</span>
-            <div className="ml-3">
-              <WindowPresetMenu />
-            </div>
-          </div>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              title={bypass ? "Enable effect" : "Bypass effect"}
-              onClick={onBypassToggle}
-              className="flex h-[30px] w-[30px] items-center justify-center rounded-lg"
-              style={{ background: "#23242B", border: "1px solid #2E2F37" }}
-            >
-              <Power size={16} color={bypass ? "#5A5B64" : "#E6AD5E"} />
-            </button>
-            <button type="button" title="Close" onClick={onClose} className="flex h-[30px] w-[30px] items-center justify-center rounded-lg">
-              <X size={14} color="#9A9AA4" />
-            </button>
-          </div>
-        </div>
-
-        <div style={{ border: "1px solid #2E2F37", borderRadius: 10, overflow: "hidden" }}>
-          <ParamEqGraph
-            params={params}
-            width={GRAPH_W}
-            height={GRAPH_H}
-            hostId={hostId}
-            effectId={effectId}
-            selected={selected}
-            onSelect={setSelected}
-            onBandChange={(index, change) => {
-              if (change.freq !== undefined) set(index, "Freq", change.freq);
-              if (change.gain !== undefined) set(index, "Gain", change.gain);
-              if (change.q !== undefined) set(index, "Q", change.q);
-            }}
-            onAddBand={addBand}
-            onToggleBypass={toggleBypass}
-            onRemoveBand={removeBand}
-            onGestureStart={onParamDragStart}
-          />
-        </div>
-
-        {/* Selected band */}
-        <div className="flex min-h-[112px] items-center gap-5 rounded-xl px-4 py-3" style={{ background: "#14151A", border: "1px solid #2E2F37" }}>
-          {band && shape && selected !== null ? (
-            <>
-              <div className="flex w-[330px] shrink-0 flex-col gap-2">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold" style={{ background: eqBandColor(selected), color: "#101115" }}>
-                    {selected + 1}
-                  </span>
-                  <span className="text-[13px] font-semibold text-[#F4EDE2]">{EQ_SHAPE_LABELS[shape]}</span>
-                  {band.on === 2 && <span className="text-[11px] uppercase tracking-wide text-muted">bypassed</span>}
-                </div>
-                <div className="flex flex-wrap gap-1" role="radiogroup" aria-label="Band shape">
-                  {EQ_SHAPES.map((s, i) => (
-                    <button
-                      key={s}
-                      type="button"
-                      role="radio"
-                      aria-checked={band.shape === i}
-                      title={EQ_SHAPE_LABELS[s]}
-                      onClick={() => {
-                        if (band.shape === i) return;
-                        onParamDragStart?.();
-                        set(selected, "Shape", i);
-                        if (!shapeUsesGain(s)) set(selected, "Gain", 0);
-                        if (s === "lowCut" || s === "highCut") set(selected, "Q", Math.SQRT1_2);
-                      }}
-                      className="flex h-7 w-9 items-center justify-center rounded-md"
-                      style={{ background: band.shape === i ? "#2E2F37" : "transparent", border: "1px solid #2E2F37" }}
-                    >
-                      <ShapeIcon shape={s} active={band.shape === i} />
-                    </button>
-                  ))}
-                </div>
-                <div className="flex items-center gap-2">
-                  <Segmented
-                    label="Stereo placement"
-                    options={EQ_PLACEMENTS.map((p, i) => ({ value: i, label: p === "stereo" ? "Stereo" : EQ_PLACEMENT_LABELS[p][0] }))}
-                    value={band.place}
-                    onSelect={(v) => {
-                      onParamDragStart?.();
-                      set(selected, "Place", v);
-                    }}
-                  />
-                  {shapeUsesSlope(shape) && (
-                    <select
-                      aria-label="Slope"
-                      value={EQ_SLOPES.reduce((best, s) => (Math.abs(s - band.slope) < Math.abs(best - band.slope) ? s : best), 12)}
-                      onChange={(e) => {
-                        onParamDragStart?.();
-                        set(selected, "Slope", Number(e.target.value));
-                      }}
-                      className="h-7 rounded-md px-1.5 text-[11px] font-bold"
-                      style={{ background: "#1B1C22", border: "1px solid #2E2F37", color: "#F4EDE2" }}
-                    >
-                      {EQ_SLOPES.map((s) => (
-                        <option key={s} value={s}>
-                          {s} dB/oct
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex flex-1 justify-around">
-                {knob("Freq", "log")}
-                {knob("Gain", "bipolar", !shapeUsesGain(shape))}
-                {knob("Q", "log")}
-              </div>
-
-              <div className="flex shrink-0 flex-col gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setSolo((v) => !v)}
-                  aria-pressed={solo}
-                  title="Solo - hear only this band's frequency range"
-                  className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide"
-                  style={solo ? { background: "rgba(230,173,94,0.18)", color: "#E6AD5E", border: "1px solid #E6AD5E" } : { color: "#9A9AA4", border: "1px solid #2E2F37" }}
-                >
-                  <Headphones size={12} /> Solo
-                </button>
-                <button
-                  type="button"
-                  onClick={() => toggleBypass(selected)}
-                  aria-pressed={band.on === 2}
-                  title="Bypass this band (Alt-click its node)"
-                  className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide"
-                  style={{ color: band.on === 2 ? "#5A5B64" : "#E6AD5E", border: "1px solid #2E2F37" }}
-                >
-                  <Power size={12} /> {band.on === 2 ? "Off" : "On"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => removeBand(selected)}
-                  title="Delete this band (Delete key, or right-click its node)"
-                  className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide"
-                  style={{ color: "#FF7A7A", border: "1px solid #2E2F37" }}
-                >
-                  <Trash2 size={12} /> Delete
-                </button>
-              </div>
-            </>
-          ) : (
-            <p className="w-full text-center text-[12px] leading-relaxed text-muted">
-              Double-click the graph to add a band. Drag a band to move it (hold Shift for fine moves), scroll to change its Q,
-              Alt-click to bypass it, right-click or press Delete to remove it.
-            </p>
-          )}
-        </div>
-
-        <div className="flex items-center gap-4">
-          <PluginKnob
-            label="Output"
-            value={params.output ?? 0}
-            min={-24}
-            max={24}
-            defaultValue={0}
-            mode="bipolar"
-            size={36}
-            layout="inline"
-            showReadout
-            onChange={(v) => onParamChange("output", v)}
-            onDragStart={onParamDragStart}
-            formatValue={spec("output").format}
-          />
-          <span className="text-[11px] font-bold uppercase tracking-wide text-muted">Analyzer</span>
-          <Segmented
-            label="Analyzer"
-            options={[
-              { value: 0, label: "Off" },
-              { value: 1, label: "Post" },
-              { value: 2, label: "Pre + Post" },
-            ]}
-            value={Math.round(params.analyzer ?? 2)}
-            onSelect={(v) => onParamChange("analyzer", v)}
-          />
-          <span className="text-[11px] font-bold uppercase tracking-wide text-muted">Range</span>
-          <Segmented
-            label="Display range"
-            options={[3, 6, 12, 30].map((v) => ({ value: v, label: `±${v}` }))}
-            value={Math.round(params.scale ?? 12)}
-            onSelect={(v) => onParamChange("scale", v)}
-          />
-          <span className="ml-auto font-mono text-[11px] text-muted">
-            {activeCount}/{MAX_EQ_BANDS} bands
-          </span>
-        </div>
+    <PluginWindow title="Parametric EQ" channelName={channelName} bypass={bypass} onBypassToggle={onBypassToggle} onClose={onClose} width={1060} gap={12} onPanelKeyDown={onKeyDown}>
+      <div style={{ border: "1px solid #2E2F37", borderRadius: 10, overflow: "hidden" }}>
+        <ParamEqGraph
+          params={params}
+          width={GRAPH_W}
+          height={GRAPH_H}
+          hostId={hostId}
+          effectId={effectId}
+          selected={selected}
+          onSelect={setSelected}
+          onBandChange={(index, change) => {
+            if (change.freq !== undefined) set(index, "Freq", change.freq);
+            if (change.gain !== undefined) set(index, "Gain", change.gain);
+            if (change.q !== undefined) set(index, "Q", change.q);
+          }}
+          onAddBand={addBand}
+          onToggleBypass={toggleBypass}
+          onRemoveBand={removeBand}
+          onGestureStart={onParamDragStart}
+        />
       </div>
-    </div>
+
+      {/* Selected band */}
+      <div className="flex min-h-[112px] items-center gap-5 rounded-xl px-4 py-3" style={{ background: "#14151A", border: "1px solid #2E2F37" }}>
+        {band && shape && selected !== null ? (
+          <>
+            <div className="flex w-[330px] shrink-0 flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold" style={{ background: eqBandColor(selected), color: "#101115" }}>
+                  {selected + 1}
+                </span>
+                <span className="text-[13px] font-semibold text-[#F4EDE2]">{EQ_SHAPE_LABELS[shape]}</span>
+                {band.on === 2 && <span className="text-[11px] uppercase tracking-wide text-muted">bypassed</span>}
+              </div>
+              <div className="flex flex-wrap gap-1" role="radiogroup" aria-label="Band shape">
+                {EQ_SHAPES.map((s, i) => (
+                  <button
+                    key={s}
+                    type="button"
+                    role="radio"
+                    aria-checked={band.shape === i}
+                    title={EQ_SHAPE_LABELS[s]}
+                    onClick={() => {
+                      if (band.shape === i) return;
+                      onParamDragStart?.();
+                      set(selected, "Shape", i);
+                      if (!shapeUsesGain(s)) set(selected, "Gain", 0);
+                      if (s === "lowCut" || s === "highCut") set(selected, "Q", Math.SQRT1_2);
+                    }}
+                    className="flex h-7 w-9 items-center justify-center rounded-md"
+                    style={{ background: band.shape === i ? "#2E2F37" : "transparent", border: "1px solid #2E2F37" }}
+                  >
+                    <ShapeIcon shape={s} active={band.shape === i} />
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-2">
+                <Segmented
+                  label="Stereo placement"
+                  options={EQ_PLACEMENTS.map((p, i) => ({ value: i, label: p === "stereo" ? "Stereo" : EQ_PLACEMENT_LABELS[p][0] }))}
+                  value={band.place}
+                  onSelect={(v) => {
+                    onParamDragStart?.();
+                    set(selected, "Place", v);
+                  }}
+                />
+                {shapeUsesSlope(shape) && (
+                  <select
+                    aria-label="Slope"
+                    value={EQ_SLOPES.reduce((best, s) => (Math.abs(s - band.slope) < Math.abs(best - band.slope) ? s : best), 12)}
+                    onChange={(e) => {
+                      onParamDragStart?.();
+                      set(selected, "Slope", Number(e.target.value));
+                    }}
+                    className="h-7 rounded-md px-1.5 text-[11px] font-bold"
+                    style={{ background: "#1B1C22", border: "1px solid #2E2F37", color: "#F4EDE2" }}
+                  >
+                    {EQ_SLOPES.map((s) => (
+                      <option key={s} value={s}>
+                        {s} dB/oct
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-1 justify-around">
+              {knob("Freq", "log")}
+              {knob("Gain", "bipolar", !shapeUsesGain(shape))}
+              {knob("Q", "log")}
+            </div>
+
+            <div className="flex shrink-0 flex-col gap-1.5">
+              <button
+                type="button"
+                onClick={() => setSolo((v) => !v)}
+                aria-pressed={solo}
+                title="Solo - hear only this band's frequency range"
+                className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide"
+                style={solo ? { background: "rgba(230,173,94,0.18)", color: "#E6AD5E", border: "1px solid #E6AD5E" } : { color: "#9A9AA4", border: "1px solid #2E2F37" }}
+              >
+                <Headphones size={12} /> Solo
+              </button>
+              <button
+                type="button"
+                onClick={() => toggleBypass(selected)}
+                aria-pressed={band.on === 2}
+                title="Bypass this band (Alt-click its node)"
+                className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide"
+                style={{ color: band.on === 2 ? "#5A5B64" : "#E6AD5E", border: "1px solid #2E2F37" }}
+              >
+                <Power size={12} /> {band.on === 2 ? "Off" : "On"}
+              </button>
+              <button
+                type="button"
+                onClick={() => removeBand(selected)}
+                title="Delete this band (Delete key, or right-click its node)"
+                className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide"
+                style={{ color: "#FF7A7A", border: "1px solid #2E2F37" }}
+              >
+                <Trash2 size={12} /> Delete
+              </button>
+            </div>
+          </>
+        ) : (
+          <p className="w-full text-center text-[12px] leading-relaxed text-muted">
+            Double-click the graph to add a band. Drag a band to move it (hold Shift for fine moves), scroll to change its Q,
+            Alt-click to bypass it, right-click or press Delete to remove it.
+          </p>
+        )}
+      </div>
+
+      <div className="flex items-center gap-4">
+        <PluginKnob
+          label="Output"
+          value={params.output ?? 0}
+          min={-24}
+          max={24}
+          defaultValue={0}
+          mode="bipolar"
+          size={36}
+          layout="inline"
+          showReadout
+          onChange={(v) => onParamChange("output", v)}
+          onDragStart={onParamDragStart}
+          formatValue={spec("output").format}
+        />
+        <span className="text-[11px] font-bold uppercase tracking-wide text-muted">Analyzer</span>
+        <Segmented
+          label="Analyzer"
+          options={[
+            { value: 0, label: "Off" },
+            { value: 1, label: "Post" },
+            { value: 2, label: "Pre + Post" },
+          ]}
+          value={Math.round(params.analyzer ?? 2)}
+          onSelect={(v) => onParamChange("analyzer", v)}
+        />
+        <span className="text-[11px] font-bold uppercase tracking-wide text-muted">Range</span>
+        <Segmented
+          label="Display range"
+          options={[3, 6, 12, 30].map((v) => ({ value: v, label: `±${v}` }))}
+          value={Math.round(params.scale ?? 12)}
+          onSelect={(v) => onParamChange("scale", v)}
+        />
+        <span className="ml-auto font-mono text-[11px] text-muted">
+          {activeCount}/{MAX_EQ_BANDS} bands
+        </span>
+      </div>
+    </PluginWindow>
   );
 }

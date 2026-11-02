@@ -3,22 +3,20 @@
 Read this first in a new session. It says where the project is, how the
 work is done and what comes next, then keeps the technical notes (the
 native engine's techniques, and what each finished item changed).
-Updated 2026-11-02, at `main` = `bfa84ac`, working tree clean.
+Updated 2026-11-02, at `main` = `3ee1966`, with step 21 not yet committed.
 
 ## Start here
 
-- **Where we are:** Phase 6 (mixing) of `nextSteps.md`. Steps 1-20 are
-  done (step 6, NAM in the engine, was dropped). The last three, all on
-  2026-11-01:
-  - step 18, better meters (`67ea045`);
-  - step 19, pre/post sends and routing highlights (`66c9526`);
-  - step 20, moving, copying and saving effect chains (`bfa84ac`).
-- **Next: step 21, Part 2 #23, one style for every window** (the effect
-  windows, Keys, the Drum Rack). It comes before the mixer view (22),
-  detached windows (23) and plugin windows (30). Several effect windows
-  have no `role="dialog"`; give them one as part of it. Wait for the user
-  to say "go" before starting a step: they ask for each one ("Lets go with
-  step N").
+- **Where we are:** Phase 6 (mixing) of `nextSteps.md`. Steps 1-21 are
+  done (step 6, NAM in the engine, was dropped). The last four:
+  - step 18, better meters (`67ea045`, 2026-11-01);
+  - step 19, pre/post sends and routing highlights (`66c9526`, 2026-11-01);
+  - step 20, moving, copying and saving effect chains (`bfa84ac`, 2026-11-01);
+  - step 21, one style for every window (2026-11-02, commit to come).
+- **Next: step 22, Part 2 #10, the mixer view.** Its windows and any new
+  device UI go in `DeviceWindow` (`src/ui/DeviceWindow.tsx`). Wait for the
+  user to say "go" before starting a step: they ask for each one ("Lets go
+  with step N").
 - **What's left after that,** in order (the full list, with sizes, is in
   `nextSteps.md`; a summary is under "The road ahead" below): the mixer
   view, detached windows, sidechains and automation in the engine,
@@ -200,10 +198,10 @@ A summary of `nextSteps.md` from step 21 on (sizes: S a session, M a few,
 L a stage of its own).
 
 - **Phase 6, mixing (the rest):**
-  - 21. Part 2 #23, one style for every window (M). Next.
+  - 21. Part 2 #23, one style for every window (M). Done 2026-11-02.
   - 22. Part 2 #10, the mixer view: channel strips with faders, meters
     (`Meter`'s `scale` shows the dB marks), sends with pre/post, inserts,
-    Audio to/from (L).
+    Audio to/from (L). Next.
   - 23. Part 2 #26, detached or second-screen windows for the mixer and
     the piano roll: Tauri windows on the desktop, pop-outs in the browser
     (L).
@@ -578,7 +576,7 @@ the order they were done, with the fixes made along the way.
 - **IMPROVEMENTS.md** (checked against the code on 2026-10-29). It has
   checkboxes, and each finished item names the commit that did it.
   - Part 1 (code) is all done.
-  - Part 2 (UX): items 1–9, 11–13, 16, 18–22, 24, 25 and 28 are done.
+  - Part 2 (UX): items 1–9, 11–13, 16, 18–25 and 28 are done.
     Item 8 (2026-10-31): an Adaptive
     snap setting that follows the zoom, and clips snapping to other
     clips' edges (`clipSnap.ts`; Alt drags free). Item 9 (2026-10-31):
@@ -658,8 +656,8 @@ the order they were done, with the fixes made along the way.
     `zoom` was tried and puts pointer positions and element boxes in
     different units (1.5x off), which the timeline's ~167 pointer
     reads would all need fixing for, so a browser uses its own zoom
-    (Preferences says how). Several effect windows have no
-    `role="dialog"`, for the accessibility pass (37).
+    (Preferences says how). Several effect windows had no
+    `role="dialog"`; they got one with item 23.
   - Item 25 (2026-11-01): a project keeps its layout (`SerializedProject.layout`,
     `ProjectLayout`: the zoom, the scroll across and down, the selected
     track or the open bus or master rack, the rack folded, the automation
@@ -711,8 +709,26 @@ the order they were done, with the fixes made along the way.
     a name in localStorage (`effects/userChains.ts`, like user presets),
     listed first under Chains with a delete button; only factory cabinets
     are kept with it, since other files belong to their project.
-  - Items 10, 14, 15, 17, 23, 26 and 27 are open. Next in `nextSteps.md`
-    is Phase 6, step 21 (#23, one style for every window).
+  - Item 23 (2026-11-02): one frame for every device window,
+    `src/ui/DeviceWindow.tsx`. It draws the dark panel and the title row
+    (`mark`, `title` or a styled `heading`, `subtitle` for the track,
+    `tools` after the name, `actions` on the right, `bypass`, close titled
+    `CLOSE_TITLE`, "Close (Esc)"). It also handles Escape (the "window"
+    shortcut layer), `role="dialog"` named "Device — Track", `aria-modal`,
+    focus in on open, a Tab trap, and focus back on close. Effects use it
+    through `PluginWindow` (`effects/ui/PluginChrome.tsx`, with the preset
+    menu and bypass); the 14 effect windows that drew their own frame now
+    use it too, and `EffectWindow` no longer binds Escape. The Drum Rack
+    (kits as `tools`, volume as `actions`) and the synth (`fit` scales its
+    fixed 1200x734 panel to small screens; its own `background`) use it
+    directly. The Keys window (`NoteInputWindow`) is `floating`: no
+    backdrop, not modal, no Escape, dragged by its title row, position in
+    `dawn.noteInputPos`; it's now named "Keys — Track". Parametric EQ and
+    Multiband pass `onPanelKeyDown` for Delete. Tests:
+    `src/ui/DeviceWindow.test.tsx`; `e2e/effects.spec.ts` looks for
+    "Close (Esc)", `e2e/instruments.spec.ts` for "Keys — Bass".
+  - Items 10, 14, 15, 17, 26 and 27 are open. Next in `nextSteps.md` is
+    Phase 6, step 22 (#10, the mixer view).
   - Fixed 2026-10-31: on Windows, Next's static export wrote each page's
     prefetch files as folders (`__next.!KHNpdGUp/__PAGE__.txt`, from a
     backslash it doesn't turn into a dot) where its router asks for
@@ -744,5 +760,5 @@ the order they were done, with the fixes made along the way.
 - **Phases done** (of `nextSteps.md`): 1, housekeeping (2026-10-30); 2,
   the engine's effects (2026-10-31; NAM dropped from it); 3, editing; 4,
   finding things (both 2026-10-31); 5, settings and look (2026-11-01).
-  Phase 6, mixing, has steps 18-20 done (2026-11-01); next is step 21
-  (#23).
+  Phase 6, mixing, has steps 18-20 done (2026-11-01) and 21 (2026-11-02);
+  next is step 22 (#10).

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight, Plus, Save, Search, Trash2, Upload, X } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Plus, Save, Search, Trash2, Upload } from "lucide-react";
 import { audioEngine } from "@/engine/audioEngine";
 import { newEffectFileId, registerEffectFile } from "@/effects/effectFiles";
 import type { SynthLiveState } from "./synth";
@@ -48,7 +48,7 @@ import {
   type SynthPreset,
 } from "./synthPresets";
 import { WAVETABLE_IDS, WAVETABLE_INFO } from "./wavetableModel";
-import { fraunces, spaceGrotesk } from "@/ui/pluginFonts";
+import { fraunces } from "@/ui/pluginFonts";
 import type { TrackColor } from "@/project/colors";
 import { EnvelopeEditor, FilterView, LfoView, Scope, WavetableView } from "./SynthDisplays";
 import {
@@ -65,6 +65,7 @@ import {
   useLiveFrames,
   useSynth,
 } from "./SynthUi";
+import { DeviceWindow } from "@/ui/DeviceWindow";
 import { useShortcuts } from "@/ui/shortcuts";
 
 interface SynthWindowProps {
@@ -78,8 +79,10 @@ interface SynthWindowProps {
   onDragStart?: () => void;
 }
 
-const W = 1180;
-const H = 740;
+// The panels' widths and heights, plus the frame's padding, title row and
+// gaps (ui/DeviceWindow.tsx).
+const W = 1200;
+const H = 734;
 
 /** Daybreak, the synth's full window. */
 export function SynthWindow({ channelId, channelName, params, onChange, onClose, onDragStart }: SynthWindowProps) {
@@ -116,64 +119,50 @@ export function SynthWindow({ channelId, channelName, params, onChange, onClose,
     [params, update, begin, onFrame, dragging, focus]
   );
 
-  useShortcuts("window", [{ keys: "escape", label: "Close", run: onClose }]);
-
-  const scale = useFitScale();
-
   return (
     <SynthContext.Provider value={ctx}>
-      <div className="device-skin fixed inset-0 z-50 flex items-center justify-center bg-black/65" onPointerDown={(e) => e.target === e.currentTarget && setFocus(null)}>
-        <div style={{ width: W * scale, height: H * scale }}>
-          <div
-            role="dialog"
-            aria-label={`Daybreak synth - ${channelName}`}
-            className={`${spaceGrotesk.className} flex flex-col gap-2.5 rounded-2xl p-3 shadow-2xl`}
-            style={{ width: W, height: H, transform: `scale(${scale})`, transformOrigin: "top left", background: SYN.bg, border: `1px solid ${SYN.border}`, color: SYN.text }}
-            onClick={() => focus && setFocus(null)}
-          >
-            <Header channelName={channelName} tab={tab} onTab={setTab} onClose={onClose} />
-            {tab === "synth" ? (
-              <>
-                <div className="flex gap-2.5" style={{ height: 346 }}>
-                  <div className="flex flex-col gap-2.5" style={{ width: 572 }}>
-                    <OscPanel index={0} />
-                    <OscPanel index={1} />
-                  </div>
-                  <div className="flex flex-col gap-2.5" style={{ width: 330 }}>
-                    <FilterPanel index={0} />
-                    <FilterPanel index={1} />
-                  </div>
-                  <div className="flex flex-col gap-2.5" style={{ width: 234 }}>
-                    <SubPanel />
-                    <NoisePanel />
-                    <VoicePanel />
-                  </div>
-                </div>
-                <div className="flex gap-2.5" style={{ height: 300 }}>
-                  <EnvelopePanel />
-                  <LfoPanel />
-                  <SourcesPanel />
-                </div>
-              </>
-            ) : (
-              <MatrixTab />
-            )}
-          </div>
-        </div>
-      </div>
+      <DeviceWindow
+        title="Daybreak"
+        heading={<Heading />}
+        subtitle={channelName}
+        mark={<SunMark />}
+        tools={<HeaderTools tab={tab} onTab={setTab} />}
+        actions={<HeaderActions />}
+        onClose={onClose}
+        fit={{ width: W, height: H }}
+        background={SYN.bg}
+        gap={10}
+        onPanelClick={() => focus && setFocus(null)}
+        onBackdropPointerDown={() => setFocus(null)}
+      >
+        {tab === "synth" ? (
+          <>
+            <div className="flex gap-2.5" style={{ height: 346 }}>
+              <div className="flex flex-col gap-2.5" style={{ width: 572 }}>
+                <OscPanel index={0} />
+                <OscPanel index={1} />
+              </div>
+              <div className="flex flex-col gap-2.5" style={{ width: 330 }}>
+                <FilterPanel index={0} />
+                <FilterPanel index={1} />
+              </div>
+              <div className="flex flex-col gap-2.5" style={{ width: 234 }}>
+                <SubPanel />
+                <NoisePanel />
+                <VoicePanel />
+              </div>
+            </div>
+            <div className="flex gap-2.5" style={{ height: 300 }}>
+              <EnvelopePanel />
+              <LfoPanel />
+              <SourcesPanel />
+            </div>
+          </>
+        ) : (
+          <MatrixTab />
+        )}
+      </DeviceWindow>
     </SynthContext.Provider>
-  );
-}
-
-/** Shrinks the window to fit small screens. */
-function useFitScale(): number {
-  return useSyncExternalStore(
-    (cb) => {
-      window.addEventListener("resize", cb);
-      return () => window.removeEventListener("resize", cb);
-    },
-    () => Math.min(1, (window.innerWidth - 24) / W, (window.innerHeight - 24) / H),
-    () => 1
   );
 }
 
@@ -195,22 +184,20 @@ function SunMark() {
   );
 }
 
-function Header({ channelName, tab, onTab, onClose }: { channelName: string; tab: "synth" | "matrix"; onTab: (t: "synth" | "matrix") => void; onClose: () => void }) {
-  const ui = useSynth();
-  const [voices, setVoices] = useState(0);
-  useEffect(() => ui.onFrame((s) => setVoices(s?.voices ?? 0)), [ui]);
-  const v = ui.params.voice;
+/** The name, in the dawn gradient. */
+function Heading() {
   return (
-    <header className="flex h-[46px] shrink-0 items-center gap-3 rounded-xl px-3" style={{ background: SYN.panel, border: `1px solid ${SYN.border}` }}>
-      <SunMark />
-      <div className="flex flex-col leading-none">
-        <span className={`${fraunces.className} text-[19px] font-semibold`} style={{ backgroundImage: SYN.gradient, WebkitBackgroundClip: "text", color: "transparent" }}>
-          Daybreak
-        </span>
-        <span className="mt-0.5 text-[10px]" style={{ color: SYN.muted }}>
-          wavetable synth · {channelName}
-        </span>
-      </div>
+    <h2 className={`${fraunces.className} whitespace-nowrap text-[19px] font-semibold`} style={{ backgroundImage: SYN.gradient, WebkitBackgroundClip: "text", color: "transparent" }}>
+      Daybreak
+    </h2>
+  );
+}
+
+/** After the name: the presets, and the Synth / Matrix tabs. */
+function HeaderTools({ tab, onTab }: { tab: "synth" | "matrix"; onTab: (t: "synth" | "matrix") => void }) {
+  const ui = useSynth();
+  return (
+    <>
       <PresetBar />
       <Segmented
         options={["synth", "matrix"] as const}
@@ -218,30 +205,37 @@ function Header({ channelName, tab, onTab, onClose }: { channelName: string; tab
         onChange={onTab}
         labels={(t) => (t === "synth" ? "Synth" : `Matrix${ui.params.mods.length ? ` · ${ui.params.mods.length}` : ""}`)}
       />
-      <div className="ml-auto flex items-center gap-3">
-        <span className="w-14 text-right font-mono text-[10px]" style={{ color: voices ? SYN.accent : SYN.dim }} title="Notes sounding">
-          {voices} {voices === 1 ? "voice" : "voices"}
-        </span>
-        <Scope width={132} height={32} />
-        <div className="w-[92px]">
-          <SynthKnob
-            inline
-            label="Volume"
-            dest="voice.volume"
-            value={v.volume}
-            min={VOLUME_MIN}
-            max={VOLUME_MAX}
-            defaultValue={-6}
-            size={30}
-            format={fmt.db}
-            onChange={(x) => ui.update((p) => (p.voice.volume = x))}
-          />
-        </div>
-        <button type="button" title="Close (Esc)" onClick={onClose} className="flex h-7 w-7 items-center justify-center rounded-lg hover:bg-white/5">
-          <X size={15} color={SYN.muted} />
-        </button>
+    </>
+  );
+}
+
+/** Before close: the notes sounding, the scope and the volume. */
+function HeaderActions() {
+  const ui = useSynth();
+  const [voices, setVoices] = useState(0);
+  useEffect(() => ui.onFrame((s) => setVoices(s?.voices ?? 0)), [ui]);
+  const v = ui.params.voice;
+  return (
+    <>
+      <span className="w-14 text-right font-mono text-[10px]" style={{ color: voices ? SYN.accent : SYN.dim }} title="Notes sounding">
+        {voices} {voices === 1 ? "voice" : "voices"}
+      </span>
+      <Scope width={132} height={30} />
+      <div className="w-[92px]">
+        <SynthKnob
+          inline
+          label="Volume"
+          dest="voice.volume"
+          value={v.volume}
+          min={VOLUME_MIN}
+          max={VOLUME_MAX}
+          defaultValue={-6}
+          size={30}
+          format={fmt.db}
+          onChange={(x) => ui.update((p) => (p.voice.volume = x))}
+        />
       </div>
-    </header>
+    </>
   );
 }
 
