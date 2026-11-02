@@ -3,7 +3,7 @@
 Read this first in a new session. It says where the project is, how the
 work is done and what comes next, then keeps the technical notes (the
 native engine's techniques, and what each finished item changed).
-Updated 2026-11-02, at `main` = `3ee1966`, with step 21 not yet committed.
+Updated 2026-11-02, at `main` = `54dd0d8`.
 
 ## Start here
 
@@ -12,7 +12,7 @@ Updated 2026-11-02, at `main` = `3ee1966`, with step 21 not yet committed.
   - step 18, better meters (`67ea045`, 2026-11-01);
   - step 19, pre/post sends and routing highlights (`66c9526`, 2026-11-01);
   - step 20, moving, copying and saving effect chains (`bfa84ac`, 2026-11-01);
-  - step 21, one style for every window (2026-11-02, commit to come).
+  - step 21, one style for every window (2026-11-02, `54dd0d8`).
 - **Next: step 22, Part 2 #10, the mixer view.** Its windows and any new
   device UI go in `DeviceWindow` (`src/ui/DeviceWindow.tsx`). Wait for the
   user to say "go" before starting a step: they ask for each one ("Lets go
@@ -709,7 +709,7 @@ the order they were done, with the fixes made along the way.
     a name in localStorage (`effects/userChains.ts`, like user presets),
     listed first under Chains with a delete button; only factory cabinets
     are kept with it, since other files belong to their project.
-  - Item 23 (2026-11-02): one frame for every device window,
+  - Item 23 (2026-11-02, `54dd0d8`): one frame for every device window,
     `src/ui/DeviceWindow.tsx`. It draws the dark panel and the title row
     (`mark`, `title` or a styled `heading`, `subtitle` for the track,
     `tools` after the name, `actions` on the right, `bypass`, close titled

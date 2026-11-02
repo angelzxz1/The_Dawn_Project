@@ -115,7 +115,7 @@ That is already ahead of most browser DAWs, such as BandLab or Soundtrap.
 
 ### Visual and comfort
 
-- [x] **23. One consistent style for windows.** Effect windows, the Keys window and the Drum Rack each look and behave differently. (commit to come)
+- [x] **23. One consistent style for windows.** Effect windows, the Keys window and the Drum Rack each look and behave differently. (54dd0d8)
   - Every device window has one frame (`src/ui/DeviceWindow.tsx`): the effects, the Drum Rack, the synth and the Keys window. A dark panel in either theme, then a title row: the device's mark, its name, the track it's on, its own tools (presets, kits, tabs), and on the right its readouts, bypass for an effect, and close ("Close (Esc)").
   - They behave alike: each is a dialog named "Device — Track", Escape closes it, focus goes in when it opens, Tab stays inside, and focus goes back to where it was when it closes. Before, 14 of the 19 effect windows had no `role="dialog"`.
   - The Keys window floats in the same frame instead of being modal, since you play while working: dragged by its title row, opened where it was left, and Escape is left to the studio.
