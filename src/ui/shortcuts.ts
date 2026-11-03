@@ -5,8 +5,14 @@
 // below it altogether. So Escape closes just the topmost thing, Space
 // doesn't start playback behind a dialog, and one check decides whether
 // you're typing in a field.
+//
+// A window of its own (the mixer or piano roll, detached) has its own
+// layers: its keys go to what's showing in it, then to the shortcuts that
+// work everywhere (play, undo), and the main window's layers never wait for
+// it.
 
-import { useEffect, useRef } from "react";
+import { useContext, useEffect, useRef } from "react";
+import { HostWindowContext } from "./hostWindow";
 
 /** From the bottom up. */
 export type ShortcutLayer =
@@ -45,6 +51,9 @@ export interface Shortcut {
   /** Left out of the command palette (default: in it, when labeled) - for
    * keys that only make sense pressed, like the arrows. */
   palette?: false;
+  /** Also from a detached window, when what's in it didn't take the key
+   * (play, undo, save). */
+  everywhere?: true;
 }
 
 /** A labeled shortcut that works right now (ShortcutRegistry.active). */
@@ -71,6 +80,8 @@ interface Registration {
   seq: number;
   shortcuts: () => Shortcut[];
   options: () => ShortcutOptions;
+  /** The detached window it's in; null: the main window. */
+  scope: Window | null;
 }
 
 /** Whether a key went to a text field or a dropdown. */
@@ -122,8 +133,8 @@ export class ShortcutRegistry {
   private seq = 0;
   private listening = false;
 
-  add(layer: ShortcutLayer, shortcuts: () => Shortcut[], options: () => ShortcutOptions): () => void {
-    const reg: Registration = { layer, seq: ++this.seq, shortcuts, options };
+  add(layer: ShortcutLayer, shortcuts: () => Shortcut[], options: () => ShortcutOptions, scope: Window | null = null): () => void {
+    const reg: Registration = { layer, seq: ++this.seq, shortcuts, options, scope };
     this.registrations.push(reg);
     this.listen();
     return () => {
@@ -132,15 +143,35 @@ export class ShortcutRegistry {
   }
 
   /** Top first: higher layers, and in a layer the latest opened. */
-  private ordered(): Registration[] {
-    return [...this.registrations].sort((a, b) => ORDER.indexOf(b.layer) - ORDER.indexOf(a.layer) || b.seq - a.seq);
+  private ordered(scope?: Window | null): Registration[] {
+    const regs = scope === undefined ? this.registrations : this.registrations.filter((r) => r.scope === scope);
+    return [...regs].sort((a, b) => ORDER.indexOf(b.layer) - ORDER.indexOf(a.layer) || b.seq - a.seq);
   }
 
   /** Hands a key press to the layers, top down. Returns whether a shortcut
-   * took it. */
-  keyDown(e: KeyboardEvent): boolean {
+   * took it. `from`: the detached window it was pressed in (null: the main
+   * window). */
+  keyDown(e: KeyboardEvent, from: Window | null = null): boolean {
     const typing = isTypingTarget(e.target);
-    for (const reg of this.ordered()) {
+    if (this.keyDownIn(e, typing, from)) return true;
+    if (from === null) return false;
+    // Then what works everywhere, wherever it is.
+    for (const reg of this.ordered(null)) {
+      if (reg.options().enabled === false) continue;
+      for (const shortcut of reg.shortcuts()) {
+        if (!shortcut.everywhere || (typing && !shortcut.whileTyping)) continue;
+        const keys = Array.isArray(shortcut.keys) ? shortcut.keys : [shortcut.keys];
+        if (!keys.some((k) => matches(e, k))) continue;
+        if (shortcut.run(e) === false) continue;
+        e.preventDefault();
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private keyDownIn(e: KeyboardEvent, typing: boolean, scope: Window | null): boolean {
+    for (const reg of this.ordered(scope)) {
       const options = reg.options();
       if (options.enabled === false) continue;
       for (const shortcut of reg.shortcuts()) {
@@ -161,10 +192,11 @@ export class ShortcutRegistry {
     this.ordered().forEach((reg) => reg.options().onKeyUp?.(e));
   }
 
-  /** The labeled shortcuts that work right now, top layer first. */
+  /** The labeled shortcuts that work right now in the main window, top
+   * layer first. */
   active(): ActiveShortcut[] {
     const out: ActiveShortcut[] = [];
-    for (const reg of this.ordered()) {
+    for (const reg of this.ordered(null)) {
       if (reg.options().enabled === false) continue;
       reg.shortcuts().forEach((s) => {
         if (s.label)
@@ -183,14 +215,28 @@ export class ShortcutRegistry {
     window.addEventListener("keydown", (e) => this.keyDown(e));
     window.addEventListener("keyup", (e) => this.keyUp(e));
   }
+
+  /** Takes the keys of a detached window, until the returned function is
+   * called. */
+  attach(win: Window): () => void {
+    const down = (e: KeyboardEvent) => this.keyDown(e, win);
+    const up = (e: KeyboardEvent) => this.keyUp(e);
+    win.addEventListener("keydown", down);
+    win.addEventListener("keyup", up);
+    return () => {
+      win.removeEventListener("keydown", down);
+      win.removeEventListener("keyup", up);
+    };
+  }
 }
 
 export const shortcuts = new ShortcutRegistry();
 
-/** Gives a component's shortcuts to a layer while it's mounted. The latest
- * `list` and `options` are used each time a key comes in, so handlers never
- * see stale values. */
+/** Gives a component's shortcuts to a layer while it's mounted, in the
+ * window it's showing in. The latest `list` and `options` are used each
+ * time a key comes in, so handlers never see stale values. */
 export function useShortcuts(layer: ShortcutLayer, list: Shortcut[], options: ShortcutOptions = {}): void {
+  const scope = useContext(HostWindowContext);
   const latest = useRef({ list, options });
   useEffect(() => {
     latest.current = { list, options };
@@ -200,8 +246,9 @@ export function useShortcuts(layer: ShortcutLayer, list: Shortcut[], options: Sh
       shortcuts.add(
         layer,
         () => latest.current.list,
-        () => latest.current.options
+        () => latest.current.options,
+        scope
       ),
-    [layer]
+    [layer, scope]
   );
 }

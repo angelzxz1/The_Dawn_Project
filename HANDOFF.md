@@ -3,26 +3,28 @@
 Read this first in a new session. It says where the project is, how the
 work is done and what comes next, then keeps the technical notes (the
 native engine's techniques, and what each finished item changed).
-Updated 2026-11-02, at `main` = `54dd0d8`, with step 22 not yet committed.
+Updated 2026-11-02, at `main` = `0078489`, with step 23 not yet committed.
 
 ## Start here
 
-- **Where we are:** Phase 6 (mixing) of `nextSteps.md`. Steps 1-22 are
-  done (step 6, NAM in the engine, was dropped). The last four:
-  - step 19, pre/post sends and routing highlights (`66c9526`, 2026-11-01);
+- **Where we are:** Phase 6 (mixing) of `nextSteps.md` is done: steps
+  1-23 are (step 6, NAM in the engine, was dropped). The last four:
   - step 20, moving, copying and saving effect chains (`bfa84ac`, 2026-11-01);
   - step 21, one style for every window (2026-11-02, `54dd0d8`);
-  - step 22, the mixer view (2026-11-02, commit to come).
-- **Next: step 23, Part 2 #26, detached or second-screen windows** for
-  the mixer and the piano roll. The mixer (`src/studio/mixer/Mixer.tsx`)
-  takes everything through its props and `MixerActions`, so it can be
-  shown in another window. Device UI goes in `DeviceWindow`
-  (`src/ui/DeviceWindow.tsx`). Wait for the user to say "go" before
-  starting a step: they ask for each one ("Lets go with step N").
+  - step 22, the mixer view (2026-11-02, `0078489`);
+  - step 23, the mixer and piano roll in windows of their own
+    (2026-11-02, commit to come).
+- **Next: step 24, sidechains in the engine** (Phase 7, native stage 4):
+  keys from other tracks at the studio's tap points, with its latency
+  alignment (`mixGraph.ts` `resolveSidechains`, `keyDelay`); then
+  `describe.ts` stops leaving sidechained effects out. It's Rust, and this
+  machine has no Rust toolchain (see Gotchas). Wait for the user to say
+  "go" before starting a step: they ask for each one ("Lets go with step
+  N").
 - **What's left after that,** in order (the full list, with sizes, is in
-  `nextSteps.md`; a summary is under "The road ahead" below): the mixer
-  view, detached windows, sidechains and automation in the engine,
-  recording (monitoring modes, punch in/out, input channels, then live
+  `nextSteps.md`; a summary is under "The road ahead" below):
+  automation in the engine, recording (monitoring modes, punch in/out,
+  input channels, then live
   input through the engine), plugins (CLAP, VST3, plugin instruments,
   AU), shipping (export through the engine, native dialogs, signed
   installers), an accessibility pass, and last the desktop's driver,
@@ -158,11 +160,11 @@ The Dawn Project is a browser DAW, also built as a desktop app.
 **Checks before handing a step over:**
 
 - `npx tsc --noEmit` and `npm run lint` (both clean).
-- `npx vitest run`: 789 unit and component tests on 2026-11-02, in the
+- `npx vitest run`: 796 unit and component tests on 2026-11-02, in the
   projects `unit` (Node), `components` (Chromium) and `web-audio`. The
   component tests have a 30 s limit (`vitest.config.ts`), and the slow
   unit tests their own; no `--testTimeout` needed.
-- `npm run build`, then `npx playwright test --workers=2`: 177 tests, 1
+- `npm run build`, then `npx playwright test --workers=2`: 180 tests, 1
   skipped, all passing on 2026-11-02 (about 10 minutes). It serves `out/`,
   so build first or it tests the last build. Use 2 workers: a full run
   with more was once stopped because the computer ran low on memory. Run a
@@ -214,8 +216,8 @@ L a stage of its own).
   - 22. Part 2 #10, the mixer view (L). Done 2026-11-02.
   - 23. Part 2 #26, detached or second-screen windows for the mixer and
     the piano roll: Tauri windows on the desktop, pop-outs in the browser
-    (L). Next.
-- **Phase 7, native stage 4:** 24, sidechains in the engine
+    (L). Done 2026-11-02.
+- **Phase 7, native stage 4:** 24 (next), sidechains in the engine
   (`mixGraph.ts` `resolveSidechains`, `keyDelay`; then `describe.ts`
   stops leaving sidechained effects out). 25, automation in the engine
   (points with a `curve`, bent by `curveShape`).
@@ -586,7 +588,7 @@ the order they were done, with the fixes made along the way.
 - **IMPROVEMENTS.md** (checked against the code on 2026-10-29). It has
   checkboxes, and each finished item names the commit that did it.
   - Part 1 (code) is all done.
-  - Part 2 (UX): items 1–13, 16, 18–25 and 28 are done.
+  - Part 2 (UX): items 1–13, 16, 18–26 and 28 are done.
     Item 8 (2026-10-31): an Adaptive
     snap setting that follows the zoom, and clips snapping to other
     clips' edges (`clipSnap.ts`; Alt drags free). Item 9 (2026-10-31):
@@ -737,7 +739,7 @@ the order they were done, with the fixes made along the way.
     Multiband pass `onPanelKeyDown` for Delete. Tests:
     `src/ui/DeviceWindow.test.tsx`; `e2e/effects.spec.ts` looks for
     "Close (Esc)", `e2e/instruments.spec.ts` for "Keys — Bass".
-  - Item 10 (2026-11-02, commit to come): the mixer view,
+  - Item 10 (2026-11-02, `0078489`): the mixer view,
     `src/studio/mixer/Mixer.tsx`. The toolbar's Arrange / Mixer buttons
     (or F3: letters play notes, and Cmd+M minimizes on a Mac) swap the
     arrangement for it; the arrangement is hidden, not unmounted, and
@@ -765,8 +767,44 @@ the order they were done, with the fixes made along the way.
     `engineSync.test.ts`, `describe.test.ts`, `projectSchema.test.ts`,
     and a Rust test in `song.rs`. The Rust wasn't built or tested here:
     this machine has no Rust toolchain (see Gotchas).
-  - Items 14, 15, 17, 26 and 27 are open. Next in `nextSteps.md` is
-    Phase 6, step 23 (#26, detached windows).
+  - Item 26 (2026-11-02, commit to come): the mixer and the piano roll
+    in windows of their own, for a second screen. "Pop out" in the
+    mixer's bar and in the piano roll's title row; "Back to the main
+    window" there, or closing the window (for the piano roll, closing
+    also stops editing). One React tree: `src/ui/Popout.tsx` opens a
+    blank window (`openPopout`, from the click, or browsers block it) and
+    portals into it, so the project, undo and the engine are the same.
+    It copies the main page's stylesheets in as rules (`<style>`, url()s
+    made absolute: a blank window's `<link>` didn't load under
+    Playwright's request routing, and rules need no loading) and mirrors
+    the `<html>` and `<body>` attributes (the theme). Size and place are
+    kept per window in localStorage (`dawn.popout.<name>`); which windows
+    are open isn't saved (no click on load). They close with the main
+    page. What's in a window uses that window's frames, timers, listeners
+    and ResizeObserver (`src/ui/hostWindow.ts`: `useHostWindow`,
+    `useDetachedWindow`): the piano roll, `ClipOverview`, `Meter`,
+    `LoudnessReadout`; a minimized main window would stop its own.
+    Shortcuts are scoped by window (`ShortcutRegistry.attach`,
+    `keyDown(e, from)`): keys in a window go to what's in it, then to
+    shortcuts marked `everywhere` (play, undo, redo, save). The main
+    window's layers don't wait for a detached piano roll (it's modal only
+    in its own window), and the command palette lists the main window's.
+    The mixer popped out leaves the arrangement; the Mixer button or F3
+    brings its window forward. The piano roll's window stays open between
+    clips and fills the window (its grid's height isn't fixed there).
+    Desktop: `src-tauri/src/lib.rs` builds the main window in `setup`
+    (`"create": false` in `tauri.conf.json`) with `on_new_window`: an
+    about:blank request gets a Tauri window
+    (`WebviewWindowBuilder::window_features`, its title from the page,
+    file drop off for effect drags); anything else is left to the
+    webview, as before. Not built or tried here (no Rust toolchain): try
+    it in `npm run desktop`. On the desktop a detached window isn't
+    zoomed with the UI size (that's the main webview's zoom). Effect and
+    instrument windows opened from a detached mixer open in the main
+    window. Tests: `e2e/popout.spec.ts`, `src/ui/Popout.test.ts`,
+    `src/ui/shortcuts.test.ts`, `Mixer.test.tsx`.
+  - Items 14, 15, 17 and 27 are open. Next in `nextSteps.md` is Phase 7,
+    step 24 (sidechains in the engine).
   - Fixed 2026-10-31: on Windows, Next's static export wrote each page's
     prefetch files as folders (`__next.!KHNpdGUp/__PAGE__.txt`, from a
     backslash it doesn't turn into a dot) where its router asks for
@@ -797,6 +835,6 @@ the order they were done, with the fixes made along the way.
     ignores them; they only move the playhead and the loop.
 - **Phases done** (of `nextSteps.md`): 1, housekeeping (2026-10-30); 2,
   the engine's effects (2026-10-31; NAM dropped from it); 3, editing; 4,
-  finding things (both 2026-10-31); 5, settings and look (2026-11-01).
-  Phase 6, mixing, has steps 18-20 done (2026-11-01) and 21-22
-  (2026-11-02); next is step 23 (#26).
+  finding things (both 2026-10-31); 5, settings and look (2026-11-01);
+  6, mixing (steps 18-20 on 2026-11-01, 21-23 on 2026-11-02). Next is
+  Phase 7, step 24.

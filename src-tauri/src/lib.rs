@@ -9,9 +9,10 @@ mod plugins;
 
 use std::ffi::OsString;
 use std::process::ExitCode;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
-use tauri::Webview;
-use tauri::webview::{PermissionKind, PermissionResponse};
+use tauri::webview::{NewWindowFeatures, NewWindowResponse, PermissionKind, PermissionResponse};
+use tauri::{AppHandle, Url, Webview, WebviewUrl, WebviewWindowBuilder, Wry};
 
 /// What the studio can learn about the native engine
 /// (`invoke("engine_info")`).
@@ -47,6 +48,34 @@ fn is_app_page(webview: &Webview) -> bool {
     bundled || dev_server
 }
 
+/// How many of the studio's own windows have been opened, to name each.
+static STUDIO_WINDOWS: AtomicUsize = AtomicUsize::new(0);
+
+/// A window the studio asked for with window.open: the mixer or the piano
+/// roll on a screen of its own (src/ui/Popout.tsx). It opens blank and the
+/// studio draws into it from the main window (window.opener), so it's a
+/// window of the main page's own, with its title taken from the page.
+/// Anything else asked for this way is left to the webview, as before.
+fn studio_window(app: &AppHandle, url: Url, features: NewWindowFeatures) -> NewWindowResponse<Wry> {
+    if url.as_str() != "about:blank" {
+        return NewWindowResponse::Allow;
+    }
+    let label = format!("studio-{}", STUDIO_WINDOWS.fetch_add(1, Ordering::Relaxed));
+    let built = WebviewWindowBuilder::new(app, label, WebviewUrl::External(url))
+        .window_features(features)
+        .title("The Dawn Project")
+        // Effects dragged onto the mixer's strips, as in the main window.
+        .disable_drag_drop_handler()
+        .on_document_title_changed(|window, title| {
+            let _ = window.set_title(&title);
+        })
+        .build();
+    match built {
+        Ok(window) => NewWindowResponse::Create { window },
+        Err(_) => NewWindowResponse::Deny,
+    }
+}
+
 /// If the app was run to read a plugin file for the plugin scan
 /// (`--scan-plugin <format> <path>`, from plugins.rs), reads it and says
 /// how to exit; otherwise None, and the app starts as usual.
@@ -66,6 +95,22 @@ pub fn run() {
                 PermissionResponse::Allow
             }
             _ => PermissionResponse::Default,
+        })
+        // The main window, from tauri.conf.json (which doesn't create it):
+        // built here to take the studio's own windows (studio_window).
+        .setup(|app| {
+            let config = app
+                .config()
+                .app
+                .windows
+                .first()
+                .cloned()
+                .ok_or("tauri.conf.json has no window")?;
+            let handle = app.handle().clone();
+            WebviewWindowBuilder::from_config(app.handle(), &config)?
+                .on_new_window(move |url, features| studio_window(&handle, url, features))
+                .build()?;
+            Ok(())
         })
         .manage(audio::AudioState::default())
         .manage(plugins::PluginsState::default())

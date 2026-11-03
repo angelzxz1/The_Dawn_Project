@@ -13,6 +13,7 @@
     "windows": [
       {
         "label": "main",
+        "create": false,
         "title": "The Dawn Project",
         "url": "app",
         "width": 1440,

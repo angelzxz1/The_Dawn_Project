@@ -353,7 +353,7 @@ export function useProjectFiles(session: SessionSettings, events: ProjectFilesEv
   // Ctrl/Cmd+S saves, +Shift saves as, Ctrl/Cmd+O opens - everywhere, even
   // while typing, in the piano roll or with a dialog open.
   useShortcuts("global", [
-    { keys: "mod+s", label: "Save", whileTyping: true, run: () => void save() },
+    { keys: "mod+s", label: "Save", whileTyping: true, everywhere: true, run: () => void save() },
     { keys: "mod+shift+s", label: "Save As", whileTyping: true, run: () => setSaveAsRequest((n) => n + 1) },
     {
       keys: "mod+o",

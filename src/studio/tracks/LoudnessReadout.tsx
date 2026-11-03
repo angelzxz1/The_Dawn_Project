@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { RotateCcw } from "lucide-react";
 import { audioEngine } from "@/engine/audioEngine";
+import { useHostWindow } from "@/ui/hostWindow";
 import { SILENT_LOUDNESS, type LoudnessReading } from "@/engine/loudness";
 import { CLIP_LEVEL, dbOf, formatDb } from "./meterScale";
 
@@ -14,10 +15,12 @@ const lufs = (v: number) => (Number.isFinite(v) && v > -70 ? v.toFixed(1) : "–
  * loudest sample. */
 export function LoudnessReadout() {
   const [reading, setReading] = useState<LoudnessReading>(SILENT_LOUDNESS);
+  // The window it's in keeps time: the main one's slows down when hidden.
+  const host = useHostWindow();
   useEffect(() => {
-    const timer = window.setInterval(() => setReading(audioEngine.getLoudness()), 100);
-    return () => window.clearInterval(timer);
-  }, []);
+    const timer = host.setInterval(() => setReading(audioEngine.getLoudness()), 100);
+    return () => host.clearInterval(timer);
+  }, [host]);
   const over = reading.peak >= CLIP_LEVEL;
   const cell = (label: string, value: string, title: string, strong = false) => (
     <span title={title} className="flex flex-col items-center leading-none">

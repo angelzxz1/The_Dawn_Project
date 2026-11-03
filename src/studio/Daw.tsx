@@ -38,6 +38,8 @@ import { keyLabel, withKeys } from "@/ui/keyLabel";
 import { TrackHeader, type TrackHeaderActions } from "@/studio/tracks/TrackHeader";
 import { TrackLane, type TrackLaneActions } from "@/studio/tracks/TrackLane";
 import { useStableActions } from "@/ui/useStableActions";
+import { openPopout, Popout } from "@/ui/Popout";
+import type { HostWindow } from "@/ui/hostWindow";
 import { TimelineScrollbar } from "@/studio/timeline/TimelineScrollbar";
 import { clampZoom, fitSpan, scrollKeeping, wheelZoomFactor, ZOOM_STEP } from "@/studio/timeline/zoom";
 import type { ClipSpan } from "@/studio/timeline/clipSnap";
@@ -48,7 +50,7 @@ import { TransportBar } from "@/studio/transport/TransportBar";
 import { PianoKeyboard } from "@/studio/notes/PianoKeyboard";
 import { NoteInputWindow } from "@/studio/notes/NoteInputWindow";
 import { EffectWindow } from "@/studio/rack/EffectWindow";
-import { Mixer, type MixerActions } from "@/studio/mixer/Mixer";
+import { Mixer, type MixerActions, type MixerSelection } from "@/studio/mixer/Mixer";
 import { MasterBusRow } from "@/studio/tracks/MasterBusRow";
 import { RecoveryNotice } from "@/studio/dialogs/RecoveryNotice";
 import { automationCurrentValue, automationRange, automationTargetKey, automationTargetOptions } from "@/project/automationTargets";
@@ -240,6 +242,11 @@ export function Daw() {
   /** Where the arrangement was scrolled when the mixer took its place:
    * hidden, it reads as unscrolled. */
   const arrangeScrollRef = useRef<{ scrollLeft: number; scrollTop: number } | null>(null);
+  /** The mixer and the piano roll, each in a window of its own (for a
+   * second screen) while set. Not saved with the project: browsers open a
+   * window only from a click. */
+  const [mixerWindow, setMixerWindow] = useState<HostWindow | null>(null);
+  const [pianoRollWindow, setPianoRollWindow] = useState<HostWindow | null>(null);
   /** Whether the FX rack at the bottom of the screen is currently showing
    * the master bus's own effects chain instead of a track's or a bus's. */
   const [fxMasterOpen, setFxMasterOpen] = useState(false);
@@ -1682,13 +1689,13 @@ export function Daw() {
   };
 
   useShortcuts("studio", [
-    { keys: "space", label: "Play / pause", run: () => handleTogglePlay() },
+    { keys: "space", label: "Play / pause", everywhere: true, run: () => handleTogglePlay() },
     { keys: "=", label: "Zoom in", run: () => zoomBy(ZOOM_STEP) },
     { keys: "-", label: "Zoom out", run: () => zoomBy(1 / ZOOM_STEP) },
     { keys: "shift+z", label: "Zoom to fit the time selection, or the whole song", run: zoomToFit },
     { keys: ["r", "shift+r"], label: "Record", run: () => void handleRecord() },
-    { keys: "mod+z", label: "Undo", run: () => undo() },
-    { keys: ["mod+shift+z", "mod+y"], label: "Redo", run: () => redo() },
+    { keys: "mod+z", label: "Undo", everywhere: true, run: () => undo() },
+    { keys: ["mod+shift+z", "mod+y"], label: "Redo", everywhere: true, run: () => redo() },
     // With a time selection, these act on it.
     { keys: "mod+x", label: "Cut the time selection", run: timeEdits.cut },
     { keys: "mod+c", label: "Copy the time selection", run: timeEdits.copy },
@@ -2082,14 +2089,39 @@ export function Daw() {
   /** Shows the mixer or the arrangement in the middle of the studio. */
   const switchView = useCallback(
     (next: StudioView) => {
+      // In a window of its own, the mixer comes to the front instead.
+      if (next === "mix" && mixerWindow) return void mixerWindow.focus();
       if (next === studioView) return;
       if (next === "mix") arrangeScrollRef.current = { scrollLeft: lanesScrollRef.current?.scrollLeft ?? 0, scrollTop: arrangementRef.current?.scrollTop ?? 0 };
       else restoreViewRef.current = arrangeScrollRef.current;
       setHovered(null);
       setStudioView(next);
     },
-    [studioView]
+    [studioView, mixerWindow]
   );
+
+  const popupBlocked = () => noticeRef.current("The browser blocked the new window: allow pop-ups for this site");
+  /** The mixer in a window of its own; the arrangement takes its place. */
+  const popOutMixer = () => {
+    const win = openPopout("mixer", { width: 1100, height: 640 });
+    if (!win) return popupBlocked();
+    switchView("arrange");
+    setMixerWindow(win);
+  };
+  /** Back from its window, in place of the arrangement. */
+  const dockMixer = () => {
+    arrangeScrollRef.current = { scrollLeft: lanesScrollRef.current?.scrollLeft ?? 0, scrollTop: arrangementRef.current?.scrollTop ?? 0 };
+    setHovered(null);
+    setStudioView("mix");
+    setMixerWindow(null);
+  };
+  /** The piano roll in a window of its own. It stays open between clips:
+   * the next clip opened shows there. */
+  const popOutPianoRoll = () => {
+    const win = openPopout("piano-roll", { width: 1200, height: 720 });
+    if (!win) return popupBlocked();
+    setPianoRollWindow(win);
+  };
   const {
     isLoading: isLoadingProject,
     saveStatus,
@@ -2452,6 +2484,43 @@ export function Daw() {
     });
     return map;
   }, [channels, clipsOf]);
+  const mixerProps = {
+    tracks: visibleChannels,
+    selected: (fxMasterOpen ? { kind: "master" } : fxBusId ? { kind: "bus", id: fxBusId } : fxChannelId ? { kind: "track", id: fxChannelId } : null) as MixerSelection,
+    route: routeLights,
+    silent: silentByTrack,
+    inputOptions: inputOptionsFor,
+    outputOptions: outputOptionsFor,
+    limiterThreshold: masterLimiterThreshold,
+    actions: mixerActions,
+  };
+  const pianoRoll = editingChannel && editingClipInstance && editingClipInstance.kind === "midi" && (
+    <PianoRollEditor
+      key={editingClipInstance.id}
+      channelName={editingChannel.name}
+      color={trackColorOf(editingChannel)}
+      instrument={editingChannel.instrument ?? "piano"}
+      drumKit={editingChannel.drumParams}
+      notes={editingClipInstance.notes}
+      length={editingClipInstance.length}
+      bpm={bpmAtSeconds(tempo, editingClipInstance.offset)}
+      beatsPerBar={beatsPerBar}
+      offset={editingClipInstance.offset}
+      scaleSetting={scaleSetting}
+      onScaleChange={setScaleSetting}
+      onChange={(notes) => handleEditorChange(editingChannel.id, editingClipInstance.id, notes)}
+      onClose={() => {
+        setEditingClip(null);
+        setPianoRollWindow(null);
+      }}
+      onPreviewNote={(note) => handlePreviewNote(editingChannel.id, note)}
+      isPlaying={transportState === "playing"}
+      onPlay={handlePlay}
+      onPause={handlePause}
+      onPopOut={popOutPianoRoll}
+      onDock={() => setPianoRollWindow(null)}
+    />
+  );
   return (
     <div className="flex h-screen overflow-hidden">
       {isLoadingProject && (
@@ -2759,17 +2828,11 @@ export function Daw() {
         </div>
       </div>
 
-      {studioView === "mix" && (
-        <Mixer
-          tracks={visibleChannels}
-          selected={fxMasterOpen ? { kind: "master" } : fxBusId ? { kind: "bus", id: fxBusId } : fxChannelId ? { kind: "track", id: fxChannelId } : null}
-          route={routeLights}
-          silent={silentByTrack}
-          inputOptions={inputOptionsFor}
-          outputOptions={outputOptionsFor}
-          limiterThreshold={masterLimiterThreshold}
-          actions={mixerActions}
-        />
+      {studioView === "mix" && !mixerWindow && <Mixer {...mixerProps} onPopOut={popOutMixer} />}
+      {mixerWindow && (
+        <Popout win={mixerWindow} name="mixer" title={`Mixer — ${projectName}`} onClose={() => setMixerWindow(null)}>
+          <Mixer {...mixerProps} onDock={dockMixer} />
+        </Popout>
       )}
       {/* Hidden, not unmounted, behind the mixer: it keeps its state. */}
       <div ref={arrangementRef} onScroll={noteScrolled} hidden={studioView === "mix"} className="flex min-h-0 flex-1 flex-col overflow-y-auto rounded-lg border border-border">
@@ -3105,7 +3168,7 @@ export function Daw() {
             activeNotes={activeNotes}
             onNoteOn={handleNoteOn}
             onNoteOff={handleNoteOff}
-            keyboardShortcutsEnabled={!editingClip}
+            keyboardShortcutsEnabled={!editingClip || !!pianoRollWindow}
           />
         ) : armedChannel.instrument === null ? (
           <div className="flex items-center justify-center gap-3 py-3 text-xs text-muted">
@@ -3132,34 +3195,29 @@ export function Daw() {
                 onNoteOn={handleNoteOn}
                 onNoteOff={handleNoteOff}
                 scaleSetting={scaleSetting}
-                keyboardShortcutsEnabled={!editingClip}
+                keyboardShortcutsEnabled={!editingClip || !!pianoRollWindow}
               />
             </div>
           </div>
         )}
       </NoteInputWindow>
 
-      {editingChannel && editingClipInstance && editingClipInstance.kind === "midi" && (
-        <PianoRollEditor
-          key={editingClipInstance.id}
-          channelName={editingChannel.name}
-          color={trackColorOf(editingChannel)}
-          instrument={editingChannel.instrument ?? "piano"}
-          drumKit={editingChannel.drumParams}
-          notes={editingClipInstance.notes}
-          length={editingClipInstance.length}
-          bpm={bpmAtSeconds(tempo, editingClipInstance.offset)}
-          beatsPerBar={beatsPerBar}
-          offset={editingClipInstance.offset}
-          scaleSetting={scaleSetting}
-          onScaleChange={setScaleSetting}
-          onChange={(notes) => handleEditorChange(editingChannel.id, editingClipInstance.id, notes)}
-          onClose={() => setEditingClip(null)}
-          onPreviewNote={(note) => handlePreviewNote(editingChannel.id, note)}
-          isPlaying={transportState === "playing"}
-          onPlay={handlePlay}
-          onPause={handlePause}
-        />
+      {pianoRollWindow ? (
+        <Popout
+          win={pianoRollWindow}
+          name="piano-roll"
+          title={editingChannel ? `Piano Roll — ${editingChannel.name}` : "Piano Roll"}
+          onClose={() => {
+            setPianoRollWindow(null);
+            setEditingClip(null);
+          }}
+        >
+          {pianoRoll || (
+            <p className="m-auto max-w-xs text-center text-sm text-muted">Double-click a MIDI clip in the main window to edit its notes here.</p>
+          )}
+        </Popout>
+      ) : (
+        pianoRoll
       )}
 
       {contextMenu && (

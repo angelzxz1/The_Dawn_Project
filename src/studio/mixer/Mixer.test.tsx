@@ -12,6 +12,7 @@ import type { ProjectState } from "@/project/project";
 import type { ChannelConfig } from "@/project/types";
 import { projectStore } from "@/state/projectStore";
 import { EFFECT_DRAG_MIME } from "@/studio/rack/effectDrag";
+import { HostWindowContext } from "@/ui/hostWindow";
 import { Fader } from "./Fader";
 import { Mixer, type MixerActions } from "./Mixer";
 
@@ -175,6 +176,35 @@ describe("the mixer", () => {
     expect(a.removeBus).toHaveBeenCalledWith("verb");
     await screen.getByRole("button", { name: "Bus", exact: true }).click();
     expect(a.addBus).toHaveBeenCalled();
+  });
+
+  test("pops out into a window of its own, and from there goes back", async () => {
+    const onPopOut = vi.fn();
+    const onDock = vi.fn();
+    const mixer = (
+      <Mixer
+        tracks={tracks}
+        selected={null}
+        route={null}
+        silent={new Map()}
+        inputOptions={() => []}
+        outputOptions={() => []}
+        limiterThreshold={-1}
+        actions={actions()}
+        onPopOut={onPopOut}
+        onDock={onDock}
+      />
+    );
+    const screen = render(mixer);
+    await screen.getByRole("button", { name: "Pop out" }).click();
+    expect(onPopOut).toHaveBeenCalled();
+    await expect.element(screen.getByRole("button", { name: "Back to the main window" })).not.toBeInTheDocument();
+
+    // Shown in another window (here, this one standing in for it).
+    screen.rerender(<HostWindowContext value={window}>{mixer}</HostWindowContext>);
+    await screen.getByRole("button", { name: "Back to the main window" }).click();
+    expect(onDock).toHaveBeenCalled();
+    await expect.element(screen.getByRole("button", { name: "Pop out" })).not.toBeInTheDocument();
   });
 });
 

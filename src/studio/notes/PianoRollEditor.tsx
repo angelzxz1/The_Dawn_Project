@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { AlignHorizontalJustifyStart, ArrowRightToLine, Pause, Pencil, MousePointer2, Play, X, ZoomIn, ZoomOut } from "lucide-react";
+import { AlignHorizontalJustifyStart, ArrowRightToLine, ExternalLink, Minimize2, Pause, Pencil, MousePointer2, Play, X, ZoomIn, ZoomOut } from "lucide-react";
 import { isBlackKey, midiToNoteName } from "@/instruments/piano/piano";
 import { isNoteInScale, SCALE_ROOTS, type ScaleSetting } from "@/project/scales";
 import { DRUM_PADS, drumLabelForNote } from "@/instruments/drum-rack/drums";
@@ -15,6 +15,7 @@ import { ClipOverview } from "./ClipOverview";
 import { velocityLine, type CurvePoint } from "@/project/curveEdits";
 import { useShortcuts } from "@/ui/shortcuts";
 import { keyLabel, withKeys } from "@/ui/keyLabel";
+import { useDetachedWindow, useHostWindow } from "@/ui/hostWindow";
 
 interface PianoRollEditorProps {
   channelName: string;
@@ -36,6 +37,10 @@ interface PianoRollEditorProps {
   isPlaying: boolean;
   onPlay: () => void;
   onPause: () => void;
+  /** Shows it in a window of its own (a second screen). */
+  onPopOut?: () => void;
+  /** In a window of its own: puts it back in the main window. */
+  onDock?: () => void;
 }
 
 interface EditableNote extends NoteEvent {
@@ -143,7 +148,13 @@ export function PianoRollEditor({
   isPlaying,
   onPlay,
   onPause,
+  onPopOut,
+  onDock,
 }: PianoRollEditorProps) {
+  /** The window it's in: a window of its own fills it, the main window
+   * shows it over the studio. */
+  const host = useHostWindow();
+  const detached = useDetachedWindow() !== null;
   const [notes, setNotes] = useState<EditableNote[]>(() => withIds(initialNotes));
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [mode, setMode] = useState<Mode>("draw");
@@ -214,7 +225,7 @@ export function PianoRollEditor({
         : instrument === "drums"
           ? noteNameToMidi("F1")
           : 60;
-    const top = rowTop(centerMidi) - GRID_VIEWPORT_H / 2 + ROW_H / 2;
+    const top = rowTop(centerMidi) - (gridScrollRef.current?.clientHeight || GRID_VIEWPORT_H) / 2 + ROW_H / 2;
     if (gridScrollRef.current) gridScrollRef.current.scrollTop = Math.max(0, top);
     if (keysViewportRef.current) keysViewportRef.current.scrollTop = Math.max(0, top);
   });
@@ -309,13 +320,13 @@ export function PianoRollEditor({
   const holding = useRef(false);
   useEffect(() => {
     const release = () => (holding.current = false);
-    window.addEventListener("pointerup", release);
-    window.addEventListener("pointercancel", release);
+    host.addEventListener("pointerup", release);
+    host.addEventListener("pointercancel", release);
     return () => {
-      window.removeEventListener("pointerup", release);
-      window.removeEventListener("pointercancel", release);
+      host.removeEventListener("pointerup", release);
+      host.removeEventListener("pointercancel", release);
     };
-  }, []);
+  }, [host]);
   /** Where the playhead was (clip seconds) on the last frame it was followed;
    * null when following starts afresh (play pressed, Follow turned on). */
   const followedAt = useRef<number | null>(null);
@@ -350,11 +361,11 @@ export function PianoRollEditor({
         }
         followedAt.current = localTime;
       }
-      frame = requestAnimationFrame(tick);
+      frame = host.requestAnimationFrame(tick);
     };
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
-  }, [offset, length, pxPerSecond, follow, isPlaying]);
+    frame = host.requestAnimationFrame(tick);
+    return () => host.cancelAnimationFrame(frame);
+  }, [offset, length, pxPerSecond, follow, isPlaying, host]);
 
   /** Lines the keys, the ruler and the velocity lane up with the grid. */
   const syncScroll = () => {
@@ -414,10 +425,10 @@ export function PianoRollEditor({
       setScrollbarWidth(grid.offsetWidth - grid.clientWidth);
     };
     measure();
-    const observer = new ResizeObserver(measure);
+    const observer = new host.ResizeObserver(measure);
     observer.observe(grid);
     return () => observer.disconnect();
-  }, []);
+  }, [host]);
 
   // The wheel over the grid: up and down scroll the notes (the browser's
   // own scrolling), sideways (or Shift+wheel) scrolls through time, and
@@ -717,12 +728,12 @@ export function PianoRollEditor({
       if (!moved && Math.abs(ev.clientX - startClientX) < DRAG_THRESHOLD_PX) return;
       moved = true;
       finalDelta = computeDelta(ev.clientX);
-      if (!rafId) rafId = requestAnimationFrame(() => { rafId = 0; applyDelta(finalDelta); });
+      if (!rafId) rafId = host.requestAnimationFrame(() => { rafId = 0; applyDelta(finalDelta); });
     };
     const onUp = (ev: MouseEvent) => {
-      if (rafId) cancelAnimationFrame(rafId);
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
+      if (rafId) host.cancelAnimationFrame(rafId);
+      host.removeEventListener("mousemove", onMove);
+      host.removeEventListener("mouseup", onUp);
       if (!moved) return;
       finalDelta = computeDelta(ev.clientX);
       commit(
@@ -733,8 +744,8 @@ export function PianoRollEditor({
         })
       );
     };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
+    host.addEventListener("mousemove", onMove);
+    host.addEventListener("mouseup", onUp);
   };
 
   // --- Velocity lane: drag a note's bar vertically to change its velocity.
@@ -899,12 +910,16 @@ export function PianoRollEditor({
   }, [length, secondsPer16th, secondsPerBeat, pxPerSecond, ticksPerBar]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+    <div className={detached ? "flex min-h-0 flex-1 flex-col bg-surface" : "fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"}>
       <div
         role="dialog"
         aria-label={`Piano Roll — ${channelName}`}
-        className="relative flex max-h-[90vh] flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-2xl"
-        style={{ width: "min(1160px, 96vw)" }}
+        className={
+          detached
+            ? "relative flex min-h-0 flex-1 flex-col overflow-hidden bg-surface"
+            : "relative flex max-h-[90vh] flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-2xl"
+        }
+        style={detached ? undefined : { width: "min(1160px, 96vw)" }}
         onPointerDownCapture={() => (holding.current = true)}
       >
         <div className="flex items-center justify-between gap-3 border-b border-border bg-surface-raised px-3 py-2">
@@ -1011,6 +1026,29 @@ export function PianoRollEditor({
               />
             )}
             <ScaleSelector value={scaleSetting} onChange={onScaleChange} />
+            {detached
+              ? onDock && (
+                  <button
+                    type="button"
+                    onClick={onDock}
+                    title="Put the piano roll back in the main window"
+                    aria-label="Back to the main window"
+                    className="flex h-7 w-7 items-center justify-center rounded border border-border text-muted hover:bg-surface hover:text-foreground"
+                  >
+                    <Minimize2 size={13} />
+                  </button>
+                )
+              : onPopOut && (
+                  <button
+                    type="button"
+                    onClick={onPopOut}
+                    title="Open the piano roll in a window of its own, to put on another screen"
+                    aria-label="Pop out"
+                    className="flex h-7 w-7 items-center justify-center rounded border border-border text-muted hover:bg-surface hover:text-foreground"
+                  >
+                    <ExternalLink size={13} />
+                  </button>
+                )}
             <button
               type="button"
               onClick={onClose}
@@ -1029,7 +1067,7 @@ export function PianoRollEditor({
           {" · press B to toggle mode · Q to quantize · arrow keys nudge the selection · Space to play/pause · Ctrl/Cmd+C/V to copy/paste: click the ruler (or empty space in select mode) to choose where pastes land, otherwise they go to the playhead · drag a velocity bar of a selection to change them all, or across the velocity lane to draw them on a line (Alt: freehand)"}
         </div>
 
-        <div className="flex flex-col overflow-hidden p-3">
+        <div className={`flex flex-col overflow-hidden p-3 ${detached ? "min-h-0 flex-1" : ""}`}>
           {/* The whole clip, to scroll and zoom */}
           <div className="flex border-b border-border">
             <div style={{ width: keyColWidth }} className="shrink-0 border-r border-border" />
@@ -1085,11 +1123,11 @@ export function PianoRollEditor({
             <div style={{ width: scrollbarWidth }} className="shrink-0 border-b border-border" />
           </div>
 
-          {/* Keys + grid row */}
-          <div className="flex">
+          {/* Keys + grid row: in a window of its own, as tall as it allows. */}
+          <div className={detached ? "flex min-h-0 flex-1" : "flex"}>
             <div
               ref={keysViewportRef}
-              style={{ width: keyColWidth, height: GRID_VIEWPORT_H }}
+              style={{ width: keyColWidth, height: detached ? undefined : GRID_VIEWPORT_H }}
               className="shrink-0 overflow-hidden border-r border-border"
             >
               <div className="relative" style={{ height: contentHeight, width: keyColWidth }}>
@@ -1128,7 +1166,7 @@ export function PianoRollEditor({
               ref={gridScrollRef}
               id={GRID_ID}
               onScroll={syncScroll}
-              style={{ height: GRID_VIEWPORT_H }}
+              style={detached ? undefined : { height: GRID_VIEWPORT_H }}
               className="flex-1 overflow-x-hidden overflow-y-auto"
             >
               <div

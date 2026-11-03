@@ -121,6 +121,13 @@ builds the same dependencies.
 The window turns off Tauri's own file drop handling (`dragDropEnabled`) so
 that dropping audio files on the timeline works as in the browser.
 
+The main window is built in `src-tauri/src/lib.rs` (`setup`), from its
+entry in `tauri.conf.json` (which has `"create": false`), so it can take
+the studio's own windows: "Pop out" in the mixer or the piano roll calls
+`window.open`, and `on_new_window` answers a blank page with a Tauri
+window the studio then draws into (`src/ui/Popout.tsx`), for a second
+screen. Other pages asked for that way are left to the webview.
+
 ## What's different in the app today
 
 The window is the system's webview, not Chrome, so a few browser features

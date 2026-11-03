@@ -8,7 +8,7 @@
 // shows in the others; clicking a strip shows its FX rack.
 
 import { useState } from "react";
-import { Circle, Plus, X } from "lucide-react";
+import { Circle, ExternalLink, Minimize2, Plus, X } from "lucide-react";
 import { EFFECT_LABELS, type EffectInstance } from "@/effects/registry";
 import { SIDECHAIN_TAPS, SIDECHAIN_TAP_LABELS, type SidechainTap } from "@/effects/sidechain/sidechainModel";
 import { INSTRUMENT_LABELS } from "@/instruments/registry";
@@ -19,6 +19,7 @@ import { useProjectValue } from "@/state/projectStore";
 import { carriesEffects, readEffectDrop, type EffectDrop } from "@/studio/rack/effectDrag";
 import { EffectDropMark, effectDropHint, type EffectDropHint } from "@/studio/tracks/EffectDropMark";
 import { LoudnessReadout } from "@/studio/tracks/LoudnessReadout";
+import { useDetachedWindow } from "@/ui/hostWindow";
 import { Meter } from "@/studio/tracks/Meter";
 import type { Hovered, RouteHighlight, RouteRole } from "@/studio/tracks/routeHighlight";
 import { ValueBar } from "@/studio/tracks/ValueBar";
@@ -79,6 +80,10 @@ interface MixerProps {
   outputOptions: (c: ChannelConfig) => { value: string; label: string }[];
   limiterThreshold: number;
   actions: MixerActions;
+  /** Shows it in a window of its own (a second screen). */
+  onPopOut?: () => void;
+  /** In a window of its own: puts it back in the main window. */
+  onDock?: () => void;
 }
 
 const SEND_OFF_DB = -60;
@@ -531,13 +536,40 @@ export function Mixer(props: MixerProps) {
   const { tracks, actions } = props;
   const channels = useProjectValue("channels");
   const buses = useProjectValue("buses");
+  const detached = useDetachedWindow() !== null;
   return (
-    <section aria-label="Mixer" className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-background">
+    <section
+      aria-label="Mixer"
+      className={`flex min-h-0 flex-1 flex-col overflow-hidden bg-background ${detached ? "" : "rounded-lg border border-border"}`}
+    >
       <div className="flex shrink-0 items-center gap-2 border-b border-border bg-surface px-3 py-1">
         <span className="text-[10px] font-semibold uppercase tracking-wide text-muted">Mixer</span>
         <span className="truncate text-[10px] text-muted/80">click a strip for its FX rack · drop effects on a strip to add them</span>
         <div className="flex-1" />
         <LoudnessReadout />
+        {detached
+          ? props.onDock && (
+              <button
+                type="button"
+                onClick={props.onDock}
+                title="Put the mixer back in the main window"
+                className="flex h-6 items-center gap-1 rounded border border-border px-1.5 text-[11px] text-muted hover:bg-surface-raised hover:text-foreground"
+              >
+                <Minimize2 size={12} />
+                Back to the main window
+              </button>
+            )
+          : props.onPopOut && (
+              <button
+                type="button"
+                onClick={props.onPopOut}
+                title="Open the mixer in a window of its own, to put on another screen"
+                className="flex h-6 items-center gap-1 rounded border border-border px-1.5 text-[11px] text-muted hover:bg-surface-raised hover:text-foreground"
+              >
+                <ExternalLink size={12} />
+                Pop out
+              </button>
+            )}
       </div>
       <div className="flex min-h-0 flex-1 gap-2 overflow-hidden p-2">
         <div className="flex min-h-0 min-w-0 flex-1 gap-1.5 overflow-auto pb-1">

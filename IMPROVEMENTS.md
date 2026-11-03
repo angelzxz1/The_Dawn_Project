@@ -1,11 +1,11 @@
 # Improvements
 
-Checked against the code and the commit history on 2026-10-29, and again on 2026-11-02; item 7 of Part 2 was added on 2026-10-30, items 8, 9, 16, 18, 19, 20, 21 and 22 on 2026-10-31, items 11, 12, 13, 24, 25 and 28 on 2026-11-01, items 23 and 10 on 2026-11-02.
+Checked against the code and the commit history on 2026-10-29, and again on 2026-11-02; item 7 of Part 2 was added on 2026-10-30, items 8, 9, 16, 18, 19, 20, 21 and 22 on 2026-10-31, items 11, 12, 13, 24, 25 and 28 on 2026-11-01, items 23, 10 and 26 on 2026-11-02.
 
 - `[x]` is done; the commit that did it is in brackets.
 - `[ ]` is still open; "Partly" says what already exists.
 
-**Summary:** Part 1 is all done. In Part 2, items 1–13, 16, 18–25 and 28 are done; 14, 15, 17, 26 and 27 are open.
+**Summary:** Part 1 is all done. In Part 2, items 1–13, 16, 18–26 and 28 are done; 14, 15, 17 and 27 are open.
 
 ## Part 1: Code improvements
 
@@ -78,7 +78,7 @@ That is already ahead of most browser DAWs, such as BandLab or Soundtrap.
 
 ### Mixing
 
-- [x] **10. A real mixer view:** vertical channel strips with faders, meters, sends, inserts and Audio to/from, side by side. Today mixing happens in track headers and the FX rack. (commit to come)
+- [x] **10. A real mixer view:** vertical channel strips with faders, meters, sends, inserts and Audio to/from, side by side. Today mixing happens in track headers and the FX rack. (0078489)
   - The Arrange / Mixer buttons (or F3) swap the arrangement for the mixer (`studio/mixer/Mixer.tsx`), and the project remembers which was showing. A strip for every track (a folded group's tracks are left out), then the buses, then the master at the right.
   - Each strip, top to bottom: Audio from, the inserts (the instrument, then the effects, each with an on/off light; a click opens its window, and effects dropped on the strip are added), the sends with pre/post, pan, mute, solo and arm, then a fader (`studio/mixer/Fader.tsx`) beside the meter with its dB marks, and Audio to. A click on a strip shows its FX rack below.
   - Buses now have a fader, pan and mute (`BusConfig.volume`, `pan`, `muted`), in both engines and in the export. The master strip has the limiter's ceiling, and the loudness readout sits over the mixer.
@@ -129,7 +129,9 @@ That is already ahead of most browser DAWs, such as BandLab or Soundtrap.
 - [x] **25. Remember the layout:** panel sizes, folded tracks, the open FX rack and zoom, per project. (`c1968f7`)
   - A project keeps its zoom, its scroll, the selected track or the open bus or master rack, the rack's fold and the automation lane (`ProjectLayout`). Folded tracks and heights were already kept. A template or an older project opens with the standard layout.
   - No panel has a size to keep: a resizable rack was tried and dropped, as its cards are a fixed height.
-- [ ] **26. Detach or second-screen windows** for the mixer and piano roll (Ableton 12, Logic).
+- [x] **26. Detach or second-screen windows** for the mixer and piano roll (Ableton 12, Logic). (commit to come)
+  - "Pop out" in the mixer and the piano roll opens each in a window of its own, to put on another screen: a pop-up window in the browser, a native window in the desktop app. It's the same studio in another window, so what's changed there is the project's and undo takes it back; play, undo, redo and save work from it.
+  - "Back to the main window", or closing the window, brings it back. Each window opens where it was last left. The piano roll's window fills it and stays open between clips.
 
 ### Accessibility and settings
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type RefObject } from "react";
+import { useHostWindow } from "@/ui/hostWindow";
 
 /** Height of the overview strip (px). */
 export const OVERVIEW_H = 24;
@@ -50,6 +51,7 @@ export function ClipOverview({
   onShow: (left: number, span: number, keep: "start" | "end") => void;
 }) {
   const stripRef = useRef<HTMLDivElement>(null);
+  const host = useHostWindow();
   /** What the editor shows, in seconds, and the strip's width. */
   const [view, setView] = useState({ left: 0, span: length, width: 0 });
   const drag = useRef<{ part: Part; startX: number; left: number; span: number } | null>(null);
@@ -69,7 +71,7 @@ export function ClipOverview({
     };
     strip.addEventListener("wheel", onWheel, { passive: false });
     el.addEventListener("scroll", measure, { passive: true });
-    const observer = new ResizeObserver(measure);
+    const observer = new host.ResizeObserver(measure);
     observer.observe(el);
     observer.observe(strip);
     return () => {
@@ -77,7 +79,7 @@ export function ClipOverview({
       strip.removeEventListener("wheel", onWheel);
       observer.disconnect();
     };
-  }, [target, pxPerSecond, length]);
+  }, [target, pxPerSecond, length, host]);
 
   /** Strip pixels -> seconds. */
   const secondsPerPx = () => length / Math.max(1, stripRef.current?.clientWidth ?? 1);

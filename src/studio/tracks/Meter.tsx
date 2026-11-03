@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { audioEngine } from "@/engine/audioEngine";
+import { useHostWindow } from "@/ui/hostWindow";
 import type { MeterReading } from "@/engine/levelMeter";
 import {
   CLIP_LEVEL,
@@ -48,6 +49,8 @@ export function Meter({ source, scale = false }: MeterProps) {
   /** The loudest peak since the clip light was last reset (dB). */
   const maxRef = useRef(-Infinity);
   const sourceKey = key(source);
+  /** Its window's frames: the main window's stop while it's minimized. */
+  const host = useHostWindow();
   const sourceRef = useRef(source);
   useEffect(() => {
     sourceRef.current = source;
@@ -88,11 +91,11 @@ export function Meter({ source, scale = false }: MeterProps) {
         const rms = dbOf(Math.max(...reading.rms));
         rootRef.current.title = `Peak ${formatDb(peak)} dB · RMS ${formatDb(rms)} dB · loudest ${formatDb(maxRef.current)} dB`;
       }
-      frame = requestAnimationFrame(tick);
+      frame = host.requestAnimationFrame(tick);
     };
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
-  }, [sourceKey]);
+    frame = host.requestAnimationFrame(tick);
+    return () => host.cancelAnimationFrame(frame);
+  }, [sourceKey, host]);
 
   return (
     <div ref={rootRef} className="flex h-full shrink-0 gap-0.5" onClick={(e) => e.stopPropagation()}>

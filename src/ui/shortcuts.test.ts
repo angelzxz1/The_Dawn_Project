@@ -23,11 +23,12 @@ function key(k: string, mods: Partial<Record<"ctrlKey" | "metaKey" | "shiftKey" 
 function registry() {
   const r = new ShortcutRegistry();
   const log: string[] = [];
-  const add = (layer: ShortcutLayer, list: Shortcut[], options: ShortcutOptions = {}) =>
+  const add = (layer: ShortcutLayer, list: Shortcut[], options: ShortcutOptions = {}, scope: Window | null = null) =>
     r.add(
       layer,
       () => list,
-      () => options
+      () => options,
+      scope
     );
   return { r, log, add };
 }
@@ -160,6 +161,33 @@ describe("ShortcutRegistry", () => {
     expect(r.keyDown(key("a").e)).toBe(false);
     r.active()[0].run(key("a").e);
     expect(log).toEqual(["added"]);
+  });
+});
+
+describe("a detached window's shortcuts", () => {
+  const popup = {} as Window;
+
+  it("take its keys, and the main window's layers don't wait for them", () => {
+    const { r, log, add } = registry();
+    add("studio", [{ keys: "delete", run: () => void log.push("delete clip") }]);
+    add("editor", [{ keys: "delete", run: () => void log.push("delete notes") }], {}, popup);
+    r.keyDown(key("Delete").e, popup);
+    // The piano roll is modal, but only in its own window.
+    r.keyDown(key("Delete").e);
+    expect(log).toEqual(["delete notes", "delete clip"]);
+    expect(r.active().map((s) => s.layer)).toEqual([]);
+  });
+
+  it("pass a key on only to what works everywhere", () => {
+    const { r, log, add } = registry();
+    add("studio", [
+      { keys: "space", everywhere: true, run: () => void log.push("play") },
+      { keys: "delete", run: () => void log.push("delete clip") },
+    ]);
+    add("editor", [{ keys: "delete", run: () => false }], {}, popup);
+    expect(r.keyDown(key(" ").e, popup)).toBe(true);
+    expect(r.keyDown(key("Delete").e, popup)).toBe(false);
+    expect(log).toEqual(["play"]);
   });
 });
 
