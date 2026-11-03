@@ -36,7 +36,7 @@ test("no page links to or mentions GitHub: feedback goes to the Discord", async 
 
 test("the studio's About window doesn't mention GitHub either", async ({ page, studio }) => {
   await studio.open();
-  await page.getByRole("button", { name: "About", exact: true }).click();
+  await studio.menu("Help", "About The Dawn Project");
   const about = page.getByRole("dialog", { name: "About The Dawn Project" });
   for (const tab of ["About", "What's new", "Credits", "Privacy", "License"]) {
     await about.getByRole("tab", { name: tab }).click();

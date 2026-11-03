@@ -19,9 +19,9 @@ test.beforeEach(async ({ studio }) => {
   await studio.open("Empty Project");
 });
 
-test("the gear, Ctrl+, and the CPU panel open Preferences", async ({ page }) => {
+test("Options > Preferences, Ctrl+, and the CPU panel open Preferences", async ({ page, studio }) => {
   const prefs = page.getByRole("dialog", { name: "Preferences" });
-  await page.getByRole("button", { name: "Preferences", exact: true }).click();
+  await studio.menu("Options", /^Preferences/);
   await expect(prefs.getByRole("tabpanel", { name: "Audio" })).toContainText("Delay compensation");
   await page.keyboard.press("Escape");
   await expect(prefs).toHaveCount(0);

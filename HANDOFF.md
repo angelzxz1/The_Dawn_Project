@@ -3,7 +3,7 @@
 Read this first in a new session. It says where the project is, how the
 work is done and what comes next, then keeps the technical notes (the
 native engine's techniques, and what each finished item changed).
-Updated 2026-11-03, at `main` = `612a0c2`, with step 24 not yet committed.
+Updated 2026-11-03, at `main` = `fdc436b`, with the menu bar (not a listed step) not yet committed.
 
 ## Start here
 
@@ -13,7 +13,9 @@ Updated 2026-11-03, at `main` = `612a0c2`, with step 24 not yet committed.
   - step 22, the mixer view (2026-11-02, `0078489`);
   - step 23, the mixer and piano roll in windows of their own
     (2026-11-02, `4b1d2c7`; the desktop's windows fixed in `612a0c2`);
-  - step 24, sidechains in the engine (2026-11-03, commit to come).
+  - step 24, sidechains in the engine (2026-11-03, `fdc436b`).
+  - Not a listed step: the menu bar, and the browser shown or hidden
+    (2026-11-03, commit to come; asked for by the user).
 - **Next: step 25, automation in the engine** (Phase 7): points with a
   `curve` each, bent by `curveShape` (`src/engine/automation.ts`); then
   tracks with automation play natively and `describe.ts`'s
@@ -160,11 +162,11 @@ The Dawn Project is a browser DAW, also built as a desktop app.
 **Checks before handing a step over:**
 
 - `npx tsc --noEmit` and `npm run lint` (both clean).
-- `npx vitest run`: 799 unit and component tests on 2026-11-03, in the
+- `npx vitest run`: 802 unit and component tests on 2026-11-03, in the
   projects `unit` (Node), `components` (Chromium) and `web-audio`. The
   component tests have a 30 s limit (`vitest.config.ts`), and the slow
   unit tests their own; no `--testTimeout` needed.
-- `npm run build`, then `npx playwright test --workers=2`: 180 tests, 1
+- `npm run build`, then `npx playwright test --workers=2`: 183 tests, 1
   skipped, all passing on 2026-11-03 (about 10 minutes). It serves `out/`,
   so build first or it tests the last build. Use 2 workers: a full run
   with more was once stopped because the computer ran low on memory. Run a
@@ -584,7 +586,7 @@ ahead" above).
    that report their loudness sound different from before.
 3. **Sidechains:** keys routed from other tracks, with the browser's tap
    points and latency alignment (`mixGraph.ts` `resolveSidechains`,
-   `keyDelay`). Done 2026-11-03 (step 24, commit to come; see "Engine
+   `keyDelay`). Done 2026-11-03 (step 24, `fdc436b`; see "Engine
    model" above). Tests: `crates/dawn-engine/tests/sidechain.rs` (a gate
    keyed by another track, in the same block whatever the track order; a
    post-fader key; a loop left out; a bus keying a track; the key waiting
@@ -831,6 +833,29 @@ the order they were done, with the fixes made along the way.
     instrument windows opened from a detached mixer open in the main
     window. Tests: `e2e/popout.spec.ts`, `src/ui/Popout.test.ts`,
     `src/ui/shortcuts.test.ts`, `Mixer.test.tsx`.
+  - The menu bar (2026-11-03, commit to come; the user asked for it, not
+    a listed step): File, Edit, Create, View, Options, Help across the top
+    of the studio, as desktop DAWs have it (`src/studio/shell/MenuBar.tsx`:
+    menus of items with their keys, checks for settings, links, notes;
+    pointing at another menu while one is open opens it; the arrows, Enter
+    and Escape work, and the studio's keys wait while a menu is open). The
+    old header went: the logo and "The Dawn Project" (the user: the tab,
+    or the desktop's title bar, has the name), the File dropdown (now
+    `dialogs/FileMenu.tsx` `useFileMenu`, which also gives the Save As
+    dialog and the file picker; "Export Audio…" was added to it), the gear
+    (Options > Preferences…), Help (`HelpMenu.tsx` removed; its items are
+    in Help), Feedback, Support and About (all in Help). The project's name
+    and its unsaved dot sit at the bar's right, with the errors and the
+    project notices. Create adds MIDI, audio and group tracks; View has the
+    Arrangement and the Mixer, the browser, the Keys window, the master's
+    effects and the zoom; Options the metronome, the loop, MIDI overdub
+    and Preferences. The browser down the left (effects, grooves,
+    plugins) shows and hides from the button at the bar's left, View >
+    Browser or Ctrl+Alt+B, remembered in localStorage
+    (`dawn.browserOpen`); the tour shows it while it runs. Tests:
+    `e2e/menubar.spec.ts`, `MenuBar.test.tsx`; `e2e/studio.ts` has
+    `menu(menu, item)`, and the tests that used the header's buttons go
+    through the menus.
   - Items 14, 15, 17 and 27 are open. Next in `nextSteps.md` is Phase 7,
     step 25 (automation in the engine); step 24 (sidechains in the engine,
     2026-11-03) is logged under "The native engine plan".

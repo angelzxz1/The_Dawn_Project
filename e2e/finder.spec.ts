@@ -30,7 +30,7 @@ test("a command with nothing to act on says so", async ({ page }) => {
   await expect(page.getByText("Nothing to delete the selected clips right now")).toBeVisible();
 });
 
-test("? lists the shortcuts; Esc closes it; the Help menu opens both", async ({ page }) => {
+test("? lists the shortcuts; Esc closes it; the Help menu opens both", async ({ page, studio }) => {
   await page.keyboard.press("Shift+?");
   const sheet = page.getByRole("dialog", { name: "Keyboard shortcuts" });
   await expect(sheet.getByRole("region", { name: "Arrangement" })).toContainText("Undo");
@@ -38,11 +38,9 @@ test("? lists the shortcuts; Esc closes it; the Help menu opens both", async ({ 
   await page.keyboard.press("Escape");
   await expect(sheet).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Help" }).click();
-  await page.getByRole("menuitem", { name: /Find a command/ }).click();
+  await studio.menu("Help", /Find a Command/);
   await expect(page.getByRole("dialog", { name: "Command palette" })).toBeVisible();
   await page.keyboard.press("Escape");
-  await page.getByRole("button", { name: "Help" }).click();
-  await page.getByRole("menuitem", { name: /Keyboard shortcuts/ }).click();
+  await studio.menu("Help", /Keyboard Shortcuts/);
   await expect(sheet).toBeVisible();
 });

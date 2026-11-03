@@ -14,18 +14,16 @@ import {
   Download,
   ChevronsDownUp,
   Eraser,
-  Heart,
-  Info,
   Loader2,
-  MessageSquare,
   MousePointer2,
   MoveHorizontal,
+  PanelLeftClose,
+  PanelLeftOpen,
   Pencil,
   Redo2,
   Repeat,
   KeyboardMusic,
   Scissors,
-  Settings,
   SlidersVertical,
   GanttChart,
   Undo2,
@@ -114,7 +112,8 @@ import { decodeAudioFile } from "@/engine/audioFile";
 import type { ProjectState } from "@/project/project";
 import { hydrateEngine, retimeEngine, syncEngine } from "@/engine/engineSync";
 import { projectSetter, projectStore, useHistoryState, useProjectValue } from "@/state/projectStore";
-import { ProjectMenu } from "@/studio/dialogs/ProjectMenu";
+import { ProjectName, useFileMenu } from "@/studio/dialogs/FileMenu";
+import { MenuBar, type Menu } from "@/studio/shell/MenuBar";
 import { AboutWindow, type AboutTab } from "@/studio/dialogs/AboutWindow";
 import { TelemetrySwitch } from "@/studio/dialogs/TelemetrySwitch";
 import { startTelemetry, track, trackAppOpened, trackOnce } from "@/services/telemetry";
@@ -130,7 +129,6 @@ import { findPreset, paramsFromPreset } from "@/effects/presets";
 import { effectFileBlob } from "@/effects/effectFiles";
 import { StartScreen } from "@/studio/dialogs/StartScreen";
 import { Tour, tourDone } from "@/studio/shell/Tour";
-import { HelpMenu } from "@/studio/dialogs/HelpMenu";
 import { PacksWindow } from "@/studio/dialogs/PacksWindow";
 import { AppUpdater } from "@/studio/shell/AppUpdater";
 import { installPack, packSamples, removePack } from "@/project/packStore";
@@ -327,6 +325,23 @@ export function Daw() {
     setNoteInputOpen(open);
     try {
       localStorage.setItem("dawn.noteInputOpen", open ? "1" : "0");
+    } catch {
+      // Not remembered in a private window.
+    }
+  }, []);
+  /** The browser down the left (effects, grooves, plugins): shown or
+   * hidden from the menu bar (remembered between visits). */
+  const [browserOpen, setBrowserOpen] = useState(() => {
+    try {
+      return localStorage.getItem("dawn.browserOpen") !== "0";
+    } catch {
+      return true;
+    }
+  });
+  const toggleBrowser = useCallback((open: boolean) => {
+    setBrowserOpen(open);
+    try {
+      localStorage.setItem("dawn.browserOpen", open ? "1" : "0");
     } catch {
       // Not remembered in a private window.
     }
@@ -2256,7 +2271,10 @@ export function Daw() {
     { keys: "mod+k", label: "Find a command", whileTyping: true, run: () => openFinder("palette") },
     { keys: ["shift+?", "?"], label: "Show the keyboard shortcuts", run: () => openFinder("sheet") },
   ]);
-  useShortcuts("studio", [{ keys: "f3", label: "Show the mixer or the arrangement", run: () => switchView(studioView === "mix" ? "arrange" : "mix") }]);
+  useShortcuts("studio", [
+    { keys: "f3", label: "Show the mixer or the arrangement", run: () => switchView(studioView === "mix" ? "arrange" : "mix") },
+    { keys: "mod+alt+b", label: "Show or hide the browser", run: () => toggleBrowser(!browserOpen) },
+  ]);
   // What has no key: the command palette runs these.
   useShortcuts("studio", [
     { keys: [], label: "Add a MIDI track", run: () => void handleAddChannel("midi") },
@@ -2271,6 +2289,101 @@ export function Daw() {
     { keys: [], label: "Take the tour", run: () => setTourOpen(true) },
     { keys: [], label: "About Dawn and what's new", run: () => setAboutTab("news") },
   ]);
+
+  // The menu bar: everything the studio does that isn't on screen, with
+  // its keys.
+  const fileMenu = useFileMenu({
+    name: projectName,
+    folders: supportsFolders(),
+    brave: isBrave(),
+    busy: projectBusy,
+    onNew: handleNewProject,
+    onOpen: () => void handleOpenProject(),
+    onOpenRecent: (r) => void handleOpenRecent(r),
+    listRecent: recentProjects,
+    onSave: () => void handleSave(),
+    onSaveAs: (n) => void handleSaveAs(n),
+    onExportAudio: () => setExportOpen(true),
+    onImport: (f) => void handleImportProjectFile(f),
+    onExport: () => void downloadProjectFile(projectName),
+    onPacks: () => setPacks({ message: null }),
+    saveAsRequest,
+  });
+  const startTour = () => setTourOpen(true);
+  const menus: Menu[] = [
+    fileMenu.menu,
+    {
+      label: "Edit",
+      entries: [
+        { label: "Undo", shortcut: keyLabel("mod+z"), disabled: !canUndo, onSelect: undo },
+        { label: "Redo", shortcut: keyLabel("mod+shift+z"), disabled: !canRedo, onSelect: redo },
+      ],
+    },
+    {
+      label: "Create",
+      entries: [
+        { label: "MIDI Track", onSelect: () => void handleAddChannel("midi") },
+        { label: "Audio Track", onSelect: () => void handleAddChannel("audio") },
+        { label: "Group Track", onSelect: () => void handleAddChannel("group") },
+      ],
+    },
+    {
+      label: "View",
+      entries: [
+        { label: "Arrangement", checked: studioView !== "mix" || !!mixerWindow, onSelect: () => switchView("arrange") },
+        { label: "Mixer", shortcut: keyLabel("f3"), checked: studioView === "mix" || !!mixerWindow, onSelect: () => switchView("mix") },
+        { kind: "separator" },
+        { label: "Browser", shortcut: keyLabel("mod+alt+b"), checked: browserOpen, onSelect: () => toggleBrowser(!browserOpen) },
+        { label: "Keys (play notes)", checked: noteInputOpen, onSelect: () => toggleNoteInput(!noteInputOpen) },
+        { label: "Master Effects", onSelect: openMasterFx },
+        { kind: "separator" },
+        { label: "Zoom In", shortcut: keyLabel("="), disabled: pxPerSecond >= MAX_PX_PER_SECOND, onSelect: () => zoomBy(ZOOM_STEP) },
+        { label: "Zoom Out", shortcut: keyLabel("-"), disabled: pxPerSecond <= MIN_PX_PER_SECOND, onSelect: () => zoomBy(1 / ZOOM_STEP) },
+      ],
+    },
+    {
+      label: "Options",
+      entries: [
+        { label: "Metronome", checked: metronomeEnabled, onSelect: () => setMetronomeEnabled((v) => !v) },
+        { label: "Loop", checked: loop.on, onSelect: toggleLoop },
+        { label: "MIDI Overdub", checked: midiOverdub, onSelect: () => setMidiOverdub((v) => !v) },
+        { kind: "separator" },
+        { label: "Preferences…", shortcut: keyLabel("mod+,"), onSelect: () => openPreferences(prefsTab ?? "audio") },
+      ],
+    },
+    {
+      label: "Help",
+      entries: [
+        { label: "Take the Tour", onSelect: startTour },
+        { label: "Find a Command…", shortcut: keyLabel("mod+k"), onSelect: () => openFinder("palette") },
+        { label: "Keyboard Shortcuts", shortcut: "?", onSelect: () => openFinder("sheet") },
+        { kind: "separator" },
+        { kind: "link", label: "Setup Guide", href: "/how-it-works#setup" },
+        { kind: "link", label: "Latency, Explained", href: "/how-it-works#latency" },
+        { kind: "link", label: "Troubleshooting", href: "/how-it-works#troubleshooting" },
+        { kind: "link", label: "Daybreak Synth Guide", href: "/guides/daybreak" },
+        { kind: "link", label: "Questions and Answers", href: "/faq" },
+        { kind: "separator" },
+        ...(hasDiscord
+          ? [{ label: "Send Feedback…", title: "Send feedback or report a problem on Dawn's Discord (your browser and Dawn's version, ready to paste)", onSelect: () => openFeedback("help") }]
+          : []),
+        ...(hasSupportLinks
+          ? [
+              {
+                label: "Support Dawn…",
+                title: "Dawn is free: support it",
+                onSelect: () => {
+                  track("support_link_clicked", { where: "menu" });
+                  setAboutTab("about");
+                },
+              },
+            ]
+          : []),
+        { label: "What's New", onSelect: () => setAboutTab("news") },
+        { label: "About The Dawn Project", onSelect: () => setAboutTab("about") },
+      ],
+    },
+  ];
 
   const editingChannel = channels.find((c) => c.id === editingClip?.channelId);
   const editingClipInstance = editingClip
@@ -2522,7 +2635,7 @@ export function Daw() {
     />
   );
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-screen flex-col overflow-hidden">
       {isLoadingProject && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/90">
           <div className="flex items-center gap-2 text-sm text-muted">
@@ -2532,6 +2645,32 @@ export function Daw() {
         </div>
       )}
       <RecoveryNotice />
+      <MenuBar
+        menus={menus}
+        start={
+          <button
+            type="button"
+            onClick={() => toggleBrowser(!browserOpen)}
+            aria-pressed={browserOpen}
+            title={withKeys(browserOpen ? "Hide the browser" : "Show the browser", "mod+alt+b", "effects, grooves and plugins")}
+            aria-label="Browser"
+            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded hover:bg-surface-raised ${browserOpen ? "text-foreground" : "text-muted"}`}
+          >
+            {browserOpen ? <PanelLeftClose size={14} /> : <PanelLeftOpen size={14} />}
+          </button>
+        }
+        end={
+          <div className="ml-auto flex min-w-0 items-center gap-3 pr-1">
+            {(micError || importError) && <p className="truncate text-xs text-record">{micError ?? importError}</p>}
+            {!micError && !importError && !samplesReady && <p className="shrink-0 text-xs text-muted">loading sounds…</p>}
+            {projectNotice && <span className="max-w-[220px] truncate text-xs text-muted">{projectNotice}</span>}
+            <ProjectName name={projectName} dirty={dirty} folderName={projectFolderName} />
+          </div>
+        }
+      />
+      {fileMenu.overlays}
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+      {(browserOpen || tourOpen) && (
       <EffectBrowser
         onAddEffect={handleSidebarAddEffect}
         onAddChain={fxChannel || fxBus || fxMasterOpen ? (chain) => effectActions.addChain(fxHostId, chain) : undefined}
@@ -2562,93 +2701,8 @@ export function Daw() {
         }
         plugins={desktop ? <PluginBrowser /> : undefined}
       />
+      )}
       <div className="flex flex-1 flex-col gap-3 overflow-hidden p-3">
-      <header className="flex shrink-0 items-center justify-between">
-        <div className="flex items-center gap-2">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo-icon.png" alt="" className="h-6 w-6 rounded-md" />
-          <h1 className="whitespace-nowrap text-lg font-semibold tracking-tight">
-            The Dawn Project
-          </h1>
-          <div className="ml-3">
-            <ProjectMenu
-              name={projectName}
-              dirty={dirty}
-              folders={supportsFolders()}
-              brave={isBrave()}
-              folderName={projectFolderName}
-              busy={projectBusy}
-              onNew={handleNewProject}
-              onOpen={() => void handleOpenProject()}
-              onOpenRecent={(r) => void handleOpenRecent(r)}
-              listRecent={recentProjects}
-              onSave={() => void handleSave()}
-              onSaveAs={(n) => void handleSaveAs(n)}
-              onImport={(f) => void handleImportProjectFile(f)}
-              onExport={() => void downloadProjectFile(projectName)}
-              onPacks={() => setPacks({ message: null })}
-              saveAsRequest={saveAsRequest}
-            />
-          </div>
-          {projectNotice && <span className="max-w-[220px] truncate text-xs text-muted">{projectNotice}</span>}
-        </div>
-        <div className="flex min-w-0 items-center gap-3">
-          <p className={`truncate text-xs ${micError || importError ? "text-record" : "hidden text-muted 2xl:block"}`}>
-            {micError
-              ? micError
-              : importError
-                ? importError
-                : samplesReady
-                  ? "double-click a clip to edit it in the piano roll · space to play/pause · ctrl/cmd+C/V to copy/paste the clip at the playhead"
-                  : "loading sounds…"}
-          </p>
-          <button
-            type="button"
-            onClick={() => openPreferences("audio")}
-            title={withKeys("Preferences", "mod+,", "audio device, buffer, recording latency, the click, autosave")}
-            aria-label="Preferences"
-            className="flex shrink-0 items-center rounded-md border border-border p-1.5 text-muted hover:bg-surface-raised hover:text-foreground"
-          >
-            <Settings size={13} />
-          </button>
-          <HelpMenu onTour={() => setTourOpen(true)} onShortcuts={() => openFinder("sheet")} onCommands={() => openFinder("palette")} onFeedback={hasDiscord ? () => openFeedback("help") : undefined} />
-          {hasDiscord && (
-            <button
-              type="button"
-              onClick={() => openFeedback("header")}
-              title="Send feedback or report a problem on Dawn's Discord (your browser and Dawn's version, ready to paste)"
-              className="flex shrink-0 items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted hover:bg-surface-raised hover:text-foreground"
-            >
-              <MessageSquare size={12} />
-              Feedback
-            </button>
-          )}
-          {hasSupportLinks && (
-            <button
-              type="button"
-              onClick={() => {
-                track("support_link_clicked", { where: "header" });
-                setAboutTab("about");
-              }}
-              title="Dawn is free: support it"
-              className="flex shrink-0 items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted hover:bg-surface-raised hover:text-foreground"
-            >
-              <Heart size={12} className="text-record" />
-              Support
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => setAboutTab("about")}
-            title="About Dawn: credits, privacy and license"
-            className="flex shrink-0 items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted hover:bg-surface-raised hover:text-foreground"
-          >
-            <Info size={12} />
-            About
-          </button>
-        </div>
-      </header>
-
       <div className="relative shrink-0" data-tour="transport">
         <TransportBar
           status={<AudioStatus />}
@@ -3392,6 +3446,7 @@ export function Daw() {
           onClose={() => setExpandedEffectId(null)}
         />
       )}
+      </div>
       </div>
     </div>
   );

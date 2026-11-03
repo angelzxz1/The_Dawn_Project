@@ -95,8 +95,14 @@ export class Studio {
 
   /** Picks an item from the File menu. */
   async fileMenu(item: string | RegExp): Promise<void> {
-    await this.page.getByRole("button", { name: /^File/ }).click();
-    await this.page.getByRole("menuitem", { name: item }).click();
+    await this.menu("File", item);
+  }
+
+  /** Picks an item from a menu in the menu bar. */
+  async menu(menu: string, item: string | RegExp): Promise<void> {
+    await this.page.getByRole("menubar").getByRole("menuitem", { name: menu, exact: true }).click();
+    const list = this.page.getByRole("menu", { name: menu });
+    await list.getByRole("menuitem", { name: item }).or(list.getByRole("menuitemcheckbox", { name: item })).click();
   }
 
   /** The tracks in the autosaved working copy (IndexedDB), or null. */
