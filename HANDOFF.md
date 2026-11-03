@@ -3,7 +3,7 @@
 Read this first in a new session. It says where the project is, how the
 work is done and what comes next, then keeps the technical notes (the
 native engine's techniques, and what each finished item changed).
-Updated 2026-11-02, at `main` = `0078489`, with step 23 not yet committed.
+Updated 2026-11-02, at `main` = `4b1d2c7`.
 
 ## Start here
 
@@ -13,12 +13,12 @@ Updated 2026-11-02, at `main` = `0078489`, with step 23 not yet committed.
   - step 21, one style for every window (2026-11-02, `54dd0d8`);
   - step 22, the mixer view (2026-11-02, `0078489`);
   - step 23, the mixer and piano roll in windows of their own
-    (2026-11-02, commit to come).
+    (2026-11-02, `4b1d2c7`).
 - **Next: step 24, sidechains in the engine** (Phase 7, native stage 4):
   keys from other tracks at the studio's tap points, with its latency
   alignment (`mixGraph.ts` `resolveSidechains`, `keyDelay`); then
-  `describe.ts` stops leaving sidechained effects out. It's Rust, and this
-  machine has no Rust toolchain (see Gotchas). Wait for the user to say
+  `describe.ts` stops leaving sidechained effects out. It's mostly Rust:
+  the cargo checks run here now (see Gotchas). Wait for the user to say
   "go" before starting a step: they ask for each one ("Lets go with step
   N").
 - **What's left after that,** in order (the full list, with sizes, is in
@@ -198,8 +198,11 @@ clippy and fmt. `desktop.yml` builds on Windows, macOS and Linux.
   `winldd/1007/winldd-win64.zip` into `winldd-1007`), unpacked with
   Windows' `tar`, each with an empty `INSTALLATION_COMPLETE` file. A
   Playwright update, or Node 24 (fnm), would fix the installer.
-- It also has no Rust toolchain (no `cargo`), so the cargo checks can't
-  run here: install rustup, or run them where Rust is.
+- Rust (cargo 1.99.1) was installed on 2026-11-03, in
+  `%USERPROFILE%.cargoin`, which a shell opened before that may not
+  have on its Path: `$env:Path = "$env:USERPROFILE.cargoin;$env:Path"`.
+  The cargo checks (fmt, clippy with `-D warnings`, test) passed then: 149
+  tests, 1 ignored.
 
 **Writing style for code and docs:** plain, short sentences in the
 codebase's voice. Comments say what something is for. Match the
@@ -765,9 +768,9 @@ the order they were done, with the fixes made along the way.
     shuts the bus when false; the engine already had bus volume and pan).
     Tests: `src/studio/mixer/Mixer.test.tsx`, `e2e/mixer.spec.ts`,
     `engineSync.test.ts`, `describe.test.ts`, `projectSchema.test.ts`,
-    and a Rust test in `song.rs`. The Rust wasn't built or tested here:
-    this machine has no Rust toolchain (see Gotchas).
-  - Item 26 (2026-11-02, commit to come): the mixer and the piano roll
+    and a Rust test in `song.rs`. The Rust was built and tested on
+    2026-11-03, once Rust was installed.
+  - Item 26 (2026-11-02, `4b1d2c7`): the mixer and the piano roll
     in windows of their own, for a second screen. "Pop out" in the
     mixer's bar and in the piano roll's title row; "Back to the main
     window" there, or closing the window (for the piano roll, closing
@@ -797,8 +800,8 @@ the order they were done, with the fixes made along the way.
     about:blank request gets a Tauri window
     (`WebviewWindowBuilder::window_features`, its title from the page,
     file drop off for effect drags); anything else is left to the
-    webview, as before. Not built or tried here (no Rust toolchain): try
-    it in `npm run desktop`. On the desktop a detached window isn't
+    webview, as before. Built, linted and tested on 2026-11-03; not yet
+    tried in `npm run desktop`. On the desktop a detached window isn't
     zoomed with the UI size (that's the main webview's zoom). Effect and
     instrument windows opened from a detached mixer open in the main
     window. Tests: `e2e/popout.spec.ts`, `src/ui/Popout.test.ts`,

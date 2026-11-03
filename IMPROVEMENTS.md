@@ -129,7 +129,7 @@ That is already ahead of most browser DAWs, such as BandLab or Soundtrap.
 - [x] **25. Remember the layout:** panel sizes, folded tracks, the open FX rack and zoom, per project. (`c1968f7`)
   - A project keeps its zoom, its scroll, the selected track or the open bus or master rack, the rack's fold and the automation lane (`ProjectLayout`). Folded tracks and heights were already kept. A template or an older project opens with the standard layout.
   - No panel has a size to keep: a resizable rack was tried and dropped, as its cards are a fixed height.
-- [x] **26. Detach or second-screen windows** for the mixer and piano roll (Ableton 12, Logic). (commit to come)
+- [x] **26. Detach or second-screen windows** for the mixer and piano roll (Ableton 12, Logic). (`4b1d2c7`)
   - "Pop out" in the mixer and the piano roll opens each in a window of its own, to put on another screen: a pop-up window in the browser, a native window in the desktop app. It's the same studio in another window, so what's changed there is the project's and undo takes it back; play, undo, redo and save work from it.
   - "Back to the main window", or closing the window, brings it back. Each window opens where it was last left. The piano roll's window fills it and stays open between clips.
 
