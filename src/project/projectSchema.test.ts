@@ -224,6 +224,23 @@ describe("damaged saved data", () => {
     expect(project.channelEffects["ch-2"][0].params.mode).toBe(1);
   });
 
+  it("keeps a bus's fader, pan and mute, within range, and only when they aren't the default", () => {
+    const project = normalizeProject({
+      channels: [{ id: "ch-1", type: "audio" }],
+      buses: [
+        { id: "a", name: "A", volume: -4.5, pan: 0.25, muted: true },
+        { id: "b", name: "B", volume: 40, pan: -9, muted: "yes" },
+        { id: "c", name: "C", volume: 0, pan: 0, muted: false },
+      ],
+    })!;
+    expectValidProject(project);
+    expect(project.buses).toEqual([
+      { id: "a", name: "A", colorIndex: 0, volume: -4.5, pan: 0.25, muted: true },
+      { id: "b", name: "B", colorIndex: 1, volume: 6, pan: -1 },
+      { id: "c", name: "C", colorIndex: 2 },
+    ]);
+  });
+
   it("keeps file references on file-based effects only", () => {
     const project = normalizeProject({
       channels: [{ id: "ch-1", type: "audio" }],
@@ -494,6 +511,7 @@ describe("the layout", () => {
       fxMaster: false,
       rackCollapsed: true,
       automation: { track: "a", target: { kind: "effect", effectId: "fx-1", paramKey: "wet" } },
+      view: "mix",
     };
     const p = normalizeProject({ channels, channelEffects, buses: [{ id: "bus-1", name: "Verb" }], layout });
     expect(p?.layout).toEqual(layout);
@@ -505,7 +523,7 @@ describe("the layout", () => {
       channelEffects,
       layout: { pxPerSecond: "far", scrollTop: -5, selectedTrack: "gone", fxBus: "gone", automation: { track: "b", target: { kind: "effect", effectId: "fx-1", paramKey: "wet" } } },
     });
-    expect(p?.layout).toMatchObject({ pxPerSecond: 70, scrollTop: 0, selectedTrack: null, fxBus: null, automation: null });
+    expect(p?.layout).toMatchObject({ pxPerSecond: 70, scrollTop: 0, selectedTrack: null, fxBus: null, automation: null, view: "arrange" });
     expect(normalizeProject({ channels })?.layout).toBeUndefined();
   });
 });

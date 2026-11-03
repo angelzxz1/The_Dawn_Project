@@ -388,6 +388,9 @@ pub struct BusSpec {
     pub volume_db: f64,
     #[serde(default)]
     pub pan: f64,
+    /// False while it's muted (its fader is then shut).
+    #[serde(default = "on")]
+    pub audible: bool,
     #[serde(default)]
     pub effects: Vec<EffectSpecIn>,
 }
@@ -617,7 +620,11 @@ pub fn build(
         .iter()
         .map(|b| Bus {
             id: b.id.clone(),
-            volume: db_to_gain(b.volume_db),
+            volume: if b.audible {
+                db_to_gain(b.volume_db)
+            } else {
+                0.0
+            },
             pan: b.pan.clamp(-1.0, 1.0),
             effects: effects(&b.effects, previous, audio, sample_rate, &mut missing),
         })
@@ -696,6 +703,23 @@ mod tests {
                 channels: vec![vec![0.5; 10]],
             }),
         }
+    }
+
+    #[test]
+    fn reads_each_bus_fader_and_pan_and_shuts_a_muted_one() {
+        let mut spec: SongSpec = serde_json::from_str(SONG).unwrap();
+        spec.buses = serde_json::from_str(
+            r#"[{ "id": "verb", "volumeDb": -6, "pan": -0.25, "audible": true, "effects": [] },
+                { "id": "echo", "volumeDb": 0, "pan": 0, "audible": false, "effects": [] },
+                { "id": "old" }]"#,
+        )
+        .unwrap();
+        let (song, _) = build(&spec, None, &HashMap::new(), 48000.0);
+        assert!((song.buses[0].volume - db_to_gain(-6.0)).abs() < 1e-12);
+        assert_eq!(song.buses[0].pan, -0.25);
+        assert_eq!(song.buses[1].volume, 0.0);
+        // From before buses had a fader: 0 dB, heard.
+        assert_eq!(song.buses[2].volume, 1.0);
     }
 
     #[test]

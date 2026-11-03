@@ -26,6 +26,8 @@ import {
   KeyboardMusic,
   Scissors,
   Settings,
+  SlidersVertical,
+  GanttChart,
   Undo2,
   Expand,
   ZoomIn,
@@ -46,6 +48,7 @@ import { TransportBar } from "@/studio/transport/TransportBar";
 import { PianoKeyboard } from "@/studio/notes/PianoKeyboard";
 import { NoteInputWindow } from "@/studio/notes/NoteInputWindow";
 import { EffectWindow } from "@/studio/rack/EffectWindow";
+import { Mixer, type MixerActions } from "@/studio/mixer/Mixer";
 import { MasterBusRow } from "@/studio/tracks/MasterBusRow";
 import { RecoveryNotice } from "@/studio/dialogs/RecoveryNotice";
 import { automationCurrentValue, automationRange, automationTargetKey, automationTargetOptions } from "@/project/automationTargets";
@@ -114,7 +117,7 @@ import { AboutWindow, type AboutTab } from "@/studio/dialogs/AboutWindow";
 import { TelemetrySwitch } from "@/studio/dialogs/TelemetrySwitch";
 import { startTelemetry, track, trackAppOpened, trackOnce } from "@/services/telemetry";
 import { isBrave, recentProjects, supportsFolders } from "@/project/projectFiles";
-import { type ProjectLayout, type SerializedProject } from "@/project/projectSchema";
+import { type ProjectLayout, type SerializedProject, type StudioView } from "@/project/projectSchema";
 import type { BounceParams } from "@/export/bounce";
 import { ExportDialog } from "@/studio/dialogs/ExportDialog";
 import { GrooveBrowser, type BrowserSample } from "@/studio/rack/GrooveBrowser";
@@ -203,6 +206,12 @@ const TOOL_ICONS: Record<ClipTool, typeof Pencil> = {
   slip: MoveHorizontal,
 };
 
+/** The studio's two views, and what each shows. */
+const VIEWS: { view: StudioView; label: string; hint: string; Icon: typeof Pencil }[] = [
+  { view: "arrange", label: "Arrange", hint: "the tracks on the timeline", Icon: GanttChart },
+  { view: "mix", label: "Mixer", hint: "a channel strip for every track, bus and the master", Icon: SlidersVertical },
+];
+
 export function Daw() {
   // The document lives in the project store (src/state/projectStore.ts),
   // with its undo history.
@@ -226,6 +235,11 @@ export function Daw() {
   const [hovered, setHovered] = useState<Hovered | null>(null);
   /** The FX rack folded away to its title bar. */
   const [rackCollapsed, setRackCollapsed] = useState(false);
+  /** The arrangement or the mixer, in the middle of the studio. */
+  const [studioView, setStudioView] = useState<StudioView>("arrange");
+  /** Where the arrangement was scrolled when the mixer took its place:
+   * hidden, it reads as unscrolled. */
+  const arrangeScrollRef = useRef<{ scrollLeft: number; scrollTop: number } | null>(null);
   /** Whether the FX rack at the bottom of the screen is currently showing
    * the master bus's own effects chain instead of a track's or a bus's. */
   const [fxMasterOpen, setFxMasterOpen] = useState(false);
@@ -2019,7 +2033,13 @@ export function Daw() {
     const px = clampZoom(layout?.pxPerSecond ?? DEFAULT_PX_PER_SECOND);
     zoomRef.current = px;
     setPxPerSecond(px);
-    restoreViewRef.current = { scrollLeft: (layout?.scrollSeconds ?? 0) * px, scrollTop: layout?.scrollTop ?? 0 };
+    const scroll = { scrollLeft: (layout?.scrollSeconds ?? 0) * px, scrollTop: layout?.scrollTop ?? 0 };
+    const view = layout?.view ?? "arrange";
+    setStudioView(view);
+    setHovered(null);
+    // In the mixer, the arrangement scrolls there when it's shown again.
+    if (view === "mix") arrangeScrollRef.current = scroll;
+    else restoreViewRef.current = scroll;
     hydrateEngine(state, registeredChannelIds.current, audioEngine);
   }, [restoreMonitoring]);
 
@@ -2037,25 +2057,39 @@ export function Daw() {
 
   /** The studio's layout, saved with the project (projectSchema.ts
    * ProjectLayout): read as it is when saving; `version` changes with it. */
-  const layoutStateRef = useRef({ selectedChannelId, fxChannelId, fxBusId, fxMasterOpen, rackCollapsed, automationChannelId, automationTarget });
+  const layoutStateRef = useRef({ selectedChannelId, fxChannelId, fxBusId, fxMasterOpen, rackCollapsed, automationChannelId, automationTarget, studioView });
   useEffect(() => {
-    layoutStateRef.current = { selectedChannelId, fxChannelId, fxBusId, fxMasterOpen, rackCollapsed, automationChannelId, automationTarget };
+    layoutStateRef.current = { selectedChannelId, fxChannelId, fxBusId, fxMasterOpen, rackCollapsed, automationChannelId, automationTarget, studioView };
   });
   const getLayout = useCallback((): ProjectLayout => {
     const st = layoutStateRef.current;
     const px = zoomRef.current;
+    const hidden = st.studioView === "mix" ? arrangeScrollRef.current : null;
     return {
       pxPerSecond: px,
-      scrollSeconds: (lanesScrollRef.current?.scrollLeft ?? 0) / px,
-      scrollTop: arrangementRef.current?.scrollTop ?? 0,
+      scrollSeconds: (hidden?.scrollLeft ?? lanesScrollRef.current?.scrollLeft ?? 0) / px,
+      scrollTop: hidden?.scrollTop ?? arrangementRef.current?.scrollTop ?? 0,
       selectedTrack: st.fxChannelId ?? st.selectedChannelId,
       fxBus: st.fxBusId,
       fxMaster: st.fxMasterOpen,
       rackCollapsed: st.rackCollapsed,
       automation: st.automationChannelId ? { track: st.automationChannelId, target: st.automationTarget } : null,
+      view: st.studioView,
     };
   }, []);
-  const layoutVersion = JSON.stringify([pxPerSecond, fxChannelId, fxBusId, fxMasterOpen, rackCollapsed, automationChannelId, automationTarget, scrollTick]);
+  const layoutVersion = JSON.stringify([pxPerSecond, fxChannelId, fxBusId, fxMasterOpen, rackCollapsed, automationChannelId, automationTarget, scrollTick, studioView]);
+
+  /** Shows the mixer or the arrangement in the middle of the studio. */
+  const switchView = useCallback(
+    (next: StudioView) => {
+      if (next === studioView) return;
+      if (next === "mix") arrangeScrollRef.current = { scrollLeft: lanesScrollRef.current?.scrollLeft ?? 0, scrollTop: arrangementRef.current?.scrollTop ?? 0 };
+      else restoreViewRef.current = arrangeScrollRef.current;
+      setHovered(null);
+      setStudioView(next);
+    },
+    [studioView]
+  );
   const {
     isLoading: isLoadingProject,
     saveStatus,
@@ -2190,6 +2224,7 @@ export function Daw() {
     { keys: "mod+k", label: "Find a command", whileTyping: true, run: () => openFinder("palette") },
     { keys: ["shift+?", "?"], label: "Show the keyboard shortcuts", run: () => openFinder("sheet") },
   ]);
+  useShortcuts("studio", [{ keys: "f3", label: "Show the mixer or the arrangement", run: () => switchView(studioView === "mix" ? "arrange" : "mix") }]);
   // What has no key: the command palette runs these.
   useShortcuts("studio", [
     { keys: [], label: "Add a MIDI track", run: () => void handleAddChannel("midi") },
@@ -2300,6 +2335,49 @@ export function Daw() {
     toggleTakes: takeActions.toggleShowTakes,
     hover: (id) => setHovered(id ? { kind: "track", id } : null),
     dropEffects: (id, drop) => handleDropEffects(id, drop),
+  });
+  /** Clicking a strip shows its FX rack, as clicking a header does. */
+  const selectTrackStrip = (id: string) => {
+    setSelectedChannelId(id);
+    setSelectedClipIds(new Set());
+    openFx(id);
+  };
+  const mixerActions = useStableActions<MixerActions>({
+    selectTrack: selectTrackStrip,
+    selectBus: openBusFx,
+    selectMaster: openMasterFx,
+    adjustStart: pushHistory,
+    setVolume: handleVolumeChange,
+    setPan: handlePanChange,
+    toggleMute: handleMuteToggle,
+    toggleSolo: handleSoloToggle,
+    toggleArm: handleArmToggle,
+    setSend: trackActions.setSend,
+    setSendPre: trackActions.setSendPre,
+    setInput: (id, track, tap) => handleSetInput(id, track ? { track, tap } : null),
+    setOutput: (id, value) => handleSetOutput(id, value || null),
+    openEffect: (host, effectId) => {
+      if (host === "master") openMasterFx();
+      else if (buses.some((b) => b.id === host)) openBusFx(host);
+      else selectTrackStrip(host);
+      setExpandedEffectId(effectId);
+    },
+    toggleBypass: (host, effectId) => effectActions.toggleBypass(host, effectId),
+    openInstrument: (id) => {
+      selectTrackStrip(id);
+      setInstrumentWindow(channels.find((c) => c.id === id)?.instrument ?? null);
+    },
+    dropEffects: (host, drop) => handleDropEffects(host, drop),
+    hover: setHovered,
+    addBus: () => void busActions.add(),
+    renameBus: busActions.rename,
+    removeBus: handleRemoveBus,
+    setBusVolume: busActions.setVolume,
+    setBusPan: busActions.setPan,
+    toggleBusMute: busActions.toggleMute,
+    setMasterVolume: (db) => projectStore.set("masterVolume", db),
+    setMasterPan: (pan) => projectStore.set("masterPan", pan),
+    setCeiling: setMasterLimiterThreshold,
   });
   const laneActions = useStableActions<TrackLaneActions>({
     selectTrack: (id) => {
@@ -2648,6 +2726,23 @@ export function Daw() {
           </span>
         </div>
         <div className="flex items-center gap-2">
+          <div role="group" aria-label="View" className="flex overflow-hidden rounded border border-border text-xs">
+            {VIEWS.map(({ view, label, hint, Icon }) => (
+              <button
+                key={view}
+                type="button"
+                onClick={() => switchView(view)}
+                aria-pressed={studioView === view}
+                title={withKeys(label, "f3", hint)}
+                className={`flex h-6 items-center gap-1 border-l border-border px-1.5 first:border-l-0 ${
+                  studioView === view ? "bg-accent/20 text-accent" : "text-muted hover:bg-surface-raised hover:text-foreground"
+                }`}
+              >
+                <Icon size={12} />
+                {label}
+              </button>
+            ))}
+          </div>
           <button
             type="button"
             onClick={() => toggleNoteInput(!noteInputOpen)}
@@ -2664,7 +2759,20 @@ export function Daw() {
         </div>
       </div>
 
-      <div ref={arrangementRef} onScroll={noteScrolled} className="flex min-h-0 flex-1 flex-col overflow-y-auto rounded-lg border border-border">
+      {studioView === "mix" && (
+        <Mixer
+          tracks={visibleChannels}
+          selected={fxMasterOpen ? { kind: "master" } : fxBusId ? { kind: "bus", id: fxBusId } : fxChannelId ? { kind: "track", id: fxChannelId } : null}
+          route={routeLights}
+          silent={silentByTrack}
+          inputOptions={inputOptionsFor}
+          outputOptions={outputOptionsFor}
+          limiterThreshold={masterLimiterThreshold}
+          actions={mixerActions}
+        />
+      )}
+      {/* Hidden, not unmounted, behind the mixer: it keeps its state. */}
+      <div ref={arrangementRef} onScroll={noteScrolled} hidden={studioView === "mix"} className="flex min-h-0 flex-1 flex-col overflow-y-auto rounded-lg border border-border">
         {/* Sticky ruler row - a direct child of the vertical scroller (not
             nested inside the horizontally-scrolling lanes column), so
             position: sticky actually has that scroller as its containing
@@ -2968,6 +3076,7 @@ export function Daw() {
         }}
       />
 
+      {studioView === "arrange" && (
       <MasterBusRow
         limiterThreshold={masterLimiterThreshold}
         onLimiterThresholdChange={setMasterLimiterThreshold}
@@ -2978,6 +3087,7 @@ export function Daw() {
         onHoverBus={(id) => setHovered(id ? { kind: "bus", id } : null)}
         onDropEffects={(hostId, drop) => handleDropEffects(hostId, drop)}
       />
+      )}
 
       <NoteInputWindow
         open={noteInputOpen}

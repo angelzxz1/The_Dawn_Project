@@ -37,7 +37,7 @@ interface FakeTrack {
 class FakeEngine {
   calls: string[] = [];
   tracks = new Map<string, FakeTrack>();
-  buses = new Map<string, { effects: FakeFx[] }>();
+  buses = new Map<string, { effects: FakeFx[]; volume: number; pan: number; muted: boolean }>();
   master = { volume: 0, pan: 0, effects: [] as FakeFx[] };
   tempo = { bpm: 0, beatsPerBar: 0 };
 
@@ -156,7 +156,22 @@ class FakeEngine {
   }
   addBus(id: string) {
     this.log("addBus");
-    if (!this.buses.has(id)) this.buses.set(id, { effects: [] });
+    if (!this.buses.has(id)) this.buses.set(id, { effects: [], volume: 0, pan: 0, muted: false });
+  }
+  setBusVolume(id: string, db: number) {
+    this.log("setBusVolume");
+    const b = this.buses.get(id);
+    if (b) b.volume = db;
+  }
+  setBusPan(id: string, pan: number) {
+    this.log("setBusPan");
+    const b = this.buses.get(id);
+    if (b) b.pan = pan;
+  }
+  setBusMute(id: string, muted: boolean) {
+    this.log("setBusMute");
+    const b = this.buses.get(id);
+    if (b) b.muted = muted;
   }
   removeBus(id: string) {
     this.log("removeBus");
@@ -339,6 +354,7 @@ const edits: Record<string, Edit> = {
   "delete an audio clip": (s) => onClips(s, "ch-2", (l) => l.slice(1)),
   "move a MIDI clip": (s) => ({ ...s, clipsByChannel: { ...s.clipsByChannel, "ch-1": [midiClip("clip-1", 4)] } }),
   "add a bus": (s) => ({ ...s, buses: [...s.buses, { id: "bus-2", name: "Bus 2", colorIndex: 1 }], busEffects: { ...s.busEffects, "bus-2": [fx("fx-10", "delay")] } }),
+  "a bus's fader, pan and mute": (s) => ({ ...s, buses: s.buses.map((b) => ({ ...b, volume: -4.5, pan: -0.25, muted: true })) }),
   "remove a bus": (s) => ({ ...s, buses: [], busEffects: {}, channels: s.channels.map((c) => ({ ...c, sends: {} })) }),
   "master": (s) => ({ ...s, masterVolume: -2, masterEffects: [s.masterEffects[1], fx("fx-11", "distortion")] }),
   "tempo": (s) => ({ ...s, bpm: 90 }),

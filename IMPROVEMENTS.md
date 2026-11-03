@@ -1,11 +1,11 @@
 # Improvements
 
-Checked against the code and the commit history on 2026-10-29, and again on 2026-11-02; item 7 of Part 2 was added on 2026-10-30, items 8, 9, 16, 18, 19, 20, 21 and 22 on 2026-10-31, items 11, 12, 13, 24, 25 and 28 on 2026-11-01, item 23 on 2026-11-02.
+Checked against the code and the commit history on 2026-10-29, and again on 2026-11-02; item 7 of Part 2 was added on 2026-10-30, items 8, 9, 16, 18, 19, 20, 21 and 22 on 2026-10-31, items 11, 12, 13, 24, 25 and 28 on 2026-11-01, items 23 and 10 on 2026-11-02.
 
 - `[x]` is done; the commit that did it is in brackets.
 - `[ ]` is still open; "Partly" says what already exists.
 
-**Summary:** Part 1 is all done. In Part 2, items 1–9, 11–13, 16, 18–25 and 28 are done; 10, 14, 15, 17, 26 and 27 are open.
+**Summary:** Part 1 is all done. In Part 2, items 1–13, 16, 18–25 and 28 are done; 14, 15, 17, 26 and 27 are open.
 
 ## Part 1: Code improvements
 
@@ -78,7 +78,10 @@ That is already ahead of most browser DAWs, such as BandLab or Soundtrap.
 
 ### Mixing
 
-- [ ] **10. A real mixer view:** vertical channel strips with faders, meters, sends, inserts and Audio to/from, side by side. Today mixing happens in track headers and the FX rack.
+- [x] **10. A real mixer view:** vertical channel strips with faders, meters, sends, inserts and Audio to/from, side by side. Today mixing happens in track headers and the FX rack. (commit to come)
+  - The Arrange / Mixer buttons (or F3) swap the arrangement for the mixer (`studio/mixer/Mixer.tsx`), and the project remembers which was showing. A strip for every track (a folded group's tracks are left out), then the buses, then the master at the right.
+  - Each strip, top to bottom: Audio from, the inserts (the instrument, then the effects, each with an on/off light; a click opens its window, and effects dropped on the strip are added), the sends with pre/post, pan, mute, solo and arm, then a fader (`studio/mixer/Fader.tsx`) beside the meter with its dB marks, and Audio to. A click on a strip shows its FX rack below.
+  - Buses now have a fader, pan and mute (`BusConfig.volume`, `pan`, `muted`), in both engines and in the export. The master strip has the limiter's ceiling, and the loudness readout sits over the mixer.
 - [x] **11. Meters with peak hold and dB scales,** a master loudness meter (LUFS), and a clip warning on every track. (`67ea045`)
   - The meters on tracks, buses and the master show dB (-60 to +6, `tracks/meterScale.ts`): each side's RMS with its peaks over it, the loudest peak held 1.5 s, and a clip light that stays on until it's clicked (`tracks/Meter.tsx`). The engine reads them with its own `LevelMeter` (`engine/levelMeter.ts`) instead of Tone's Meter.
   - The master row shows momentary, short-term and integrated LUFS and the loudest sample (`LoudnessReadout`, `engine/loudness.ts`: BS.1770-4 K-weighting and EBU R128 gating). It starts afresh when playback starts from a stop or a recording starts.

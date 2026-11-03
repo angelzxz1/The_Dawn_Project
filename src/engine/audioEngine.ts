@@ -1207,6 +1207,11 @@ class AudioEngine {
     if (bus) bus.channel.pan.value = pan;
   }
 
+  setBusMute(id: string, muted: boolean): void {
+    const bus = this.buses.get(id);
+    if (bus) bus.channel.mute = muted;
+  }
+
   getBusMeter(id: string): MeterReading {
     return this.buses.get(id)?.meter.read() ?? SILENT_READING;
   }

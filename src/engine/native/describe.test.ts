@@ -90,7 +90,13 @@ describe("the song for the native engine", () => {
     ]);
     // A MIDI track's clips are its notes.
     expect(song.tracks[3].clips).toEqual([]);
-    expect(song.buses).toEqual([{ id: "verb", effects: [] }]);
+    expect(song.buses).toEqual([{ id: "verb", volumeDb: 0, pan: 0, audible: true, effects: [] }]);
+  });
+
+  it("has each bus's fader and pan, and silences a muted one", () => {
+    const p = project();
+    p.buses = [{ ...p.buses[0], volume: -4.5, pan: -0.25, muted: true }];
+    expect(describeSong(p, session, idOf).buses).toEqual([{ id: "verb", volumeDb: -4.5, pan: -0.25, audible: false, effects: [] }]);
   });
 
   it("has a MIDI track's notes on the timeline, clamped or tiled to their clips, with its instrument", () => {
@@ -201,7 +207,7 @@ describe("the song for the native engine", () => {
       { id: "ir2", type: "irLoader", params: {}, bypass: false },
     ]);
     expect(song.tracks[1].effects).toEqual([]);
-    expect(song.buses).toEqual([{ id: "verb", effects: [{ id: "l", type: "limiter", params: {}, bypass: false }] }]);
+    expect(song.buses).toEqual([{ id: "verb", volumeDb: 0, pan: 0, audible: true, effects: [{ id: "l", type: "limiter", params: {}, bypass: false }] }]);
     expect(song.masterEffects.map((e) => e.id)).toEqual(["u2"]);
   });
 

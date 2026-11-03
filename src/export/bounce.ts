@@ -234,7 +234,7 @@ export async function renderProject(params: BounceParams, options: RenderOptions
     const buses = new Map<string, { input: Tone.Gain }>();
     params.buses.forEach((bus) => {
       const input = new Tone.Gain(1);
-      const channel = new Tone.Channel({ volume: 0, pan: 0, channelCount: 2 }).connect(master);
+      const channel = new Tone.Channel({ volume: bus.volume ?? 0, pan: bus.pan ?? 0, mute: !!bus.muted, channelCount: 2 }).connect(master);
       const pdc = new Tone.Delay(0, MAX_COMPENSATION).connect(channel);
       const postFx = new Tone.Gain().connect(pdc);
       const { entry, latency: busLatency, built } = buildOfflineEffectsChain(params.busEffects[bus.id] ?? [], postFx, files);

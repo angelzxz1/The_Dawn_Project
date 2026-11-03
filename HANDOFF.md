@@ -3,20 +3,22 @@
 Read this first in a new session. It says where the project is, how the
 work is done and what comes next, then keeps the technical notes (the
 native engine's techniques, and what each finished item changed).
-Updated 2026-11-02, at `main` = `54dd0d8`.
+Updated 2026-11-02, at `main` = `54dd0d8`, with step 22 not yet committed.
 
 ## Start here
 
-- **Where we are:** Phase 6 (mixing) of `nextSteps.md`. Steps 1-21 are
+- **Where we are:** Phase 6 (mixing) of `nextSteps.md`. Steps 1-22 are
   done (step 6, NAM in the engine, was dropped). The last four:
-  - step 18, better meters (`67ea045`, 2026-11-01);
   - step 19, pre/post sends and routing highlights (`66c9526`, 2026-11-01);
   - step 20, moving, copying and saving effect chains (`bfa84ac`, 2026-11-01);
-  - step 21, one style for every window (2026-11-02, `54dd0d8`).
-- **Next: step 22, Part 2 #10, the mixer view.** Its windows and any new
-  device UI go in `DeviceWindow` (`src/ui/DeviceWindow.tsx`). Wait for the
-  user to say "go" before starting a step: they ask for each one ("Lets go
-  with step N").
+  - step 21, one style for every window (2026-11-02, `54dd0d8`);
+  - step 22, the mixer view (2026-11-02, commit to come).
+- **Next: step 23, Part 2 #26, detached or second-screen windows** for
+  the mixer and the piano roll. The mixer (`src/studio/mixer/Mixer.tsx`)
+  takes everything through its props and `MixerActions`, so it can be
+  shown in another window. Device UI goes in `DeviceWindow`
+  (`src/ui/DeviceWindow.tsx`). Wait for the user to say "go" before
+  starting a step: they ask for each one ("Lets go with step N").
 - **What's left after that,** in order (the full list, with sizes, is in
   `nextSteps.md`; a summary is under "The road ahead" below): the mixer
   view, detached windows, sidechains and automation in the engine,
@@ -156,11 +158,11 @@ The Dawn Project is a browser DAW, also built as a desktop app.
 **Checks before handing a step over:**
 
 - `npx tsc --noEmit` and `npm run lint` (both clean).
-- `npx vitest run`: 771 unit and component tests on 2026-11-01, in the
+- `npx vitest run`: 789 unit and component tests on 2026-11-02, in the
   projects `unit` (Node), `components` (Chromium) and `web-audio`. The
   component tests have a 30 s limit (`vitest.config.ts`), and the slow
   unit tests their own; no `--testTimeout` needed.
-- `npm run build`, then `npx playwright test --workers=2`: 174 tests, 1
+- `npm run build`, then `npx playwright test --workers=2`: 177 tests, 1
   skipped, all passing on 2026-11-02 (about 10 minutes). It serves `out/`,
   so build first or it tests the last build. Use 2 workers: a full run
   with more was once stopped because the computer ran low on memory. Run a
@@ -186,6 +188,16 @@ clippy and fmt. `desktop.yml` builds on Windows, macOS and Linux.
   session's scratchpad and run them from there.
 - The repo isn't Prettier-formatted: don't run `prettier --write`.
 - `next dev` re-adds the block in `AGENTS.md`; leave it be.
+- This machine (2026-11-02) has Node 26, and Playwright 1.56.1's
+  installer breaks on it (`rmdir` with `recursive` is gone): it downloads,
+  then stops unpacking. The browser was installed by hand: the zips from
+  `cdn.playwright.dev/dbazure/download/playwright/builds/` (`chromium/1194/chromium-headless-shell-win64.zip`
+  into `%LOCALAPPDATA%/ms-playwright/chromium_headless_shell-1194`,
+  `winldd/1007/winldd-win64.zip` into `winldd-1007`), unpacked with
+  Windows' `tar`, each with an empty `INSTALLATION_COMPLETE` file. A
+  Playwright update, or Node 24 (fnm), would fix the installer.
+- It also has no Rust toolchain (no `cargo`), so the cargo checks can't
+  run here: install rustup, or run them where Rust is.
 
 **Writing style for code and docs:** plain, short sentences in the
 codebase's voice. Comments say what something is for. Match the
@@ -199,12 +211,10 @@ L a stage of its own).
 
 - **Phase 6, mixing (the rest):**
   - 21. Part 2 #23, one style for every window (M). Done 2026-11-02.
-  - 22. Part 2 #10, the mixer view: channel strips with faders, meters
-    (`Meter`'s `scale` shows the dB marks), sends with pre/post, inserts,
-    Audio to/from (L). Next.
+  - 22. Part 2 #10, the mixer view (L). Done 2026-11-02.
   - 23. Part 2 #26, detached or second-screen windows for the mixer and
     the piano roll: Tauri windows on the desktop, pop-outs in the browser
-    (L).
+    (L). Next.
 - **Phase 7, native stage 4:** 24, sidechains in the engine
   (`mixGraph.ts` `resolveSidechains`, `keyDelay`; then `describe.ts`
   stops leaving sidechained effects out). 25, automation in the engine
@@ -576,7 +586,7 @@ the order they were done, with the fixes made along the way.
 - **IMPROVEMENTS.md** (checked against the code on 2026-10-29). It has
   checkboxes, and each finished item names the commit that did it.
   - Part 1 (code) is all done.
-  - Part 2 (UX): items 1–9, 11–13, 16, 18–25 and 28 are done.
+  - Part 2 (UX): items 1–13, 16, 18–25 and 28 are done.
     Item 8 (2026-10-31): an Adaptive
     snap setting that follows the zoom, and clips snapping to other
     clips' edges (`clipSnap.ts`; Alt drags free). Item 9 (2026-10-31):
@@ -727,8 +737,36 @@ the order they were done, with the fixes made along the way.
     Multiband pass `onPanelKeyDown` for Delete. Tests:
     `src/ui/DeviceWindow.test.tsx`; `e2e/effects.spec.ts` looks for
     "Close (Esc)", `e2e/instruments.spec.ts` for "Keys — Bass".
-  - Items 10, 14, 15, 17, 26 and 27 are open. Next in `nextSteps.md` is
-    Phase 6, step 22 (#10, the mixer view).
+  - Item 10 (2026-11-02, commit to come): the mixer view,
+    `src/studio/mixer/Mixer.tsx`. The toolbar's Arrange / Mixer buttons
+    (or F3: letters play notes, and Cmd+M minimizes on a Mac) swap the
+    arrangement for it; the arrangement is hidden, not unmounted, and
+    its scroll is kept in `arrangeScrollRef` meanwhile (hidden, it reads
+    as 0). The view is saved in the layout (`ProjectLayout.view`). The
+    master/bus row goes while the mixer shows: the mixer has their strips
+    and the loudness readout. Strips: every shown track (a folded group
+    hides its tracks), the buses, "+ Bus", and the master pinned at the
+    right. Each has Audio from, inserts (instrument first; a click opens
+    the effect's or instrument's window, the light bypasses), sends with a
+    pre switch, pan, M/S/arm, `Fader` (`studio/mixer/Fader.tsx`: -60 to
+    +6 dB on the meter's own scale, so the cap lines up with `Meter
+    scale`; drag, Shift fine, wheel, arrows 0.5 dB, Page 3 dB, Home/End,
+    double-click 0 dB) and Audio to. A click on a strip selects it (its
+    FX rack shows), hovering lights its routing, and effects dropped on
+    it are added. The studio passes `MixerActions` through
+    `useStableActions`. Buses gained a fader, pan and mute
+    (`BusConfig.volume`/`pan`/`muted`, saved only when not the default):
+    `busActions.setVolume`/`setPan`/`toggleMute`, `engineSync`
+    (`syncBusMix`), `audioEngine.setBusMute`, the bounce, and the native
+    song (`describe.ts` sends `volumeDb`, `pan`, `audible`; `BusSpec`
+    in `src-tauri/src/audio/song.rs` reads `audible`, default true, and
+    shuts the bus when false; the engine already had bus volume and pan).
+    Tests: `src/studio/mixer/Mixer.test.tsx`, `e2e/mixer.spec.ts`,
+    `engineSync.test.ts`, `describe.test.ts`, `projectSchema.test.ts`,
+    and a Rust test in `song.rs`. The Rust wasn't built or tested here:
+    this machine has no Rust toolchain (see Gotchas).
+  - Items 14, 15, 17, 26 and 27 are open. Next in `nextSteps.md` is
+    Phase 6, step 23 (#26, detached windows).
   - Fixed 2026-10-31: on Windows, Next's static export wrote each page's
     prefetch files as folders (`__next.!KHNpdGUp/__PAGE__.txt`, from a
     backslash it doesn't turn into a dot) where its router asks for
@@ -760,5 +798,5 @@ the order they were done, with the fixes made along the way.
 - **Phases done** (of `nextSteps.md`): 1, housekeeping (2026-10-30); 2,
   the engine's effects (2026-10-31; NAM dropped from it); 3, editing; 4,
   finding things (both 2026-10-31); 5, settings and look (2026-11-01).
-  Phase 6, mixing, has steps 18-20 done (2026-11-01) and 21 (2026-11-02);
-  next is step 22 (#10).
+  Phase 6, mixing, has steps 18-20 done (2026-11-01) and 21-22
+  (2026-11-02); next is step 23 (#26).

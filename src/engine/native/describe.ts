@@ -111,7 +111,8 @@ export interface NativeAudioIds {
 
 export interface NativeSong {
   tracks: NativeTrack[];
-  buses: { id: string; effects: NativeEffect[] }[];
+  /** `audible`: false while it's muted. */
+  buses: { id: string; volumeDb: number; pan: number; audible: boolean; effects: NativeEffect[] }[];
   master: { volumeDb: number; pan: number; limiterDb: number };
   masterEffects: NativeEffect[];
   tempo: { beat: number; seconds: number; bpm: number }[];
@@ -227,7 +228,7 @@ export function describeSong(doc: ProjectState, session: NativeSession, ids: Nat
       notes: nativeNotes(doc, c),
       effects: nativeEffects(doc.channelEffects[c.id], ids),
     })),
-    buses: doc.buses.map((b) => ({ id: b.id, effects: nativeEffects(doc.busEffects[b.id], ids) })),
+    buses: doc.buses.map((b) => ({ id: b.id, volumeDb: b.volume ?? 0, pan: b.pan ?? 0, audible: !b.muted, effects: nativeEffects(doc.busEffects[b.id], ids) })),
     master: { volumeDb: doc.masterVolume, pan: doc.masterPan, limiterDb: session.limiterDb },
     masterEffects: nativeEffects(doc.masterEffects, ids),
     tempo: makeTempoMap(doc.bpm, doc.tempoChanges).segments.map((s) => ({ beat: s.beat, seconds: s.seconds, bpm: s.bpm })),

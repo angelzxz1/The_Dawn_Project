@@ -102,6 +102,11 @@ export interface BusConfig {
   colorIndex: number;
   /** A color picked freely ("#rrggbb"), overriding the palette slot. */
   color?: string;
+  /** Its fader (dB) and pan, after its effects; unset: 0 dB, centered. */
+  volume?: number;
+  pan?: number;
+  /** Silenced (the mixer's M). Solo leaves buses alone. */
+  muted?: boolean;
 }
 
 /** One point on an automation lane's curve - `value` is in the target

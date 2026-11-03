@@ -14,7 +14,7 @@ import { changedInstrumentSettings } from "../instruments/registry";
 import { notesWithinClip, type ProjectState } from "../project/project";
 import { quarterNotesPerBar } from "../project/musicTime";
 import { makeTempoMap } from "../project/tempoMap";
-import type { AudioClipInstance, ChannelConfig, ClipInstance, MidiClipInstance, NoteEvent } from "../project/types";
+import type { AudioClipInstance, BusConfig, ChannelConfig, ClipInstance, MidiClipInstance, NoteEvent } from "../project/types";
 
 /** The engine calls the sync makes (the real engine, or a test's fake). */
 export type EngineApi = Pick<
@@ -36,6 +36,9 @@ export type EngineApi = Pick<
   | "removeAudioClip"
   | "addBus"
   | "removeBus"
+  | "setBusVolume"
+  | "setBusPan"
+  | "setBusMute"
   | "resetEffects"
   | "addEffect"
   | "removeEffect"
@@ -52,6 +55,13 @@ export type EngineApi = Pick<
 >;
 
 const isMidiClip = (c: ClipInstance): c is MidiClipInstance => c.kind === "midi";
+
+/** A bus's fader, pan and mute: all of them (`prev` null), or what changed. */
+function syncBusMix(engine: EngineApi, prev: BusConfig | null, next: BusConfig): void {
+  if (!prev || (prev.volume ?? 0) !== (next.volume ?? 0)) engine.setBusVolume(next.id, next.volume ?? 0);
+  if (!prev || (prev.pan ?? 0) !== (next.pan ?? 0)) engine.setBusPan(next.id, next.pan ?? 0);
+  if (!prev || !!prev.muted !== !!next.muted) engine.setBusMute(next.id, !!next.muted);
+}
 
 // What a host without effects or a track without clips has, the same
 // array each time so it never reads as a change.
@@ -201,6 +211,7 @@ export function hydrateEngine(state: ProjectState, registeredIds: Set<string>, e
     // Buses and the master outlive a hydrate (tracks don't): clear their
     // chains before adding the project's.
     engine.resetEffects(bus.id);
+    syncBusMix(engine, null, bus);
     syncEffects(engine, bus.id, [], state.busEffects[bus.id] ?? NO_EFFECTS);
   });
   state.channels.forEach((channel) => {
@@ -237,10 +248,12 @@ export function syncEngine(prev: ProjectState, next: ProjectState, registeredIds
   if (prev.tempoChanges !== next.tempoChanges) engine.setTempoMap(makeTempoMap(next.bpm, next.tempoChanges));
 
   // Buses first: tracks' sends need them.
-  const prevBuses = new Set(prev.buses.map((b) => b.id));
+  const prevBuses = new Map(prev.buses.map((b) => [b.id, b]));
   const nextBuses = new Set(next.buses.map((b) => b.id));
   next.buses.forEach((bus) => {
     if (!prevBuses.has(bus.id)) engine.addBus(bus.id);
+    const old = prevBuses.get(bus.id) ?? null;
+    if (old !== bus) syncBusMix(engine, old, bus);
     syncEffects(engine, bus.id, prevBuses.has(bus.id) ? prev.busEffects[bus.id] ?? NO_EFFECTS : NO_EFFECTS, next.busEffects[bus.id] ?? NO_EFFECTS);
   });
 

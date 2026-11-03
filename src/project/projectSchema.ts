@@ -121,6 +121,10 @@ export interface SerializedProject {
   layout?: ProjectLayout;
 }
 
+/** What the middle of the studio shows: the arrangement or the mixer. */
+export type StudioView = "arrange" | "mix";
+export const STUDIO_VIEWS: readonly StudioView[] = ["arrange", "mix"];
+
 /** The studio's layout for a project (no undo; not an unsaved change). */
 export interface ProjectLayout {
   /** The arrangement's zoom (px a second), the second at the left of the
@@ -137,6 +141,8 @@ export interface ProjectLayout {
   rackCollapsed: boolean;
   /** The automation lane showing, on which track and for what. */
   automation: { track: string; target: AutomationTarget } | null;
+  /** The arrangement or the mixer (unset in layouts from before the mixer). */
+  view?: StudioView;
 }
 
 /** A saved layout, checked: what refers to a track, bus or effect that
@@ -163,6 +169,7 @@ function normalizeLayout(raw: unknown, channels: ChannelConfig[], busIds: Set<st
     fxMaster: bool(r.fxMaster, false),
     rackCollapsed: bool(r.rackCollapsed, false),
     automation: lane && target ? { track: lane, target } : null,
+    view: oneOf(r.view, STUDIO_VIEWS, "arrange"),
   };
 }
 
@@ -449,12 +456,18 @@ export function normalizeProject(raw: unknown): SerializedProject | null {
     arr(r.buses).map((b, i) => {
       const br = obj(b);
       const id = nonEmptyId(br.id);
+      // Its fader, pan and mute are kept only when they aren't the default.
+      const volume = num(br.volume, 0, -60, 6);
+      const pan = num(br.pan, 0, -1, 1);
       return id
         ? {
             id,
             name: str(br.name, `Bus ${i + 1}`),
             colorIndex: int(br.colorIndex, i, 0),
             ...(typeof br.color === "string" && HEX_COLOR.test(br.color) ? { color: br.color.toLowerCase() } : {}),
+            ...(volume !== 0 ? { volume } : {}),
+            ...(pan !== 0 ? { pan } : {}),
+            ...(br.muted === true ? { muted: true } : {}),
           }
         : null;
     })
