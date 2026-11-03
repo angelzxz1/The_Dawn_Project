@@ -800,8 +800,14 @@ the order they were done, with the fixes made along the way.
     about:blank request gets a Tauri window
     (`WebviewWindowBuilder::window_features`, its title from the page,
     file drop off for effect drags); anything else is left to the
-    webview, as before. Built, linted and tested on 2026-11-03; not yet
-    tried in `npm run desktop`. On the desktop a detached window isn't
+    webview, as before. Built, linted and tested on 2026-11-03. Tried in
+    `npm run desktop` by the user that day: "Back to the main window" left
+    the native window open and empty, and popping out again opened another
+    (wry's `window.close()` destroys the webview, not the window). Fixed
+    (2026-11-03, commit to come): the desktop opens them at
+    `about:blank#dawn-<name>`, labels the window after it, and closes it
+    with the `close_studio_window` command (`Popout.tsx` `closeWindow`);
+    the main window going closes the others (`on_window_event`). On the desktop a detached window isn't
     zoomed with the UI size (that's the main webview's zoom). Effect and
     instrument windows opened from a detached mixer open in the main
     window. Tests: `e2e/popout.spec.ts`, `src/ui/Popout.test.ts`,

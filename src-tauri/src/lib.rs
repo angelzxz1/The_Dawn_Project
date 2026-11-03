@@ -12,7 +12,7 @@ use std::process::ExitCode;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use tauri::webview::{NewWindowFeatures, NewWindowResponse, PermissionKind, PermissionResponse};
-use tauri::{AppHandle, Url, Webview, WebviewUrl, WebviewWindowBuilder, Wry};
+use tauri::{AppHandle, Manager, Url, Webview, WebviewUrl, WebviewWindowBuilder, WindowEvent, Wry};
 
 /// What the studio can learn about the native engine
 /// (`invoke("engine_info")`).
@@ -51,16 +51,28 @@ fn is_app_page(webview: &Webview) -> bool {
 /// How many of the studio's own windows have been opened, to name each.
 static STUDIO_WINDOWS: AtomicUsize = AtomicUsize::new(0);
 
+/// The name the studio gave one of its windows (`dawn-mixer`, from
+/// `about:blank#dawn-mixer`), if it's one it could have given: the window's
+/// label starts with it.
+fn studio_window_name(url: &Url) -> Option<&str> {
+    url.fragment().filter(|name| {
+        name.len() <= 64
+            && name.starts_with("dawn-")
+            && name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
+    })
+}
+
 /// A window the studio asked for with window.open: the mixer or the piano
 /// roll on a screen of its own (src/ui/Popout.tsx). It opens blank and the
 /// studio draws into it from the main window (window.opener), so it's a
 /// window of the main page's own, with its title taken from the page.
 /// Anything else asked for this way is left to the webview, as before.
 fn studio_window(app: &AppHandle, url: Url, features: NewWindowFeatures) -> NewWindowResponse<Wry> {
-    if url.as_str() != "about:blank" {
+    if url.scheme() != "about" || url.path() != "blank" {
         return NewWindowResponse::Allow;
     }
-    let label = format!("studio-{}", STUDIO_WINDOWS.fetch_add(1, Ordering::Relaxed));
+    let name = studio_window_name(&url).unwrap_or("dawn-window");
+    let label = format!("{name}-{}", STUDIO_WINDOWS.fetch_add(1, Ordering::Relaxed));
     let built = WebviewWindowBuilder::new(app, label, WebviewUrl::External(url))
         .window_features(features)
         .title("The Dawn Project")
@@ -73,6 +85,27 @@ fn studio_window(app: &AppHandle, url: Url, features: NewWindowFeatures) -> NewW
     match built {
         Ok(window) => NewWindowResponse::Create { window },
         Err(_) => NewWindowResponse::Deny,
+    }
+}
+
+/// Whether `label` is one of the windows studio_window opened as `name`.
+fn is_studio_window(label: &str, name: &str) -> bool {
+    name.starts_with("dawn-")
+        && label
+            .strip_prefix(name)
+            .and_then(|rest| rest.strip_prefix('-'))
+            .is_some_and(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()))
+}
+
+/// Closes the studio's window named `name` (`dawn-mixer`). window.close()
+/// in it would take away only its page (wry destroys the webview, not the
+/// window around it), leaving an empty window.
+#[tauri::command]
+fn close_studio_window(app: AppHandle, name: String) {
+    for (label, window) in app.webview_windows() {
+        if is_studio_window(&label, &name) {
+            let _ = window.destroy();
+        }
     }
 }
 
@@ -114,8 +147,20 @@ pub fn run() {
         })
         .manage(audio::AudioState::default())
         .manage(plugins::PluginsState::default())
+        // The studio's own windows go with the main one: otherwise the app
+        // keeps running for them.
+        .on_window_event(|window, event| {
+            if window.label() == "main" && matches!(event, WindowEvent::Destroyed) {
+                for (label, other) in window.app_handle().webview_windows() {
+                    if label != "main" {
+                        let _ = other.destroy();
+                    }
+                }
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             engine_info,
+            close_studio_window,
             audio::audio_devices,
             audio::audio_open,
             audio::audio_close,
@@ -140,4 +185,35 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running the Dawn desktop app");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_studio_window_is_named_by_the_address_it_was_opened_at() {
+        let name = |s: &str| studio_window_name(&Url::parse(s).unwrap()).map(str::to_owned);
+        assert_eq!(
+            name("about:blank#dawn-mixer").as_deref(),
+            Some("dawn-mixer")
+        );
+        assert_eq!(
+            name("about:blank#dawn-piano-roll").as_deref(),
+            Some("dawn-piano-roll")
+        );
+        assert_eq!(name("about:blank"), None);
+        assert_eq!(name("about:blank#mixer"), None);
+        assert_eq!(name("about:blank#dawn-a/b"), None);
+    }
+
+    #[test]
+    fn closing_a_studio_window_closes_only_the_ones_of_that_name() {
+        assert!(is_studio_window("dawn-mixer-0", "dawn-mixer"));
+        assert!(is_studio_window("dawn-mixer-12", "dawn-mixer"));
+        assert!(!is_studio_window("dawn-piano-roll-1", "dawn-piano"));
+        assert!(!is_studio_window("dawn-mixer-", "dawn-mixer"));
+        assert!(!is_studio_window("main", "main"));
+        assert!(!is_studio_window("main-0", "main"));
+    }
 }

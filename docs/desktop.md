@@ -126,7 +126,13 @@ entry in `tauri.conf.json` (which has `"create": false`), so it can take
 the studio's own windows: "Pop out" in the mixer or the piano roll calls
 `window.open`, and `on_new_window` answers a blank page with a Tauri
 window the studio then draws into (`src/ui/Popout.tsx`), for a second
-screen. Other pages asked for that way are left to the webview.
+screen. Other pages asked for that way are left to the webview. The
+studio opens them at `about:blank#dawn-<name>` (`dawn-mixer`,
+`dawn-piano-roll`), and the window is labelled after it (`dawn-mixer-0`).
+To close one, the studio calls `close_studio_window` with that name:
+`window.close()` in it would destroy only the webview (wry), leaving an
+empty window. When the main window goes, the app closes the others, or it
+would keep running for them.
 
 ## What's different in the app today
 

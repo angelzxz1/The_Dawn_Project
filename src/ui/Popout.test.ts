@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { absoluteUrls, popoutFeatures } from "./Popout";
+import { absoluteUrls, popoutAddress, popoutFeatures } from "./Popout";
+
+describe("popoutAddress", () => {
+  it("opens blank, and in the desktop app named after the window, to close it by", () => {
+    expect(popoutAddress("mixer", false)).toBe("");
+    expect(popoutAddress("piano-roll", true)).toBe("about:blank#dawn-piano-roll");
+  });
+});
 
 describe("popoutFeatures", () => {
   it("opens a new window at its usual size, wherever the system puts it", () => {

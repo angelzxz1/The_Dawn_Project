@@ -8,6 +8,8 @@
 
 import { useEffect, useEffectEvent, useLayoutEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { invoke } from "@tauri-apps/api/core";
+import { isDesktopApp } from "@/services/desktop";
 import { HostWindowContext, type HostWindow } from "./hostWindow";
 import { shortcuts } from "./shortcuts";
 
@@ -46,13 +48,31 @@ export function popoutFeatures(size: { width: number; height: number }, saved: P
   return parts.join(",");
 }
 
+/** The address a window is opened at: blank, and in the desktop app named
+ * after the window (its fragment), which the app labels it by, to close it
+ * (closeWindow). */
+export function popoutAddress(name: string, desktop: boolean): string {
+  return desktop ? `about:blank#dawn-${name}` : "";
+}
+
 /** Opens (or brings back) the window for `name`, where it was last left.
  * Call it from a click: browsers block pop-ups opened any other way.
  * Null when it was blocked. */
 export function openPopout(name: string, size: { width: number; height: number }): HostWindow | null {
-  const win = window.open("", `dawn-${name}`, popoutFeatures(size, savedBounds(name))) as HostWindow | null;
+  const address = popoutAddress(name, isDesktopApp());
+  const win = window.open(address, `dawn-${name}`, popoutFeatures(size, savedBounds(name))) as HostWindow | null;
   win?.focus();
   return win;
+}
+
+/** Closes the window. In the desktop app the app closes it: window.close()
+ * there takes away only its page, leaving the window empty. */
+function closeWindow(win: Window, name: string): void {
+  if (isDesktopApp()) {
+    invoke("close_studio_window", { name: `dawn-${name}` }).catch(() => win.close());
+  } else {
+    win.close();
+  }
 }
 
 const COPIED = "data-dawn-copied";
@@ -194,7 +214,7 @@ export function Popout({ win, name, title, onClose, children }: PopoutProps) {
     win.addEventListener("pagehide", finish);
     // Moving a window fires nothing, and a closed one may not say so.
     const timer = window.setInterval(() => (win.closed ? finish() : measure()), 500);
-    const closeWithPage = () => win.close();
+    const closeWithPage = () => closeWindow(win, name);
     window.addEventListener("pagehide", closeWithPage);
     return () => {
       window.clearInterval(timer);
@@ -211,7 +231,7 @@ export function Popout({ win, name, title, onClose, children }: PopoutProps) {
           win,
           window.setTimeout(() => {
             closing.delete(win);
-            win.close();
+            closeWindow(win, name);
           })
         );
       }
