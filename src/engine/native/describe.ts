@@ -3,21 +3,22 @@
 // it's heard (mute and solo, worked out as the browser's engine does,
 // mixGraph.ts), where it goes, its sends, its audio clips, a MIDI track's
 // notes and instrument, and its effects; the buses with theirs; the master
-// with its; the tempo map; delay compensation's setting and the tracks
-// played live. The engine only renders what it's told (and lines the paths
-// up itself, from its effects' latencies). Pure.
+// with its, and the sidechains connected (the keys that make no loop, as
+// the browser's engine connects them: sidechainRouting.ts); the tempo map;
+// delay compensation's setting and the tracks played live. The engine only
+// renders what it's told (and lines the paths and the keys up itself, from
+// its effects' latencies). Pure.
 //
 // So far the native engine plays audio clips, every instrument's notes (the
 // piano, the Drum Rack, the synth) and most of the effects (NATIVE_EFFECTS,
-// an IR Loader with its file)
-// through the mix; a chain plays without the others and without effects
-// keyed by another track (sidechains aren't in it yet: keyed by their own
-// input instead, a ducking compressor would squash what it ducks), and
-// automation isn't in it yet (unsupported() names what a project uses of
-// them).
+// an IR Loader with its file, sidechains included) through the mix; a
+// chain plays without the others, and automation isn't in it yet
+// (unsupported() names what a project uses of them).
 
 import { audibleTracks } from "../mixGraph";
-import { routeMap } from "../routing";
+import { inputMap, routeMap } from "../routing";
+import { resolveSidechains, type RoutingSnapshot, type SidechainRequest } from "../../effects/sidechain/sidechainRouting";
+import type { SidechainTap } from "../../effects/sidechain/sidechainModel";
 import { notesWithinClip, type ProjectState } from "../../project/project";
 import { makeTempoMap } from "../../project/tempoMap";
 import type { AudioClipInstance, ChannelConfig } from "../../project/types";
@@ -26,7 +27,7 @@ import { PIANO_SAMPLE_URLS, noteNameToMidi } from "../../instruments/piano/piano
 import { tableKey } from "../../instruments/synth/synth";
 import { compileSynth, initSynthParams } from "../../instruments/synth/synthParams";
 import type { InstrumentType } from "../../instruments/registry";
-import { EFFECT_LABELS, type EffectInstance, type EffectType } from "../../effects/registry";
+import { EFFECT_LABELS, hasSidechain, type EffectInstance, type EffectType } from "../../effects/registry";
 
 /** The instruments the native engine plays. */
 export const NATIVE_INSTRUMENTS: readonly InstrumentType[] = ["piano", "drums", "synth"];
@@ -77,6 +78,10 @@ export interface NativeEffect {
   /** The file it plays (an IR Loader's impulse response), sent to the
    * engine under this id; left out when it has none. */
   file?: string;
+  /** Where its detector listens, for an effect keyed by another track or
+   * bus (a track's or bus's id); left out when it listens to its own
+   * input. */
+  sidechain?: { source: string; tap: SidechainTap };
 }
 
 export interface NativeTrack {
@@ -175,21 +180,54 @@ function nativeInstrument(channel: ChannelConfig, ids: NativeAudioIds): NativeIn
   return null;
 }
 
-/** Whether an effect listens to another track. */
-const sidechained = (fx: EffectInstance) => !!(fx.sidechain?.on && fx.sidechain.source);
-
 /** Whether the engine plays an effect. */
-const plays = (fx: EffectInstance) => NATIVE_EFFECTS.includes(fx.type) && !sidechained(fx);
+const plays = (fx: EffectInstance) => NATIVE_EFFECTS.includes(fx.type);
 
-/** A chain's effects the engine plays, in order. */
-function nativeEffects(chain: EffectInstance[] | undefined, ids: NativeAudioIds): NativeEffect[] {
-  return (chain ?? []).filter(plays).map((fx) => ({
-    id: fx.id,
-    type: fx.type,
-    params: fx.params,
-    bypass: !!fx.bypass,
-    ...(fx.file ? { file: ids.effectFile(fx.file.id) } : {}),
-  }));
+/** The sidechains to connect: effect id -> its source's id. As the
+ * browser's engine connects them (mixGraph.ts): in order, leaving out a
+ * key that's off, from nothing there, or that would make a loop through
+ * the routing (a track's route, its sends, its input from another track,
+ * the other keys). */
+function connectedKeys(doc: ProjectState, routes: Map<string, string | null>): Map<string, string> {
+  const busIds = new Set(doc.buses.map((b) => b.id));
+  const inputs = inputMap(doc.channels, routes);
+  const snapshot: RoutingSnapshot = {
+    channels: doc.channels.map((c) => ({
+      id: c.id,
+      sends: Object.keys(c.sends ?? {}).filter((bus) => busIds.has(bus)),
+      chain: 0,
+      pdc: 0,
+      toMaster: 0,
+      dest: routes.get(c.id) ?? null,
+      inputFrom: inputs.get(c.id)?.track ?? null,
+    })),
+    buses: doc.buses.map((b) => ({ id: b.id, chain: 0, pdc: 0 })),
+  };
+  const hosts: [string, EffectInstance[] | undefined][] = [
+    ...doc.channels.map((c): [string, EffectInstance[] | undefined] => [c.id, doc.channelEffects[c.id]]),
+    ...doc.buses.map((b): [string, EffectInstance[] | undefined] => [b.id, doc.busEffects[b.id]]),
+    ["master", doc.masterEffects],
+  ];
+  const requests: SidechainRequest[] = hosts.flatMap(([hostId, chain]) =>
+    (chain ?? []).filter((fx) => hasSidechain(fx.type) && fx.sidechain).map((fx) => ({ hostId, effectId: fx.id, routing: fx.sidechain }))
+  );
+  return resolveSidechains(snapshot, requests);
+}
+
+/** A chain's effects the engine plays, in order; `keys` the sidechains
+ * connected (connectedKeys). */
+function nativeEffects(chain: EffectInstance[] | undefined, ids: NativeAudioIds, keys: Map<string, string>): NativeEffect[] {
+  return (chain ?? []).filter(plays).map((fx) => {
+    const source = keys.get(fx.id);
+    return {
+      id: fx.id,
+      type: fx.type,
+      params: fx.params,
+      bypass: !!fx.bypass,
+      ...(fx.file ? { file: ids.effectFile(fx.file.id) } : {}),
+      ...(source ? { sidechain: { source, tap: fx.sidechain?.tap ?? "postFx" } } : {}),
+    };
+  });
 }
 
 /** A MIDI track's notes on the timeline: each clip's, clamped or tiled
@@ -212,6 +250,7 @@ export function describeSong(doc: ProjectState, session: NativeSession, ids: Nat
   const routes = routeMap(doc.channels);
   const heard = audibleTracks(doc.channels, routes);
   const busIds = new Set(doc.buses.map((b) => b.id));
+  const keys = connectedKeys(doc, routes);
   return {
     tracks: doc.channels.map((c) => ({
       id: c.id,
@@ -226,11 +265,11 @@ export function describeSong(doc: ProjectState, session: NativeSession, ids: Nat
       clips: (doc.clipsByChannel[c.id] ?? []).flatMap((clip) => (clip.kind === "audio" ? [nativeClip(clip, ids.clip(clip))] : [])),
       instrument: nativeInstrument(c, ids),
       notes: nativeNotes(doc, c),
-      effects: nativeEffects(doc.channelEffects[c.id], ids),
+      effects: nativeEffects(doc.channelEffects[c.id], ids, keys),
     })),
-    buses: doc.buses.map((b) => ({ id: b.id, volumeDb: b.volume ?? 0, pan: b.pan ?? 0, audible: !b.muted, effects: nativeEffects(doc.busEffects[b.id], ids) })),
+    buses: doc.buses.map((b) => ({ id: b.id, volumeDb: b.volume ?? 0, pan: b.pan ?? 0, audible: !b.muted, effects: nativeEffects(doc.busEffects[b.id], ids, keys) })),
     master: { volumeDb: doc.masterVolume, pan: doc.masterPan, limiterDb: session.limiterDb },
-    masterEffects: nativeEffects(doc.masterEffects, ids),
+    masterEffects: nativeEffects(doc.masterEffects, ids, keys),
     tempo: makeTempoMap(doc.bpm, doc.tempoChanges).segments.map((s) => ({ beat: s.beat, seconds: s.seconds, bpm: s.bpm })),
     beatsPerBar: session.beatsPerBar,
     compensation: session.compensation,
@@ -239,8 +278,7 @@ export function describeSong(doc: ProjectState, session: NativeSession, ids: Nat
 
 /** What the project uses that the native engine doesn't play yet: the
  * tracks with instruments it doesn't have, the effects it plays their
- * chains without ("Reverb on Vox", "Compressor on Bass (sidechained)"),
- * and the tracks with automation. */
+ * chains without ("NAM Amp on Gtr"), and the tracks with automation. */
 export function unsupported(doc: ProjectState): { instruments: string[]; effects: string[]; automation: string[] } {
   const named = (ids: string[]) => doc.channels.filter((c) => ids.includes(c.id)).map((c) => c.name);
   const instruments = doc.channels.filter((c) => c.type === "midi" && c.instrument !== null && !NATIVE_INSTRUMENTS.includes(c.instrument)).map((c) => c.id);
@@ -252,7 +290,7 @@ export function unsupported(doc: ProjectState): { instruments: string[]; effects
   const effects = hosts.flatMap((h) =>
     h.chain
       .filter((fx) => !fx.bypass && !plays(fx))
-      .map((fx) => `${EFFECT_LABELS[fx.type]} on ${h.name}${NATIVE_EFFECTS.includes(fx.type) ? " (sidechained)" : ""}`)
+      .map((fx) => `${EFFECT_LABELS[fx.type]} on ${h.name}`)
   );
   const automation = doc.channels.filter((c) => (c.automationLanes ?? []).some((lane) => lane.points.length > 0)).map((c) => c.id);
   return { instruments: named(instruments), effects, automation: named(automation) };

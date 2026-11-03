@@ -175,6 +175,30 @@ impl GateKernel {
         block
     }
 
+    /// As `process_in_place`, keyed by `key` (left, right, at least as
+    /// long) while the settings say `external`: missing is silence.
+    pub fn process_keyed(
+        &mut self,
+        left: &mut [f32],
+        right: &mut [f32],
+        key: Option<(&[f32], &[f32])>,
+    ) -> GateBlock {
+        if !self.external {
+            return self.process_in_place(left, right);
+        }
+        let mut block = GateBlock {
+            peak_in: 0.0,
+            min_gain: 1.0,
+        };
+        for i in 0..left.len().min(right.len()) {
+            let (kl, kr) = key.map_or((0.0, 0.0), |(kl, kr)| (kl[i] as f64, kr[i] as f64));
+            let (yl, yr) = self.tick(left[i] as f64, right[i] as f64, kl, kr, &mut block);
+            left[i] = yl as f32;
+            right[i] = yr as f32;
+        }
+        block
+    }
+
     fn tick(&mut self, l: f64, r: f64, kl: f64, kr: f64, block: &mut GateBlock) -> (f64, f64) {
         let kl = self.key.run(kl, 0);
         let kr = self.key.run(kr, 1);

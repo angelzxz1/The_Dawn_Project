@@ -80,9 +80,8 @@ pub enum EffectKind {
 impl EffectSettings {
     /// The settings for an effect of type `kind` (its saved key, as in the
     /// studio's `registry.ts`) with these parameters; None for a type the
-    /// engine doesn't have. Sidechains aren't in the engine yet: an effect
-    /// that can take one listens to its own input (the studio leaves out
-    /// those keyed by another track).
+    /// engine doesn't have. One that can take a sidechain listens to its own
+    /// input until the song connects its key (`set_external`).
     pub fn from_params<P: ParamSource + ?Sized>(kind: &str, params: &P) -> Option<Self> {
         Some(match kind {
             "chorus" => Self::Chorus(Box::new(ChorusSettings::from_params(params))),
@@ -119,6 +118,32 @@ impl EffectSettings {
             Self::PitchShift(s) => s.latency(sample_rate),
             Self::Saturator(s) => s.latency(),
             _ => 0,
+        }
+    }
+
+    /// Whether its detector can listen to another track (a sidechain), as
+    /// the studio's `SIDECHAIN_EFFECT_TYPES`.
+    pub fn takes_key(&self) -> bool {
+        matches!(
+            self,
+            Self::Compressor(_)
+                | Self::Gate(_)
+                | Self::Glue(_)
+                | Self::MbDynamics(_)
+                | Self::Multiband(_)
+        )
+    }
+
+    /// Whether its detector listens to its key (connected) rather than its
+    /// own input.
+    pub fn set_external(&mut self, external: bool) {
+        match self {
+            Self::Compressor(s) => s.key.external = external,
+            Self::Gate(s) => s.key.external = external,
+            Self::Glue(s) => s.key.external = external,
+            Self::MbDynamics(s) => s.key.external = external,
+            Self::Multiband(s) => s.key.external = external,
+            _ => {}
         }
     }
 
@@ -193,6 +218,30 @@ impl EffectSettings {
     }
 }
 
+/// Where on a track or bus a sidechain's key is taken, as the studio's
+/// `SidechainTap`: before its effects, after them (ahead of its delay
+/// compensation), or after its fader.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Tap {
+    PreFx,
+    PostFx,
+    PostFader,
+}
+
+/// A track or bus, by its index in the song: where a key comes from.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum KeySource {
+    Track(usize),
+    Bus(usize),
+}
+
+/// A keyed effect's sidechain: what its detector listens to.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct KeySpec {
+    pub source: KeySource,
+    pub tap: Tap,
+}
+
 /// An effect in a chain.
 #[derive(Clone, Debug, PartialEq)]
 pub struct EffectSpec {
@@ -201,6 +250,10 @@ pub struct EffectSpec {
     pub settings: EffectSettings,
     /// Skipped, as if unplugged.
     pub bypass: bool,
+    /// Its sidechain, for an effect that takes one (`takes_key`). The song
+    /// drops one that would make a loop, and the effect then listens to its
+    /// own input, as the browser's does.
+    pub key: Option<KeySpec>,
 }
 
 impl EffectSpec {
@@ -209,6 +262,7 @@ impl EffectSpec {
             id: id.into(),
             settings,
             bypass: false,
+            key: None,
         }
     }
 }
@@ -342,28 +396,36 @@ impl Effect {
         }
     }
 
-    /// Processes a stereo block (at most `MAX_BLOCK` frames) in place.
-    pub fn process(&mut self, l: &mut [f32], r: &mut [f32]) {
+    /// Processes a stereo block (at most `MAX_BLOCK` frames) in place;
+    /// `key` is its sidechain (left, right, at least as long), heard by an
+    /// effect that takes one while its settings say `external`.
+    pub fn process(&mut self, l: &mut [f32], r: &mut [f32], key: Option<(&[f32], &[f32])>) {
         let n = l.len().min(r.len());
+        let key = key.map(|(kl, kr)| (&kl[..n], &kr[..n]));
         match &mut self.kernel {
             Kernel::Amp(k) => k.process_in_place(&mut l[..n], &mut r[..n]),
             Kernel::Chorus(k) => k.process_in_place(&mut l[..n], &mut r[..n]),
-            Kernel::Compressor(k) => k.process_in_place(&mut l[..n], Some(&mut r[..n]), None, None),
+            Kernel::Compressor(k) => k.process_in_place(
+                &mut l[..n],
+                Some(&mut r[..n]),
+                key.map(|k| k.0),
+                key.map(|k| k.1),
+            ),
             Kernel::Delay(k) => k.process_in_place(&mut l[..n], &mut r[..n]),
             Kernel::EqThree(k) => k.process_in_place(&mut l[..n], &mut r[..n]),
             Kernel::Filter(k) => k.process_in_place(&mut l[..n], &mut r[..n]),
             Kernel::Gate(k) => {
-                k.process_in_place(&mut l[..n], &mut r[..n]);
+                k.process_keyed(&mut l[..n], &mut r[..n], key);
             }
-            Kernel::Glue(k) => k.process_in_place(&mut l[..n], &mut r[..n]),
+            Kernel::Glue(k) => k.process_keyed(&mut l[..n], &mut r[..n], key),
             Kernel::IrLoader(k) => k.process_in_place(&mut l[..n], &mut r[..n]),
             Kernel::Limiter(k, in_l, in_r) => {
                 in_l[..n].copy_from_slice(&l[..n]);
                 in_r[..n].copy_from_slice(&r[..n]);
                 k.process(Some(&in_l[..n]), Some(&in_r[..n]), l, Some(r), n);
             }
-            Kernel::MbDynamics(k) => k.process_in_place(&mut l[..n], &mut r[..n]),
-            Kernel::Multiband(k) => k.process_in_place(&mut l[..n], &mut r[..n]),
+            Kernel::MbDynamics(k) => k.process_keyed(&mut l[..n], &mut r[..n], key),
+            Kernel::Multiband(k) => k.process_keyed(&mut l[..n], &mut r[..n], key),
             Kernel::ParamEq(k) => k.process_in_place(&mut l[..n], &mut r[..n]),
             Kernel::PitchShift(k) => k.process_in_place(&mut l[..n], &mut r[..n]),
             Kernel::Reverb(k) => k.process_in_place(&mut l[..n], &mut r[..n]),
@@ -388,13 +450,20 @@ pub(crate) fn latency(specs: &[EffectSpec], sample_rate: f64) -> usize {
 /// takes it) waiting to be swapped for the one already playing.
 pub(crate) type Chain = Vec<Option<Box<Effect>>>;
 
-/// Runs a chain on a stereo block, skipping what's bypassed.
-pub(crate) fn run(chain: &mut Chain, specs: &[EffectSpec], l: &mut [f32], r: &mut [f32]) {
-    for (effect, spec) in chain.iter_mut().zip(specs) {
+/// Runs a chain on a stereo block, skipping what's bypassed; `key` gives
+/// the effect at an index its sidechain's key for this block, if connected.
+pub(crate) fn run<'a>(
+    chain: &mut Chain,
+    specs: &[EffectSpec],
+    l: &mut [f32],
+    r: &mut [f32],
+    key: impl Fn(usize) -> Option<(&'a [f32], &'a [f32])>,
+) {
+    for (e, (effect, spec)) in chain.iter_mut().zip(specs).enumerate() {
         if let Some(effect) = effect
             && !spec.bypass
         {
-            effect.process(l, r);
+            effect.process(l, r, key(e));
         }
     }
 }

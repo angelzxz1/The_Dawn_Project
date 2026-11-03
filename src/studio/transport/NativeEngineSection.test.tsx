@@ -50,7 +50,7 @@ describe("the native engine section", () => {
     expect(update).toHaveBeenCalledWith({ nativeDevice: "wasapi:scarlett", nativeSampleRate: null, nativeBufferSize: null });
   });
 
-  test("says which effects, sidechains and automation it plays without", async () => {
+  test("says which effects and automation it plays without, and plays the sidechained compressor", async () => {
     projectStore.set("channels", [
       { id: "k", name: "Keys", volume: 0, pan: 0, colorIndex: 0, type: "midi", instrument: "synth", muted: false, solo: false, armed: false },
       { id: "v", name: "Vox", volume: 0, pan: 0, colorIndex: 0, type: "audio", instrument: null, muted: false, solo: false, armed: false },
@@ -68,7 +68,7 @@ describe("the native engine section", () => {
       ),
     ]);
     const { screen } = renderSection({ nativeEngine: true });
-    await expect.element(screen.getByText("Played without: Compressor on Vox (sidechained), NAM Amp on Vox.")).toBeVisible();
+    await expect.element(screen.getByText("Played without: NAM Amp on Vox.")).toBeVisible();
     await expect.element(screen.getByText("Without their automation: Keys.")).toBeVisible();
     // The synth plays.
     expect(screen.container.textContent).not.toContain("Silent here");

@@ -376,10 +376,22 @@ impl GlueKernel {
 
     /// As `process`, over its stereo input, keyed by it.
     pub fn process_in_place(&mut self, left: &mut [f32], right: &mut [f32]) {
-        for (l, r) in left.iter_mut().zip(right.iter_mut()) {
-            let (yl, yr) = self.tick(*l as f64, *r as f64, 0.0, 0.0);
-            *l = yl as f32;
-            *r = yr as f32;
+        self.process_keyed(left, right, None);
+    }
+
+    /// As `process_in_place`, keyed by `key` (left, right, at least as
+    /// long) while the settings say `external`: missing is silence.
+    pub fn process_keyed(
+        &mut self,
+        left: &mut [f32],
+        right: &mut [f32],
+        key: Option<(&[f32], &[f32])>,
+    ) {
+        for i in 0..left.len().min(right.len()) {
+            let (el, er) = key.map_or((0.0, 0.0), |(kl, kr)| (kl[i] as f64, kr[i] as f64));
+            let (yl, yr) = self.tick(left[i] as f64, right[i] as f64, el, er);
+            left[i] = yl as f32;
+            right[i] = yr as f32;
         }
     }
 

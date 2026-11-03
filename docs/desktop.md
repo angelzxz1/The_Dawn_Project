@@ -18,8 +18,8 @@ It's early. Today:
   instrument through the mix (volume, pan, mute, solo, groups, sends), the
   dynamics and EQ effects, the Filter, the Chorus, the Delay, the Reverb,
   the Saturator, the Pitch Shift, the Furnace amp, the IR Loader and the
-  Tuner, with delay compensation, the master limiter and the metronome.
-  Sidechains, automation and recording still need the browser's engine,
+  Tuner, with sidechains, delay compensation, the master limiter and the
+  metronome. Automation and recording still need the browser's engine,
   and the NAM Amp stays a browser effect (on the desktop, NAM models are
   meant to play through NAM's own plugin, once plugins run in the
   engine): the
@@ -221,10 +221,17 @@ the rest of the studio doesn't change while parts move over.
 
 The studio sends each chain's effects the engine has (with their
 parameters as the project keeps them, `NATIVE_EFFECTS` in `describe.ts`);
-a chain plays without the others, and without an effect keyed by another
-track (sidechains aren't in the engine yet; keyed by its own input, a
-ducking compressor would squash what it ducks). What it doesn't play yet -
-those effects, automation - the Audio panel names for the project open.
+a chain plays without the others. What it doesn't play yet - those
+effects, automation - the Audio panel names for the project open.
+
+Sidechains: the studio sends each keyed effect's source (a track's or
+bus's id) and tap, for the keys the browser's engine connects (those that
+make no loop, `resolveSidechains`). The engine checks them again the same
+way (`crates/dawn-engine/src/mix/keys.rs`), mixes every source before the
+effects it keys (a bus can key a track), copies each key at its tap
+(before the source's effects, after them, or after its fader) and delays
+it to line up with the effect's input, from its own latencies, as
+`keyDelay` does.
 
 ### ASIO
 
@@ -396,9 +403,9 @@ crash and hang on purpose. CI runs it on Windows, macOS and Linux
 
 1. **Recording through the engine**: the interface's inputs, monitoring
    with low latency, takes written to disk, latency compensation.
-2. **Sidechains and automation in the engine.** Every instrument and
-   effect plays already, bar the NAM Amp, which stays in the browser (on
-   the desktop, NAM's own plugin plays NAM models).
+2. **Automation in the engine.** Every instrument and effect plays
+   already, sidechains included, bar the NAM Amp, which stays in the
+   browser (on the desktop, NAM's own plugin plays NAM models).
 3. **Plugins**: finding them is done (above). Next, CLAP effects running in
    the engine on tracks, with their own windows and their state saved in
    the project; then VST3 effects the same way; then plugin instruments on

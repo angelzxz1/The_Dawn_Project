@@ -3,27 +3,26 @@
 Read this first in a new session. It says where the project is, how the
 work is done and what comes next, then keeps the technical notes (the
 native engine's techniques, and what each finished item changed).
-Updated 2026-11-02, at `main` = `4b1d2c7`.
+Updated 2026-11-03, at `main` = `612a0c2`, with step 24 not yet committed.
 
 ## Start here
 
-- **Where we are:** Phase 6 (mixing) of `nextSteps.md` is done: steps
-  1-23 are (step 6, NAM in the engine, was dropped). The last four:
-  - step 20, moving, copying and saving effect chains (`bfa84ac`, 2026-11-01);
+- **Where we are:** Phase 7 (native stage 4) of `nextSteps.md`: steps
+  1-24 are done (step 6, NAM in the engine, was dropped). The last four:
   - step 21, one style for every window (2026-11-02, `54dd0d8`);
   - step 22, the mixer view (2026-11-02, `0078489`);
   - step 23, the mixer and piano roll in windows of their own
-    (2026-11-02, `4b1d2c7`).
-- **Next: step 24, sidechains in the engine** (Phase 7, native stage 4):
-  keys from other tracks at the studio's tap points, with its latency
-  alignment (`mixGraph.ts` `resolveSidechains`, `keyDelay`); then
-  `describe.ts` stops leaving sidechained effects out. It's mostly Rust:
-  the cargo checks run here now (see Gotchas). Wait for the user to say
-  "go" before starting a step: they ask for each one ("Lets go with step
-  N").
+    (2026-11-02, `4b1d2c7`; the desktop's windows fixed in `612a0c2`);
+  - step 24, sidechains in the engine (2026-11-03, commit to come).
+- **Next: step 25, automation in the engine** (Phase 7): points with a
+  `curve` each, bent by `curveShape` (`src/engine/automation.ts`); then
+  tracks with automation play natively and `describe.ts`'s
+  `unsupported()` stops naming them. Mostly Rust; the cargo checks run
+  here (see Gotchas). Wait for the user to say "go" before starting a
+  step: they ask for each one ("Lets go with step N").
 - **What's left after that,** in order (the full list, with sizes, is in
   `nextSteps.md`; a summary is under "The road ahead" below):
-  automation in the engine, recording (monitoring modes, punch in/out,
+  recording (monitoring modes, punch in/out,
   input channels, then live
   input through the engine), plugins (CLAP, VST3, plugin instruments,
   AU), shipping (export through the engine, native dialogs, signed
@@ -106,7 +105,8 @@ The Dawn Project is a browser DAW, also built as a desktop app.
      Audio nodes (PRs #9–#13, then `fd0e076` to `cd4775f`). The NAM Amp
      stays out (below).
   4. Sidechains and automation (Phase 7). Delay compensation was planned
-     here and was brought forward into stage 3 (PR #11).
+     here and was brought forward into stage 3 (PR #11). Sidechains done
+     2026-11-03 (step 24); automation next.
   5. Live input and recording (Phase 8).
   6. Then the plugins: P2 CLAP effects, P3 VST3 effects, P4 plugin
      instruments, P5 Audio Units (Phase 9).
@@ -160,12 +160,12 @@ The Dawn Project is a browser DAW, also built as a desktop app.
 **Checks before handing a step over:**
 
 - `npx tsc --noEmit` and `npm run lint` (both clean).
-- `npx vitest run`: 796 unit and component tests on 2026-11-02, in the
+- `npx vitest run`: 799 unit and component tests on 2026-11-03, in the
   projects `unit` (Node), `components` (Chromium) and `web-audio`. The
   component tests have a 30 s limit (`vitest.config.ts`), and the slow
   unit tests their own; no `--testTimeout` needed.
 - `npm run build`, then `npx playwright test --workers=2`: 180 tests, 1
-  skipped, all passing on 2026-11-02 (about 10 minutes). It serves `out/`,
+  skipped, all passing on 2026-11-03 (about 10 minutes). It serves `out/`,
   so build first or it tests the last build. Use 2 workers: a full run
   with more was once stopped because the computer ran low on memory. Run a
   single spec while working (`npx playwright test e2e/<name>.spec.ts`).
@@ -199,10 +199,10 @@ clippy and fmt. `desktop.yml` builds on Windows, macOS and Linux.
   Windows' `tar`, each with an empty `INSTALLATION_COMPLETE` file. A
   Playwright update, or Node 24 (fnm), would fix the installer.
 - Rust (cargo 1.99.1) was installed on 2026-11-03, in
-  `%USERPROFILE%.cargoin`, which a shell opened before that may not
-  have on its Path: `$env:Path = "$env:USERPROFILE.cargoin;$env:Path"`.
-  The cargo checks (fmt, clippy with `-D warnings`, test) passed then: 149
-  tests, 1 ignored.
+  `%USERPROFILE%\.cargo\bin`, which a shell opened before that may not
+  have on its Path: `$env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"`.
+  The cargo checks (fmt, clippy with `-D warnings`, test) pass: 164
+  tests, 1 ignored, on 2026-11-03 (step 24).
 
 **Writing style for code and docs:** plain, short sentences in the
 codebase's voice. Comments say what something is for. Match the
@@ -220,10 +220,9 @@ L a stage of its own).
   - 23. Part 2 #26, detached or second-screen windows for the mixer and
     the piano roll: Tauri windows on the desktop, pop-outs in the browser
     (L). Done 2026-11-02.
-- **Phase 7, native stage 4:** 24 (next), sidechains in the engine
-  (`mixGraph.ts` `resolveSidechains`, `keyDelay`; then `describe.ts`
-  stops leaving sidechained effects out). 25, automation in the engine
-  (points with a `curve`, bent by `curveShape`).
+- **Phase 7, native stage 4:** 24, sidechains in the engine. Done
+  2026-11-03. 25 (next), automation in the engine (points with a
+  `curve`, bent by `curveShape`).
 - **Phase 8, recording, then native stage 5:** 26, monitoring modes per
   track (In, Auto, Off; #14). 27, punch-in and punch-out in the loop
   (#15). 28, input channels on multi-input interfaces (#17). 29, live
@@ -330,10 +329,22 @@ To add an effect, follow `docs/desktop.md` → "Porting the next kernel":
 - Pitch Shift: window·sr/2 + 2.
 - Furnace: 16.
 
-**Sidechains:** not in the engine yet. `describe.ts` leaves out effects
-whose sidechain is `on && source`, and the panel lists them as
-"(sidechained)". Keyed by their own input instead, a ducking compressor
-would squash what it ducks.
+**Sidechains** (`keys.rs`, step 24): the studio sends a keyed effect's
+`sidechain` (its source's id and tap) only for the keys the browser
+connects (`describe.ts` `connectedKeys`, `resolveSidechains` over the
+routing, inputs from other tracks included). The engine resolves them
+again in the same order (`keys::resolve`; a key that would loop is
+dropped and its effect hears its own input), points each detector at
+its key (`EffectSettings::set_external`), and mixes the tracks and buses
+in an order where every source comes before what it keys
+(`keys::order`, keeping the tracks' depth order otherwise; a bus can key
+a track). Each key is copied at its tap as its source goes by (pre-FX:
+the source's input; post-FX: after its effects, ahead of its
+compensation; post-fader: its strip's output) and waits
+`keys::Timing::key_delay` frames, the port of `keyDelay`, from the
+engine's own plan; it carries into the next version of the song as the
+other delays do. The kernels' `process_keyed` (Gate, Glue, the
+multiband two) and the Compressor's `process_in_place` take the key.
 
 ### Testing in the real desktop app (the "probe")
 
@@ -441,9 +452,9 @@ Temporary, never committed:
     click sounds).
 - **The Audio panel lists what it doesn't play:**
   - instruments it lacks;
-  - effects: the NAM Amp, plus sidechained ones;
+  - effects: the NAM Amp;
   - tracks with automation.
-- **Not yet in the engine:** sidechains and automation (Phase 7),
+- **Not yet in the engine:** automation (Phase 7),
   recording (Phase 8), sending its meter levels back to the studio. The
   NAM Amp won't be (NAM's own plugin will play it).
 
@@ -573,7 +584,14 @@ ahead" above).
    that report their loudness sound different from before.
 3. **Sidechains:** keys routed from other tracks, with the browser's tap
    points and latency alignment (`mixGraph.ts` `resolveSidechains`,
-   `keyDelay`). Then **automation**: points with straight or bent
+   `keyDelay`). Done 2026-11-03 (step 24, commit to come; see "Engine
+   model" above). Tests: `crates/dawn-engine/tests/sidechain.rs` (a gate
+   keyed by another track, in the same block whatever the track order; a
+   post-fader key; a loop left out; a bus keying a track; the key waiting
+   for a limiter ahead of the gate), `keys.rs`'s unit tests (the studio's
+   `sidechainRouting.test.ts` cases), `describe.test.ts`, and a test of
+   the desktop's reader in `src-tauri/src/audio/song.rs`. Then
+   **automation**: points with straight or bent
    segments, read by `interpolateAutomation` and `curveShape`
    (`src/engine/automation.ts`); the engine's port has to bend them the
    same way.
@@ -804,16 +822,18 @@ the order they were done, with the fixes made along the way.
     `npm run desktop` by the user that day: "Back to the main window" left
     the native window open and empty, and popping out again opened another
     (wry's `window.close()` destroys the webview, not the window). Fixed
-    (2026-11-03, commit to come): the desktop opens them at
+    (2026-11-03, `612a0c2`): the desktop opens them at
     `about:blank#dawn-<name>`, labels the window after it, and closes it
     with the `close_studio_window` command (`Popout.tsx` `closeWindow`);
-    the main window going closes the others (`on_window_event`). On the desktop a detached window isn't
-    zoomed with the UI size (that's the main webview's zoom). Effect and
+    the main window going closes the others (`on_window_event`). The user
+    tried the fix in `npm run desktop` the same day: it works. On the
+    desktop a detached window isn't zoomed with the UI size (that's the main webview's zoom). Effect and
     instrument windows opened from a detached mixer open in the main
     window. Tests: `e2e/popout.spec.ts`, `src/ui/Popout.test.ts`,
     `src/ui/shortcuts.test.ts`, `Mixer.test.tsx`.
   - Items 14, 15, 17 and 27 are open. Next in `nextSteps.md` is Phase 7,
-    step 24 (sidechains in the engine).
+    step 25 (automation in the engine); step 24 (sidechains in the engine,
+    2026-11-03) is logged under "The native engine plan".
   - Fixed 2026-10-31: on Windows, Next's static export wrote each page's
     prefetch files as folders (`__next.!KHNpdGUp/__PAGE__.txt`, from a
     backslash it doesn't turn into a dot) where its router asks for

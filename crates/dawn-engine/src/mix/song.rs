@@ -16,6 +16,7 @@ use std::sync::Arc;
 
 use super::clip::Clip;
 use super::fx::{self, Chain, Effect, EffectSpec};
+use super::keys::{self, KeyLink, Node, Timing};
 use super::latency::{self, Delay, MAX_COMPENSATION, Path, Plan, Ring};
 use super::player::{InstrumentSpec, Note, Player, track_key};
 use super::tempo::{TempoSegment, constant};
@@ -199,8 +200,14 @@ pub(crate) struct Applied {
 /// Made off the audio thread (`Song::prepare`).
 pub struct Prepared {
     pub song: Song,
-    /// Track indices, every track before the one it feeds.
-    pub(crate) order: Vec<usize>,
+    /// The tracks and buses in the order they're mixed: each after what it
+    /// takes audio from (the tracks routed into it, those sending to it,
+    /// its keys' sources).
+    pub(crate) order: Vec<Node>,
+    /// The connected sidechains (`keys`), and for each chain's effects
+    /// (numbered as `fx`) the one it hears, if any.
+    pub(crate) keys: Vec<KeyLink>,
+    pub(crate) key_of: Vec<Vec<Option<usize>>>,
     pub(crate) track_bufs: Vec<Stereo>,
     pub(crate) bus_bufs: Vec<Stereo>,
     pub(crate) track_applied: Vec<Applied>,
@@ -341,6 +348,8 @@ impl Song {
         if self.tempo.is_empty() {
             self.tempo = constant(120.0).to_vec();
         }
+        // The keys that make no loop, with the detectors listening to them.
+        let graph = keys::resolve(&mut self);
 
         // Depth: how many tracks a track's audio passes through on its way
         // to the master. Deeper ones are mixed first.
@@ -353,8 +362,9 @@ impl Song {
             }
             d
         };
-        let mut order: Vec<usize> = (0..n).collect();
-        order.sort_by_key(|&i| std::cmp::Reverse(depth(i)));
+        let mut tracks: Vec<usize> = (0..n).collect();
+        tracks.sort_by_key(|&i| std::cmp::Reverse(depth(i)));
+        let order = keys::order(&graph, &tracks, self.buses.len());
 
         let strip_of = |t: &Track| Applied {
             gain: t.volume * if t.audible { 1.0 } else { 0.0 },
@@ -454,7 +464,39 @@ impl Song {
         let most = (MAX_COMPENSATION * sample_rate) as usize;
         let delays = |frames: &[usize]| frames.iter().map(|&f| Delay::new(f.min(most))).collect();
 
+        // Each connected key, waiting to line up with its effect's input.
+        let timing = Timing::new(&self, &plan, sample_rate);
+        let mut key_links = vec![];
+        let key_of = (0..self.host_count())
+            .map(|h| {
+                let mut before = 0;
+                self.host_effects(h)
+                    .iter()
+                    .map(|spec| {
+                        let link = spec.key.map(|k| {
+                            key_links.push(KeyLink {
+                                effect: spec.id.clone(),
+                                source: k.source,
+                                tap: k.tap,
+                                delay: Delay::new(
+                                    timing.key_delay(h, before, k.source, k.tap).min(most),
+                                ),
+                                buf: Stereo::new(),
+                            });
+                            key_links.len() - 1
+                        });
+                        if !spec.bypass {
+                            before += spec.settings.latency(sample_rate);
+                        }
+                        link
+                    })
+                    .collect()
+            })
+            .collect();
+
         Prepared {
+            keys: key_links,
+            key_of,
             own_delays: delays(&plan.own),
             channel_delays: delays(&plan.channel),
             send_delays: delays(&plan.send),

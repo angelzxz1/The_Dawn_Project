@@ -235,8 +235,50 @@ describe("the song for the native engine", () => {
   });
 });
 
+describe("sidechains", () => {
+  const keyed = (source: string, extra: object = {}) => ({ type: "compressor" as const, params: {}, sidechain: { on: true, source, tap: "postFader" as const }, ...extra });
+  const sidechainOf = (song: ReturnType<typeof describeSong>, id: string) =>
+    [...song.tracks.flatMap((t) => t.effects), ...song.buses.flatMap((b) => b.effects), ...song.masterEffects].find((e) => e.id === id)?.sidechain;
+
+  it("sends each keyed effect's source and tap, and nothing for one listening to itself", () => {
+    const p = project();
+    p.channels = [...p.channels, track("pad", "midi", { instrument: "synth" })];
+    p.channelEffects = {
+      keys: [{ id: "duck", ...keyed("drums") }],
+      // Off, or with no source, it listens to its own input.
+      pad: [
+        { id: "off", ...keyed("drums"), sidechain: { on: false, source: "drums", tap: "postFx" } },
+        { id: "none", ...keyed("drums"), sidechain: { on: true, source: null, tap: "postFx" } },
+        { id: "plain", type: "compressor", params: {} },
+      ],
+    };
+    p.masterEffects = [{ id: "glue", type: "glue", params: {}, sidechain: { on: true, source: "keys", tap: "preFx" } }];
+    const song = describeSong(p, session, idOf);
+    expect(sidechainOf(song, "duck")).toEqual({ source: "drums", tap: "postFader" });
+    expect(sidechainOf(song, "glue")).toEqual({ source: "keys", tap: "preFx" });
+    expect(["off", "none", "plain"].map((id) => sidechainOf(song, id))).toEqual([undefined, undefined, undefined]);
+    expect(song.tracks.find((t) => t.id === "pad")?.effects.map((e) => e.id)).toEqual(["off", "none", "plain"]);
+  });
+
+  it("leaves out a key that would make a loop, as the browser's engine does", () => {
+    const p = project();
+    p.channels = p.channels.map((c) => (c.id === "keys" ? { ...c, sends: { verb: -6 } } : c));
+    p.channelEffects = {
+      // keys sends to verb: verb can't key it.
+      keys: [{ id: "loop", ...keyed("verb") }],
+      // Two tracks keying each other: the first is connected.
+      drums: [{ id: "first", ...keyed("gtr") }],
+      gtr: [{ id: "second", ...keyed("drums") }],
+    };
+    const song = describeSong(p, session, idOf);
+    expect(sidechainOf(song, "loop")).toBeUndefined();
+    expect(sidechainOf(song, "first")).toEqual({ source: "gtr", tap: "postFader" });
+    expect(sidechainOf(song, "second")).toBeUndefined();
+  });
+});
+
 describe("what the native engine doesn't play yet", () => {
-  it("names the effects it plays chains without, sidechained ones among them, and the tracks with automation", () => {
+  it("names the effects it plays chains without, and the tracks with automation", () => {
     const p = project();
     p.channels = [
       ...p.channels,
@@ -250,20 +292,15 @@ describe("what the native engine doesn't play yet", () => {
         { id: "fx4", type: "namAmp", params: {} },
       ],
       gtr: [{ id: "fx2", type: "tuner", params: {}, bypass: true }],
-      // Ducked by the drums: the engine has no sidechains yet, so it's left
-      // out (keyed by its own input, it would squash the keys).
+      // Ducked by the drums: the engine plays sidechains.
       keys: [{ id: "fx5", type: "compressor", params: {}, sidechain: { on: true, source: "drums", tap: "postFx" } }],
-      // A sidechain that's off, or has no source, is no sidechain.
-      pad: [{ id: "fx6", type: "compressor", params: {}, sidechain: { on: false, source: "drums", tap: "postFx" } }],
     };
     p.masterEffects = [{ id: "fx3", type: "namAmp", params: {} }];
     p.channels = p.channels.map((c) =>
       c.id === "gtr" ? { ...c, automationLanes: [{ id: "l", target: { kind: "volume" }, points: [{ id: "p", time: 0, value: 0 }] }] } : c
     );
-    // Every instrument plays, and the compressors without sidechains do.
-    expect(unsupported(p)).toEqual({ instruments: [], effects: ["NAM Amp on drums", "Compressor on keys (sidechained)", "NAM Amp on Master"], automation: ["gtr"] });
-    expect(describeSong(p, session, idOf).tracks.find((t) => t.id === "keys")?.effects).toEqual([]);
-    expect(describeSong(p, session, idOf).tracks.find((t) => t.id === "pad")?.effects.map((e) => e.id)).toEqual(["fx6"]);
+    // Every instrument plays, and every compressor.
+    expect(unsupported(p)).toEqual({ instruments: [], effects: ["NAM Amp on drums", "NAM Amp on Master"], automation: ["gtr"] });
   });
 
   it("is nothing for audio tracks played dry", () => {

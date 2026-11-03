@@ -459,13 +459,25 @@ impl MbDynamicsKernel {
     /// As `process`, over its stereo input, keyed by it, a quantum at a
     /// time.
     pub fn process_in_place(&mut self, left: &mut [f32], right: &mut [f32]) {
+        self.process_keyed(left, right, None);
+    }
+
+    /// As `process_in_place`, keyed by `key` (left, right, at least as
+    /// long) while the settings say `external`: missing is silence.
+    pub fn process_keyed(
+        &mut self,
+        left: &mut [f32],
+        right: &mut [f32],
+        key: Option<(&[f32], &[f32])>,
+    ) {
         let n = left.len().min(right.len());
         let mut at = 0;
         while at < n {
             let len = (n - at).min(QUANTUM);
             self.begin_block(len);
             for i in at..at + len {
-                let (yl, yr) = self.tick(left[i] as f64, right[i] as f64, 0.0, 0.0);
+                let (el, er) = key.map_or((0.0, 0.0), |(kl, kr)| (kl[i] as f64, kr[i] as f64));
+                let (yl, yr) = self.tick(left[i] as f64, right[i] as f64, el, er);
                 left[i] = yl as f32;
                 right[i] = yr as f32;
             }

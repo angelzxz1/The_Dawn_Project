@@ -16,10 +16,14 @@
 //! the master's effects (`fx`) run where the browser's chains are, and
 //! delay compensation (`latency`) lines the paths up at the master: the
 //! tracks go into it through the shared direct delay, live ones straight.
+//! An effect keyed by another track or bus (`keys`) hears it at its tap,
+//! in the same block: the tracks and buses are mixed in an order that puts
+//! every source first.
 
 use std::f64::consts::FRAC_PI_2;
 
-use super::fx;
+use super::fx::{self, KeySource, Tap};
+use super::keys::{self, KeyLink, Node};
 use super::latency::Delay;
 use super::metronome::{Loop, Metronome};
 use super::player::Player;
@@ -227,6 +231,11 @@ impl Engine {
             let id = &new.song.buses[i].id;
             if let Some(j) = old.song.buses.iter().position(|b| &b.id == id) {
                 keep(&mut new.bus_delays[i], &mut old.bus_delays[j]);
+            }
+        }
+        for k in new.keys.iter_mut() {
+            if let Some(o) = old.keys.iter_mut().find(|o| o.effect == k.effect) {
+                keep(&mut k.delay, &mut o.delay);
             }
         }
         keep(&mut new.direct_delay, &mut old.direct_delay);
@@ -502,16 +511,69 @@ impl Engine {
         }
 
         // The strips (after their effects, and the wait lining them up),
-        // each before the track it feeds; then the buses.
-        for &i in &p.order {
+        // each after what it takes audio from: the tracks feeding it, and
+        // the tracks and buses keying its effects (`keys`). A source's key
+        // is copied at its tap as it goes by.
+        let tracks = p.song.tracks.len();
+        for &node in &p.order {
+            let i = match node {
+                Node::Track(i) => i,
+                Node::Bus(j) => {
+                    let bus = &p.song.buses[j];
+                    let buf = &mut p.bus_bufs[j];
+                    let source = KeySource::Bus(j);
+                    keys::feed(&mut p.keys, source, Tap::PreFx, &buf.l[..n], &buf.r[..n]);
+                    let (links, key_of) = (&p.keys, &p.key_of[tracks + j]);
+                    fx::run(
+                        &mut p.fx[tracks + j],
+                        &bus.effects,
+                        &mut buf.l[..n],
+                        &mut buf.r[..n],
+                        |e| key_at(links, key_of, e),
+                    );
+                    keys::feed(&mut p.keys, source, Tap::PostFx, &buf.l[..n], &buf.r[..n]);
+                    p.bus_delays[j].run(&mut buf.l[..n], &mut buf.r[..n]);
+                    let target = Applied {
+                        gain: bus.volume,
+                        pan: bus.pan,
+                    };
+                    let from = std::mem::replace(&mut p.bus_applied[j], target);
+                    let out = &mut self.scratch;
+                    out.clear(n);
+                    let peak = strip(
+                        &p.bus_bufs[j],
+                        from,
+                        target,
+                        n,
+                        &mut out.l[..n],
+                        &mut out.r[..n],
+                    );
+                    keep_peak(&mut p.bus_peaks[j], peak);
+                    keys::feed(
+                        &mut p.keys,
+                        source,
+                        Tap::PostFader,
+                        &out.l[..n],
+                        &out.r[..n],
+                    );
+                    add(&mut self.master.l[..n], &out.l[..n], 1.0);
+                    add(&mut self.master.r[..n], &out.r[..n], 1.0);
+                    continue;
+                }
+            };
             let track = &p.song.tracks[i];
             let buf = &mut p.track_bufs[i];
+            let source = KeySource::Track(i);
+            keys::feed(&mut p.keys, source, Tap::PreFx, &buf.l[..n], &buf.r[..n]);
+            let (links, key_of) = (&p.keys, &p.key_of[i]);
             fx::run(
                 &mut p.fx[i],
                 &track.effects,
                 &mut buf.l[..n],
                 &mut buf.r[..n],
+                |e| key_at(links, key_of, e),
             );
+            keys::feed(&mut p.keys, source, Tap::PostFx, &buf.l[..n], &buf.r[..n]);
             p.channel_delays[i].run(&mut buf.l[..n], &mut buf.r[..n]);
             let target = Applied {
                 gain: track.volume * if track.audible { 1.0 } else { 0.0 },
@@ -530,6 +592,13 @@ impl Engine {
                 &mut out.r[..n],
             );
             keep_peak(&mut p.track_peaks[i], peak);
+            keys::feed(
+                &mut p.keys,
+                source,
+                Tap::PostFader,
+                &out.l[..n],
+                &out.r[..n],
+            );
             let dest = match track.destination {
                 Destination::Master if p.plan.live[i] => &mut self.master,
                 Destination::Master => &mut self.direct,
@@ -573,31 +642,6 @@ impl Engine {
             .run(&mut self.direct.l[..n], &mut self.direct.r[..n]);
         add(&mut self.master.l[..n], &self.direct.l[..n], 1.0);
         add(&mut self.master.r[..n], &self.direct.r[..n], 1.0);
-        let tracks = p.song.tracks.len();
-        for (i, bus) in p.song.buses.iter().enumerate() {
-            let buf = &mut p.bus_bufs[i];
-            fx::run(
-                &mut p.fx[tracks + i],
-                &bus.effects,
-                &mut buf.l[..n],
-                &mut buf.r[..n],
-            );
-            p.bus_delays[i].run(&mut buf.l[..n], &mut buf.r[..n]);
-            let target = Applied {
-                gain: bus.volume,
-                pan: bus.pan,
-            };
-            let from = std::mem::replace(&mut p.bus_applied[i], target);
-            let peak = strip(
-                &p.bus_bufs[i],
-                from,
-                target,
-                n,
-                &mut self.master.l[..n],
-                &mut self.master.r[..n],
-            );
-            keep_peak(&mut p.bus_peaks[i], peak);
-        }
 
         // The master: fader and pan, its effects, then the limiter, into
         // the output.
@@ -611,7 +655,10 @@ impl Engine {
         out_r.fill(0.0);
         strip(&self.master, from, target, n, out_l, out_r);
         let last = p.fx.len() - 1;
-        fx::run(&mut p.fx[last], &p.song.master_effects, out_l, out_r);
+        let (links, key_of) = (&p.keys, &p.key_of[last]);
+        fx::run(&mut p.fx[last], &p.song.master_effects, out_l, out_r, |e| {
+            key_at(links, key_of, e)
+        });
         self.master.l[..n].copy_from_slice(out_l);
         self.master.r[..n].copy_from_slice(out_r);
         self.limiter.process(
@@ -645,6 +692,19 @@ impl Engine {
 
         self.clock += n as u64;
     }
+}
+
+/// The key the effect at `e` in a chain hears this block, if it's connected.
+fn key_at<'a>(
+    links: &'a [KeyLink],
+    key_of: &[Option<usize>],
+    e: usize,
+) -> Option<(&'a [f32], &'a [f32])> {
+    key_of
+        .get(e)
+        .copied()
+        .flatten()
+        .map(|k| (&links[k].buf.l[..], &links[k].buf.r[..]))
 }
 
 fn add(into: &mut [f32], from: &[f32], gain: f64) {

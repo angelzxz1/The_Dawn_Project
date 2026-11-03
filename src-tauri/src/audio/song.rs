@@ -17,7 +17,7 @@ use dawn_engine::instruments::synth::{
 use dawn_engine::mix::tempo::TempoSegment;
 use dawn_engine::mix::{
     AudioData, Bus, Clip, ClipTiming, Destination, EffectSettings, EffectSpec, InstrumentSpec,
-    Master, Note, Send, Song, Track, db_to_gain,
+    KeySource, KeySpec, Master, Note, Send, Song, Tap, Track, db_to_gain,
 };
 use serde::Deserialize;
 
@@ -302,14 +302,37 @@ pub struct EffectSpecIn {
     /// response), if it has one.
     #[serde(default)]
     pub file: Option<String>,
+    /// Its sidechain, for an effect keyed by another track or bus (the
+    /// studio sends only those it connects).
+    #[serde(default)]
+    pub sidechain: Option<SidechainSpec>,
+}
+
+/// Where a keyed effect's key comes from: a track's or bus's id, and where
+/// on it (`SidechainTap`: "preFx", "postFx", "postFader").
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SidechainSpec {
+    pub source: String,
+    pub tap: String,
+}
+
+fn tap(name: &str) -> Tap {
+    match name {
+        "preFx" => Tap::PreFx,
+        "postFader" => Tap::PostFader,
+        _ => Tap::PostFx,
+    }
 }
 
 /// A chain's effects for the engine: those it has. A file that hasn't
 /// arrived (at this rate) goes in `missing`; until it does, the effect
 /// keeps the one it had (in `previous`, the song playing), as the
-/// browser's does, or with none plays without one.
+/// browser's does, or with none plays without one. `source` finds a key's
+/// track or bus by its id; a key from one that isn't there is left out.
 fn effects(
     specs: &[EffectSpecIn],
+    source: &dyn Fn(&str) -> Option<KeySource>,
     previous: Option<&Song>,
     audio: &HashMap<String, LoadedAudio>,
     sample_rate: f64,
@@ -338,10 +361,17 @@ fn effects(
                 };
                 settings.set_file(file);
             }
+            let key = e.sidechain.as_ref().and_then(|k| {
+                Some(KeySpec {
+                    source: source(&k.source)?,
+                    tap: tap(&k.tap),
+                })
+            });
             Some(EffectSpec {
                 id: e.id.clone(),
                 settings,
                 bypass: e.bypass,
+                key,
             })
         })
         .collect()
@@ -548,6 +578,12 @@ pub fn build(
         .enumerate()
         .map(|(i, b)| (b.id.as_str(), i))
         .collect();
+    let source = |id: &str| {
+        track_index
+            .get(id)
+            .map(|&i| KeySource::Track(i))
+            .or_else(|| bus_index.get(id).map(|&j| KeySource::Bus(j)))
+    };
     let tracks = spec
         .tracks
         .iter()
@@ -611,7 +647,14 @@ pub fn build(
                     velocity: n.velocity.clamp(0.0, 1.0),
                 })
                 .collect(),
-            effects: effects(&t.effects, previous, audio, sample_rate, &mut missing),
+            effects: effects(
+                &t.effects,
+                &source,
+                previous,
+                audio,
+                sample_rate,
+                &mut missing,
+            ),
             live: t.live,
         })
         .collect();
@@ -626,7 +669,14 @@ pub fn build(
                 0.0
             },
             pan: b.pan.clamp(-1.0, 1.0),
-            effects: effects(&b.effects, previous, audio, sample_rate, &mut missing),
+            effects: effects(
+                &b.effects,
+                &source,
+                previous,
+                audio,
+                sample_rate,
+                &mut missing,
+            ),
         })
         .collect();
     let master = Master {
@@ -646,6 +696,7 @@ pub fn build(
         .collect();
     let master_effects = effects(
         &spec.master_effects,
+        &source,
         previous,
         audio,
         sample_rate,
@@ -919,6 +970,56 @@ mod tests {
             EffectSettings::Limiter(_)
         ));
         assert_eq!(song.master_effects.len(), 1);
+    }
+
+    #[test]
+    fn reads_the_sidechains_by_their_sources_ids() {
+        let keyed = |id: &str, source: &str, tap: &str| {
+            format!(
+                r#"{{ "id": "{id}", "type": "compressor", "params": {{}},
+                     "sidechain": {{ "source": "{source}", "tap": "{tap}" }} }}"#
+            )
+        };
+        let json = format!(
+            r#"{{
+            "tracks": [
+                {{ "id": "kick", "volumeDb": 0, "pan": 0, "audible": true, "output": null, "sends": [], "clips": [],
+                   "effects": [] }},
+                {{ "id": "bass", "volumeDb": 0, "pan": 0, "audible": true, "output": null, "sends": [], "clips": [],
+                   "effects": [{}, {}, {{ "id": "own", "type": "compressor", "params": {{}} }}] }}
+            ],
+            "buses": [{{ "id": "verb", "effects": [] }}],
+            "master": {{ "volumeDb": 0, "pan": 0, "limiterDb": -1 }},
+            "masterEffects": [{}],
+            "tempo": [{{ "beat": 0, "seconds": 0, "bpm": 120 }}],
+            "beatsPerBar": 4
+        }}"#,
+            keyed("duck", "kick", "postFader"),
+            keyed("gone", "nowhere", "postFx"),
+            keyed("glue", "verb", "preFx"),
+        );
+        let spec: SongSpec = serde_json::from_str(&json).unwrap();
+        let (song, _) = build(&spec, None, &HashMap::new(), 48000.0);
+        let keys: Vec<_> = song.tracks[1].effects.iter().map(|e| e.key).collect();
+        assert_eq!(
+            keys,
+            [
+                Some(KeySpec {
+                    source: KeySource::Track(0),
+                    tap: Tap::PostFader
+                }),
+                // From a track or bus that isn't there: its own input.
+                None,
+                None,
+            ]
+        );
+        assert_eq!(
+            song.master_effects[0].key,
+            Some(KeySpec {
+                source: KeySource::Bus(0),
+                tap: Tap::PreFx
+            })
+        );
     }
 
     #[test]
