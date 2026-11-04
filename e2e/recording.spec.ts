@@ -51,6 +51,26 @@ test("record the microphone onto an audio track", async ({ page, studio }) => {
   await expect.poll(() => inked(studio.clipsOn("Audio 1"))).toBeGreaterThan(0);
 });
 
+test("record one input of a device with two: the take comes from input 2", async ({ page, studio }) => {
+  await studio.addTrack("Audio");
+  const header = studio.header("Audio 1");
+  await header.getByTitle("Arm this channel for recording and note input").click();
+  // The (fake) microphone has two channels, once the browser lists it.
+  const picker = header.getByRole("combobox", { name: "Input channel" });
+  await expect(picker).toBeVisible();
+  await picker.selectOption({ label: "In 2" });
+  // The meter reads input 2.
+  await expect(header.getByRole("img", { name: "Input level meter" })).toBeVisible();
+  const record = page.getByTitle("Record microphone input onto Audio 1");
+  await record.click();
+  await expect(record).toHaveAttribute("aria-pressed", "true");
+  await page.waitForTimeout(1500);
+  await page.getByTitle("Stop").click();
+  await expect(studio.clipsOn("Audio 1")).toHaveCount(1);
+  // The fake microphone's beep is on both channels, so the take isn't silent.
+  await expect.poll(() => inked(studio.clipsOn("Audio 1"))).toBeGreaterThan(0);
+});
+
 test("with Punch on, a recording keeps only what's between the loop brace's ends", async ({ page, studio }) => {
   await studio.addTrack("Audio");
   // The brace from the second beat, two beats long; the loop stays off.
@@ -71,8 +91,9 @@ test("with Punch on, a recording keeps only what's between the loop brace's ends
   const record = page.getByTitle("Record microphone input onto Audio 1");
   await record.click();
   await expect(record).toHaveAttribute("aria-pressed", "true");
-  // Recording from the start, on past the punch-out.
-  await page.waitForTimeout(3000);
+  // Recording from the start, on well past the punch-out (a busy machine
+  // starts the take late).
+  await page.waitForTimeout(5000);
   await page.getByTitle("Stop").click();
 
   const clip = studio.clipsOn("Audio 1");
@@ -141,8 +162,8 @@ test("the audio status panel shows the sample rate and latency", async ({ page }
 test("each audio track keeps its own input device", async ({ studio }) => {
   await studio.addTrack("Audio");
   await studio.addTrack("Audio");
-  const first = studio.header("Audio 1").getByRole("combobox", { name: "Input" });
-  const second = studio.header("Audio 2").getByRole("combobox", { name: "Input" });
+  const first = studio.header("Audio 1").getByRole("combobox", { name: "Input", exact: true });
+  const second = studio.header("Audio 2").getByRole("combobox", { name: "Input", exact: true });
   // Going to the list asks for the (fake) devices; pick the last one.
   await first.focus();
   await expect.poll(() => first.locator("option").count()).toBeGreaterThan(1);

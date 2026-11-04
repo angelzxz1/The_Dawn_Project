@@ -22,6 +22,7 @@ import { Meter } from "./Meter";
 import { InputMeter } from "./InputMeter";
 import { useNoInputSignal } from "./useNoInputSignal";
 import { MONITOR_LABELS, type MonitorMode } from "./monitoring";
+import { inputChannelChoices } from "./inputChannels";
 import type { ChannelConfig } from "@/project/types";
 import { INSTRUMENT_LABELS } from "@/instruments/registry";
 import { TRACK_COLOR_PALETTE, type TrackColor, type TrackColorPick } from "@/project/colors";
@@ -106,6 +107,9 @@ export interface TrackHeaderActions {
   move(id: string, direction: -1 | 1): void;
   toggleAutomation(id: string): void;
   setInputDevice(id: string, deviceId: string | null): void;
+  /** Which channel of its device an audio track records (null: all of
+   * them, mixed to one). */
+  setInputChannel(id: string, channel: number | null): void;
   /** Primes mic permission and refreshes the input devices - fired when the
    * input select gains focus, since the browser only returns the full,
    * labeled device list once permission has been granted at least once. */
@@ -156,7 +160,7 @@ interface TrackHeaderProps {
    * track records from - shown in place of the "Audio" badge on an audio
    * track so a device can be picked right on the track, without needing
    * it armed first. Unused for a MIDI track. */
-  inputDevices?: { deviceId: string; label: string }[];
+  inputDevices?: { deviceId: string; label: string; channels?: number }[];
   /** The row's height: short when the track is folded; the header shows as
    * many of its rows as fit. */
   rowHeight?: number;
@@ -326,6 +330,7 @@ export const TrackHeader = memo(function TrackHeader({
   // Its own device, or the default; one that isn't plugged in still shows.
   const inputDevice = channel.inputDevice ?? "";
   const deviceMissing = !!inputDevice && !(inputDevices ?? []).some((d) => d.deviceId === inputDevice);
+  const inputChannels = inputChannelChoices(inputDevices ?? [], inputDevice, channel.inputChannel);
   const onRequestInputDevices = actions.requestInputDevices;
   const onToggleFold = (all: boolean) => actions.toggleFold(id, all);
   const onPick = () => actions.pick(id);
@@ -612,6 +617,22 @@ export const TrackHeader = memo(function TrackHeader({
               {(inputDevices ?? []).map((d) => (
                 <option key={d.deviceId} value={d.deviceId}>
                   {d.label}
+                </option>
+              ))}
+            </select>
+          )}
+          {!inputName && inputChannels.length > 0 && (
+            <select
+              title="Which of the device's inputs this track records: one of them (a guitar on input 2), or all of them mixed to one"
+              aria-label="Input channel"
+              value={channel.inputChannel ?? ""}
+              onChange={(e) => actions.setInputChannel(id, e.target.value === "" ? null : Number(e.target.value))}
+              className="h-5 w-[42px] shrink-0 rounded border border-border bg-surface px-0.5 text-[10px] text-muted"
+            >
+              <option value="">All</option>
+              {inputChannels.map((n) => (
+                <option key={n} value={n}>
+                  In {n + 1}
                 </option>
               ))}
             </select>

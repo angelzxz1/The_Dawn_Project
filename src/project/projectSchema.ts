@@ -364,6 +364,9 @@ function normalizeChannel(
     ...(typeof r.output === "string" && r.output ? { output: r.output } : {}),
     ...(type === "audio" && normalizeTrackInput(r.input) ? { input: normalizeTrackInput(r.input)! } : {}),
     ...(type === "audio" && typeof r.inputDevice === "string" && r.inputDevice && r.inputDevice.length <= 512 ? { inputDevice: r.inputDevice } : {}),
+    ...(type === "audio" && typeof r.inputChannel === "number" && Number.isInteger(r.inputChannel) && r.inputChannel >= 0 && r.inputChannel < 32
+      ? { inputChannel: r.inputChannel }
+      : {}),
     ...(r.folded === true ? { folded: true } : {}),
     ...(typeof r.height === "number" && Number.isFinite(r.height) ? { height: clampTrackHeight(r.height) } : {}),
     ...(r.showTakes === true && type !== "group" ? { showTakes: true } : {}),

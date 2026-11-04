@@ -166,7 +166,7 @@ import type { AudioClipInstance, AudioWarp, AutomationTarget, ChannelConfig, Cha
 import { newClipId } from "@/state/ids";
 import { noteIssue } from "@/services/issues";
 import { flushSync } from "react-dom";
-import { microphoneAllowed } from "@/engine/inputs";
+import { microphoneAllowed, type InputDevice, type InputPick } from "@/engine/inputs";
 
 type TransportState = "stopped" | "playing" | "paused" | "recording";
 
@@ -304,7 +304,7 @@ export function Daw() {
   /** The browser's available audio input devices, and which one
    * recordings currently use (null = the browser's default). Refreshed on
    * mount and whenever the OS reports a device was plugged/unplugged. */
-  const [inputDevices, setInputDevices] = useState<{ deviceId: string; label: string }[]>([]);
+  const [inputDevices, setInputDevices] = useState<InputDevice[]>([]);
   /** Each audio track's monitoring mode, In or Auto (Off: absent) - its
    * headphones button (monitoring.ts). Saved with the project but not part
    * of the undo-tracked document. */
@@ -949,17 +949,17 @@ export function Daw() {
     };
   }, [refreshInputDevices]);
 
-  // Each audio track records from its own input device.
+  // Each audio track records from its own input device, and channel.
   const inputDeviceKey = channels
     .filter((c) => c.type === "audio")
-    .map((c) => `${c.id}=${c.inputDevice ?? ""}`)
+    .map((c) => `${c.id}=${c.inputDevice ?? ""}#${c.inputChannel ?? ""}`)
     .join("|");
   useEffect(() => {
-    const devices = new Map<string, string | null>();
+    const devices = new Map<string, InputPick>();
     projectStore
       .get()
       .channels.filter((c) => c.type === "audio")
-      .forEach((c) => devices.set(c.id, c.inputDevice ?? null));
+      .forEach((c) => devices.set(c.id, { device: c.inputDevice ?? null, channel: c.inputChannel ?? null }));
     audioEngine.setInputDevices(devices);
   }, [inputDeviceKey]);
   const handleInputDeviceChange = trackActions.setInputDevice;
@@ -2492,6 +2492,7 @@ export function Daw() {
     move: handleReorderChannel,
     toggleAutomation: handleToggleAutomation,
     setInputDevice: handleInputDeviceChange,
+    setInputChannel: trackActions.setInputChannel,
     requestInputDevices: handleRequestInputDevices,
     toggleFold: (id, all) => (all ? handleFoldAll(!channels.find((c) => c.id === id)?.folded) : handleToggleFold(id)),
     resizeHeight: (id, height, all) => (all ? trackActions.setAllHeights(height) : trackActions.setHeight(id, height)),

@@ -36,7 +36,7 @@ import type { RouteNode } from "./routing";
 import { planMix, type MixGraph, type MixHost, type MixInput, type MixTrack } from "./mixGraph";
 import type { ClickSound } from "./clickSounds";
 import { interpolateAutomation } from "./automation";
-import { InputManager } from "./inputs";
+import { InputManager, type InputDevice, type InputPick } from "./inputs";
 import { MidiTake } from "./midiTake";
 import { Transport } from "./transport";
 import { createInstrument, updateInstrument } from "../instruments/nodes";
@@ -1751,11 +1751,12 @@ class AudioEngine {
   requestMicAccess(): Promise<void> {
     return this.inputs.requestMicAccess();
   }
-  /** Each audio track's input device (null: the browser's default). */
-  setInputDevices(devices: Map<string, string | null>): void {
+  /** Each audio track's input device (null: the browser's default) and
+   * channel (null: the device as one). */
+  setInputDevices(devices: Map<string, InputPick>): void {
     this.inputs.setTrackDevices(devices);
   }
-  listInputDevices(): Promise<{ deviceId: string; label: string }[]> {
+  listInputDevices(): Promise<InputDevice[]> {
     return this.inputs.listInputDevices();
   }
   setInputMonitoring(channelId: string, enabled: boolean): Promise<boolean> {

@@ -696,6 +696,15 @@ For audio:
   asks for the microphone).
 - A take recorded from another track is stereo (or mono, when both sides
   came out the same); the audio interface is recorded in mono.
+- **Input channel**: on an interface with several inputs, the small list
+  beside the track's Input picks which one it records and monitors, for
+  example **In 2** for a guitar on input 2, so two tracks can record two
+  inputs of the same interface. **All** (the default) mixes the device's
+  inputs into one. The list shows once the browser says the device has
+  more than one channel (Chrome and Edge do, after the microphone is
+  allowed), and the choice is saved with the track. On Windows, an
+  interface usually shows up as pairs of inputs ("In 1-2"), each a device
+  with two channels.
 - Recordings are lined up with the beat automatically: each take is moved
   earlier by your setup's round trip (the time from Dawn's output to the
   speakers, and from the mic back into Dawn). Until you measure it, that's

@@ -2,6 +2,11 @@
 // a stream per device in use, opened when first needed) and other tracks
 // ("Audio From"), and each audio track's monitor - its input heard live
 // through its effects.
+//
+// A track takes its device as one mono channel, as the browser mixes it
+// down, or one of the device's channels (an interface's input 2, say): those
+// come from a second stream of the device, opened with all its channels and
+// split, shared by every track taking a channel of it.
 
 import * as Tone from "tone";
 import type { SidechainTap } from "../effects/sidechain/sidechainModel";
@@ -30,27 +35,67 @@ export async function microphoneAllowed(): Promise<boolean> {
   }
 }
 
-/** An open input device: its stream, its graph input, and the analyser
- * its meter reads. */
+/** An open input: its graph input (mono), and the analyser its meter
+ * reads; a device's own stream, or a channel of its multichannel one. */
 interface OpenDevice {
   stream: MediaStream;
-  source: MediaStreamAudioSourceNode;
+  source: AudioNode;
   analyser: AnalyserNode;
+}
+
+/** A device opened with all its channels, split. */
+interface OpenChannels {
+  stream: MediaStream;
+  source: MediaStreamAudioSourceNode;
+  splitter: ChannelSplitterNode;
+  count: number;
 }
 
 /** The browser's default input, as a device key. */
 const DEFAULT_DEVICE = "";
 
+/** Where a track's interface input comes from: a device ("" for the
+ * default) and, optionally, one of its channels (0 = the first). */
+export interface InputPick {
+  device: string | null;
+  channel: number | null;
+}
+
+/** The key an input is open under: the device's id, then `#n` for its
+ * channel n. */
+export function inputKey(pick: InputPick): string {
+  const device = pick.device ?? DEFAULT_DEVICE;
+  return pick.channel === null ? device : `${device}#${pick.channel}`;
+}
+
+/** A key's device and channel (null: the device as one channel). */
+export function parseInputKey(key: string): { device: string; channel: number | null } {
+  const at = key.lastIndexOf("#");
+  if (at < 0) return { device: key, channel: null };
+  const channel = Number(key.slice(at + 1));
+  return Number.isInteger(channel) && channel >= 0 ? { device: key.slice(0, at), channel } : { device: key, channel: null };
+}
+
+/** The channel of a device with `count` channels that a pick of `channel`
+ * gets: the last when it asks for one past it (another interface). */
+export function availableChannel(channel: number, count: number): number {
+  return Math.max(0, Math.min(channel, count - 1));
+}
+
 export class InputManager {
   constructor(private readonly host: InputHost) {}
 
-  /** Each audio track's input device (setTrackDevices); a track not in it
-   * takes the browser's default. */
+  /** Each audio track's input (setTrackDevices), as its key (inputKey); a
+   * track not in it takes the browser's default. */
   private trackDevices = new Map<string, string>();
-  /** The open devices, by id (DEFAULT_DEVICE for the default), and those
+  /** The open inputs, by key (DEFAULT_DEVICE for the default), and those
    * opening. */
   private devices = new Map<string, OpenDevice>();
   private opening = new Map<string, Promise<OpenDevice>>();
+  /** The devices open with all their channels, by device id, and those
+   * opening. */
+  private multi = new Map<string, OpenChannels>();
+  private openingMulti = new Map<string, Promise<OpenChannels>>();
 
   /** Per-channel live input-monitor taps - open only while that channel is
    * both armed and monitoring is enabled (see `setInputMonitoring`). Each
@@ -117,51 +162,81 @@ export class InputManager {
     });
   }
 
-  /** An input device, open: one stream and graph input per device, shared
-   * by every track on it, every capture (see InputRecorder.start) and its
-   * meter. */
-  private ensureDevice(device: string): Promise<OpenDevice> {
-    const open = this.devices.get(device);
+  /** An input, open: one graph input per key, shared by every track on
+   * it, every capture (see InputRecorder.start) and its meter. A device
+   * as one channel has a stream of its own; a channel of it is split from
+   * the device's multichannel stream. */
+  private ensureDevice(key: string): Promise<OpenDevice> {
+    const open = this.devices.get(key);
     if (open) return Promise.resolve(open);
-    const pending = this.opening.get(device);
+    const pending = this.opening.get(key);
     if (pending) return pending;
     const opening = (async () => {
-      // `channelCount: { ideal: 1 }` asks for a single (mono) capture
-      // rather than whatever multi-channel width the device natively
-      // exposes - without it, some audio interfaces hand back every input
-      // channel summed together regardless of which single `deviceId` was
-      // requested. Echo cancellation, noise suppression and auto gain are
-      // made for calls: they pump, gate and dull an instrument, so they're
-      // off. Recording and monitoring both use this one stream.
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          ...(device ? { deviceId: { exact: device } } : {}),
-          channelCount: { ideal: 1 },
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false,
-        },
-      });
+      const { device, channel } = parseInputKey(key);
       const context = Tone.getContext();
-      const source = context.createMediaStreamSource(stream);
+      let stream: MediaStream;
+      let source: AudioNode;
+      if (channel === null) {
+        // `channelCount: { ideal: 1 }` asks for a single (mono) capture
+        // rather than whatever multi-channel width the device natively
+        // exposes - without it, some audio interfaces hand back every input
+        // channel summed together regardless of which single `deviceId` was
+        // requested. Recording and monitoring both use this one stream.
+        stream = await openStream(device, 1);
+        source = context.createMediaStreamSource(stream);
+      } else {
+        const all = await this.ensureChannels(device);
+        stream = all.stream;
+        const pick = context.createGain();
+        pick.channelCount = 1;
+        pick.channelCountMode = "explicit";
+        all.splitter.connect(pick, availableChannel(channel, all.count));
+        source = pick;
+      }
       // The input meter listens to the raw input, before any effect.
       const analyser = context.createAnalyser();
       analyser.fftSize = 2048;
       source.connect(analyser);
       const opened = { stream, source, analyser };
-      this.devices.set(device, opened);
+      this.devices.set(key, opened);
       return opened;
     })();
-    this.opening.set(device, opening);
+    this.opening.set(key, opening);
     opening.then(
-      () => this.opening.delete(device),
-      () => this.opening.delete(device)
+      () => this.opening.delete(key),
+      () => this.opening.delete(key)
+    );
+    return opening;
+  }
+
+  /** A device opened with all its channels, split. */
+  private ensureChannels(device: string): Promise<OpenChannels> {
+    const open = this.multi.get(device);
+    if (open) return Promise.resolve(open);
+    const pending = this.openingMulti.get(device);
+    if (pending) return pending;
+    const opening = (async () => {
+      const stream = await openStream(device, MOST_CHANNELS);
+      const context = Tone.getContext();
+      const source = context.createMediaStreamSource(stream);
+      const settings = stream.getAudioTracks()[0]?.getSettings();
+      const count = Math.max(1, Math.min(MOST_CHANNELS, settings?.channelCount ?? 1));
+      const splitter = context.createChannelSplitter(count);
+      source.connect(splitter);
+      const opened = { stream, source, splitter, count };
+      this.multi.set(device, opened);
+      return opened;
+    })();
+    this.openingMulti.set(device, opening);
+    opening.then(
+      () => this.openingMulti.delete(device),
+      () => this.openingMulti.delete(device)
     );
     return opening;
   }
 
   /** A track's interface input (its device's), opened if it isn't. */
-  async inputSource(channelId: string): Promise<MediaStreamAudioSourceNode> {
+  async inputSource(channelId: string): Promise<AudioNode> {
     return (await this.ensureDevice(this.deviceOf(channelId))).source;
   }
 
@@ -195,25 +270,36 @@ export class InputManager {
     await this.ensureDevice(DEFAULT_DEVICE);
   }
 
-  /** Each audio track's input device (null: the browser's default). A
-   * track whose device changed reopens its monitor on the new one; a
-   * device no track uses any more is closed (the default stays open once
-   * it is). */
-  setTrackDevices(devices: Map<string, string | null>): void {
+  /** Each audio track's input: its device (null: the browser's default)
+   * and channel (null: the device as one channel). A track whose input
+   * changed reopens its monitor on the new one; an input no track uses any
+   * more is closed (the default stays open once it is), and a device's
+   * multichannel stream once no track takes a channel of it. */
+  setTrackDevices(devices: Map<string, InputPick>): void {
     const next = new Map<string, string>();
-    devices.forEach((device, id) => {
-      if (device) next.set(id, device);
+    devices.forEach((pick, id) => {
+      const key = inputKey(pick);
+      if (key !== DEFAULT_DEVICE) next.set(id, key);
     });
     const ids = new Set([...this.trackDevices.keys(), ...next.keys()]);
     const changed = [...ids].filter((id) => this.trackDevices.get(id) !== next.get(id));
     this.trackDevices = next;
     if (changed.length === 0) return;
     const used = new Set([DEFAULT_DEVICE, ...next.values()]);
-    this.devices.forEach((open, device) => {
-      if (used.has(device)) return;
+    this.devices.forEach((open, key) => {
+      if (used.has(key)) return;
       open.source.disconnect();
+      // A channel's stream is its device's multichannel one, closed below.
+      if (parseInputKey(key).channel === null) open.stream.getTracks().forEach((track) => track.stop());
+      this.devices.delete(key);
+    });
+    const split = new Set([...used].map(parseInputKey).filter((k) => k.channel !== null).map((k) => k.device));
+    this.multi.forEach((open, device) => {
+      if (split.has(device)) return;
+      open.source.disconnect();
+      open.splitter.disconnect();
       open.stream.getTracks().forEach((track) => track.stop());
-      this.devices.delete(device);
+      this.multi.delete(device);
     });
     // Monitors on the interface input move to their track's device.
     changed.forEach((id) => {
@@ -223,17 +309,21 @@ export class InputManager {
   }
 
   /** Lists the browser's available audio input devices (an interface's
-   * separate inputs included, once the OS exposes them). Device labels -
-   * and, on some browsers, entries for anything past the first device -
-   * come back blank/missing until mic permission has been granted at
-   * least once; call `requestMicAccess` first (or just try recording) to
-   * unlock the real list, then call this again. */
-  async listInputDevices(): Promise<{ deviceId: string; label: string }[]> {
+   * separate inputs included, once the OS exposes them), with how many
+   * channels each has when the browser says. Device labels - and, on some
+   * browsers, entries for anything past the first device - come back
+   * blank/missing until mic permission has been granted at least once;
+   * call `requestMicAccess` first (or just try recording) to unlock the
+   * real list, then call this again. */
+  async listInputDevices(): Promise<InputDevice[]> {
     if (!navigator.mediaDevices?.enumerateDevices) return [];
     const devices = await navigator.mediaDevices.enumerateDevices();
     return devices
       .filter((d) => d.kind === "audioinput")
-      .map((d, i) => ({ deviceId: d.deviceId, label: d.label || `Microphone ${i + 1}` }));
+      .map((d, i) => {
+        const channels = channelsOf(d);
+        return { deviceId: d.deviceId, label: d.label || `Microphone ${i + 1}`, ...(channels ? { channels } : {}) };
+      });
   }
 
   /** Starts or stops hearing the audio input live through an audio
@@ -307,4 +397,39 @@ export class InputManager {
       this.devices.values().next().value;
     return (open?.stream.getAudioTracks()[0]?.getSettings() as MediaTrackSettings & { latency?: number }) ?? null;
   }
+}
+
+/** An input device the browser lists. */
+export interface InputDevice {
+  deviceId: string;
+  label: string;
+  /** How many channels it has (an interface's inputs), when known. */
+  channels?: number;
+}
+
+/** The most channels a device is opened with. */
+const MOST_CHANNELS = 32;
+
+/** A device's stream: mono (`channels` 1), or with all its channels. Echo
+ * cancellation, noise suppression and auto gain are made for calls: they
+ * pump, gate and dull an instrument (and echo cancellation makes it mono),
+ * so they're off. */
+function openStream(device: string, channels: number): Promise<MediaStream> {
+  return navigator.mediaDevices.getUserMedia({
+    audio: {
+      ...(device ? { deviceId: { exact: device } } : {}),
+      channelCount: { ideal: channels },
+      echoCancellation: false,
+      noiseSuppression: false,
+      autoGainControl: false,
+    },
+  });
+}
+
+/** How many channels a listed device has, as the browser says (Chrome
+ * and Edge, once the microphone is allowed); undefined when it doesn't. */
+function channelsOf(device: MediaDeviceInfo): number | undefined {
+  const capabilities = (device as MediaDeviceInfo & { getCapabilities?: () => MediaTrackCapabilities }).getCapabilities?.();
+  const max = capabilities?.channelCount?.max;
+  return typeof max === "number" && Number.isFinite(max) && max >= 1 ? Math.min(MOST_CHANNELS, Math.floor(max)) : undefined;
 }

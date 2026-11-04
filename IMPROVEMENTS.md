@@ -1,11 +1,11 @@
 # Improvements
 
-Checked against the code and the commit history on 2026-10-29, and again on 2026-11-02; item 7 of Part 2 was added on 2026-10-30, items 8, 9, 16, 18, 19, 20, 21 and 22 on 2026-10-31, items 11, 12, 13, 24, 25 and 28 on 2026-11-01, items 23, 10 and 26 on 2026-11-02. The menu bar (not a listed item) was added on 2026-11-03, and the native engine's automation (item 9) the same day; items 14 and 15 on 2026-11-04.
+Checked against the code and the commit history on 2026-10-29, and again on 2026-11-02; item 7 of Part 2 was added on 2026-10-30, items 8, 9, 16, 18, 19, 20, 21 and 22 on 2026-10-31, items 11, 12, 13, 24, 25 and 28 on 2026-11-01, items 23, 10 and 26 on 2026-11-02. The menu bar (not a listed item) was added on 2026-11-03, and the native engine's automation (item 9) the same day; items 14, 15 and 17 on 2026-11-04.
 
 - `[x]` is done; the commit that did it is in brackets.
 - `[ ]` is still open; "Partly" says what already exists.
 
-**Summary:** Part 1 is all done. In Part 2, items 1–16, 18–26 and 28 are done; 17 and 27 are open.
+**Summary:** Part 1 is all done. In Part 2, items 1–26 and 28 are done; 27 is open.
 
 ## Part 1: Code improvements
 
@@ -99,11 +99,11 @@ That is already ahead of most browser DAWs, such as BandLab or Soundtrap.
 ### Recording
 
 - [x] **14. Monitoring modes per track:** In / Auto / Off, as in Ableton, instead of one toggle. (`f750344`; `src/studio/tracks/monitoring.ts`: In always hears the input, Auto while the track is armed and stopped or recording onto it, Off never; the track's clips play in every mode)
-- [x] **15. Punch-in/out recording** within the loop region. (2026-11-04, commit to come; `src/project/punch.ts`: with Punch on, a recording keeps only what's between the loop brace's ends, the song before it a run-up)
+- [x] **15. Punch-in/out recording** within the loop region. (`2331049`; `src/project/punch.ts`: with Punch on, a recording keeps only what's between the loop brace's ends, the song before it a run-up)
 - [x] **16. A visible count-in** in the transport, and a click-volume control with click sound choices. (`84d1f02`)
   - The transport shows the count-in as it goes, the beats left (4, 3, 2, 1), the bar's first beat brighter (`CountIn.tsx`, `Transport.countInLeft`).
   - Four click sounds, next to the click level: Classic (the one there was), Beep, Wood block and Cowbell (`metronomeKernel.ts` `makeClick`, and the native engine's port in `metronome.rs`). Like the level, it's a setting of this computer (`audioPrefs.ts`).
-- [ ] **17. Choosing input channels on multi-input interfaces,** for example a mono guitar on input 2.
+- [x] **17. Choosing input channels on multi-input interfaces,** for example a mono guitar on input 2. (2026-11-04, commit to come; `src/engine/inputs.ts`: each audio track picks In 1, In 2... or All beside its Input, split from the device's multichannel stream)
 
 ### Finding things and learning the app
 

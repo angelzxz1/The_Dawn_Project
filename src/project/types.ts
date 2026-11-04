@@ -66,6 +66,11 @@ export interface ChannelConfig extends InstrumentSettings {
    * keeps its own. A device that isn't there (another computer) is the
    * default. */
   inputDevice?: string;
+  /** Audio tracks: which of that device's channels it records (0 = the
+   * first: an interface's input 1); unset, the device as one channel, as
+   * the browser mixes it down. A device with fewer channels gives its
+   * last. */
+  inputChannel?: number;
   /** Folded: a short row in the arrangement (for a group: its members are
    * hidden too). */
   folded?: boolean;

@@ -29,7 +29,7 @@ beforeEach(() => {
 
 const ACTIONS = [
   "select", "rename", "renameDone", "setVolume", "setPan", "adjustStart", "toggleMute", "toggleSolo", "toggleArm",
-  "toggleMonitor", "openFx", "importMidi", "exportMidi", "importAudio", "clear", "remove", "contextMenu",
+  "toggleMonitor", "setInputChannel", "openFx", "importMidi", "exportMidi", "importAudio", "clear", "remove", "contextMenu",
   "recolor", "move", "toggleAutomation", "setInputDevice", "requestInputDevices", "toggleFold", "pick", "resizeHeight", "hover",
   "dropEffects",
 ] as const satisfies readonly (keyof TrackHeaderActions)[];
@@ -218,6 +218,24 @@ describe("routing highlights", () => {
 });
 
 describe("other kinds of track", () => {
+  test("an audio track on an interface with two inputs picks one of them, or both mixed", async () => {
+    const { screen, actions } = renderHeader({
+      channel: channel({ id: "gtr", name: "Guitar", type: "audio", instrument: null, inputDevice: "umc" }),
+      inputDevices: [{ deviceId: "umc", label: "UMC", channels: 2 }],
+    });
+    const picker = screen.getByRole("combobox", { name: "Input channel" });
+    await picker.selectOptions("In 2");
+    expect(actions.setInputChannel).toHaveBeenCalledWith("gtr", 1);
+  });
+
+  test("an input with one channel has no channel picker", async () => {
+    const { screen } = renderHeader({
+      channel: channel({ id: "gtr", name: "Guitar", type: "audio", instrument: null, inputDevice: "mic" }),
+      inputDevices: [{ deviceId: "mic", label: "Mic", channels: 1 }],
+    });
+    await expect.element(screen.getByRole("combobox", { name: "Input channel" })).not.toBeInTheDocument();
+  });
+
   test("an audio track: monitor, its input device, and an input meter when armed", async () => {
     const devices = [{ deviceId: "usb", label: "USB Interface" }];
     const { screen, actions } = renderHeader({

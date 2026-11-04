@@ -505,6 +505,19 @@ describe("an audio track's input device", () => {
     });
     expect(p?.channels.map((c) => c.inputDevice)).toEqual(["usb-1", undefined, undefined]);
   });
+
+  it("and its channel: a whole number from 0, on audio tracks", () => {
+    const p = normalizeProject({
+      channels: [
+        { id: "a", name: "Gtr", type: "audio", inputChannel: 1 },
+        { id: "b", name: "Vox", type: "audio", inputChannel: -1 },
+        { id: "c", name: "Bass", type: "audio", inputChannel: 1.5 },
+        { id: "d", name: "Old", type: "audio" },
+        { id: "m", name: "Keys", type: "midi", inputChannel: 1 },
+      ],
+    });
+    expect(p?.channels.map((c) => c.inputChannel)).toEqual([1, undefined, undefined, undefined, undefined]);
+  });
 });
 
 describe("the layout", () => {

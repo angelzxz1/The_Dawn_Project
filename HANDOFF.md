@@ -3,13 +3,13 @@
 Read this first in a new session. It says where the project is, how the
 work is done and what comes next, then keeps the technical notes (the
 native engine's techniques, and what each finished item changed).
-Updated 2026-11-04, at `main` = `f750344`, with step 27 not yet
+Updated 2026-11-04, at `main` = `2331049`, with step 28 not yet
 committed.
 
 ## Start here
 
 - **Where we are:** Phase 8 (recording) of `nextSteps.md` is under way:
-  steps 1-27 are done (step 6, NAM in the engine, was dropped). The last
+  steps 1-28 are done (step 6, NAM in the engine, was dropped). The last
   few:
   - step 22, the mixer view (2026-11-02, `0078489`);
   - step 23, the mixer and piano roll in windows of their own
@@ -23,14 +23,17 @@ committed.
     `scripts/desktop.mjs`, docs/desktop.md "ASIO"). The user has
     LLVM installed and it builds; the installers stay without it.
   - step 26, monitoring modes per track (2026-11-04, `f750344`).
-  - step 27, punch-in and punch-out (2026-11-04, commit to come).
-- **Next: step 28, choosing input channels on multi-input interfaces**
-  (Phase 8, Part 2 #17), for example a mono guitar on input 2. Wait for
-  the user to say "go" before starting a step: they ask for each one
-  ("Lets go with step N").
+  - step 27, punch-in and punch-out (2026-11-04, `2331049`).
+  - step 28, input channels on multi-input interfaces (2026-11-04,
+    commit to come).
+- **Next: step 29, live input and recording through the engine**: the
+  interface's inputs, low-latency monitoring and takes written to disk,
+  using the model from steps 26-28 (monitoring modes, punch, input
+  channels). Wait for the user to say "go" before starting a step: they
+  ask for each one ("Lets go with step N").
 - **What's left after that,** in order (the full list, with sizes, is in
   `nextSteps.md`; a summary is under "The road ahead" below):
-  recording (input channels, then live
+  recording (live
   input through the engine), plugins (CLAP, VST3, plugin instruments,
   AU), shipping (export through the engine, native dialogs, signed
   installers), an accessibility pass, and last the desktop's driver,
@@ -168,7 +171,7 @@ The Dawn Project is a browser DAW, also built as a desktop app.
 **Checks before handing a step over:**
 
 - `npx tsc --noEmit` and `npm run lint` (both clean).
-- `npx vitest run`: 819 unit and component tests on 2026-11-04, in the
+- `npx vitest run`: 827 unit and component tests on 2026-11-04, in the
   projects `unit` (Node), `components` (Chromium) and `web-audio`. The
   component tests have a 30 s limit (`vitest.config.ts`), and the slow
   unit tests their own; no `--testTimeout` needed.
@@ -909,7 +912,7 @@ the order they were done, with the fixes made along the way.
     modes so far: the native engine takes no input until step 29, which
     uses this model. Tests: `monitoring.test.ts`, `contextMenus.test.tsx`,
     `projectSchema.test.ts`, `TrackHeader.test.tsx`, `e2e/tracks.spec.ts`.
-  - Item 15, punch-in and punch-out (2026-11-04, commit to come; step
+  - Item 15, punch-in and punch-out (2026-11-04, `2331049`; step
     27): Punch (the brackets button in the transport, Options > Punch
     In/Out, saved with the project as `punch`) makes a recording keep only
     what's between the loop brace's ends, loop on or off.
@@ -923,8 +926,24 @@ the order they were done, with the fixes made along the way.
     only inside the range would need the playhead's position in
     `monitoredNow`). The lanes show the range with dashed red ends. Tests:
     `punch.test.ts`, `projectSchema.test.ts`, `e2e/recording.spec.ts`.
-  - Items 17 and 27 are open. Next in `nextSteps.md` is Phase 8,
-    step 28 (input channels, item 17); steps 24 and 25 (sidechains and
+  - Item 17, input channels on multi-input interfaces (2026-11-04,
+    commit to come; step 28): an audio track keeps `inputChannel` (0 =
+    input 1; unset, the device as one channel, as before), picked in a
+    small list beside its Input (In 1, In 2... or All), shown when the
+    browser lists the device with more than one channel
+    (`InputDeviceInfo.getCapabilities().channelCount`, Chrome and Edge;
+    `inputChannels.ts`). `src/engine/inputs.ts` opens each input under a
+    key (`inputKey`: the device's id, then `#n`): the device as one
+    channel is its own mono stream, as before; a channel comes from a
+    second stream of the device opened with all its channels and split,
+    shared by every track taking a channel of it and closed when none
+    does. A channel past the device's last gives its last. The meter,
+    monitor and recording all take the track's key. Tests:
+    `inputChannels.test.ts`, `TrackHeader.test.tsx`,
+    `projectSchema.test.ts`, `e2e/recording.spec.ts` (input 2 of the
+    fake microphone, which has two channels).
+  - Item 27 is open. Next in `nextSteps.md` is Phase 8, step 29 (live
+    input and recording through the engine); steps 24 and 25 (sidechains and
     automation in the engine, 2026-11-03) are logged under "The native
     engine plan".
   - Fixed 2026-10-31: on Windows, Next's static export wrote each page's
