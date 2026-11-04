@@ -18,7 +18,10 @@
 //! tracks go into it through the shared direct delay, live ones straight.
 //! An effect keyed by another track or bus (`keys`) hears it at its tap,
 //! in the same block: the tracks and buses are mixed in an order that puts
-//! every source first.
+//! every source first. A track's automation (`automation`) moves its fader
+//! and pan, gliding over each block to where the lanes are at its end, and
+//! gives its automated effects the settings made for where the block
+//! starts.
 
 use std::f64::consts::FRAC_PI_2;
 
@@ -221,6 +224,9 @@ impl Engine {
         for i in 0..new.song.tracks.len() {
             let id = &new.song.tracks[i].id;
             if let Some(j) = old.song.tracks.iter().position(|t| &t.id == id) {
+                // Its strip glides on from where it was (its automation's
+                // level and pan, not its fader's).
+                new.track_applied[i] = old.track_applied[j];
                 keep(&mut new.own_delays[i], &mut old.own_delays[j]);
                 keep(&mut new.channel_delays[i], &mut old.channel_delays[j]);
                 keep(&mut new.send_delays[i], &mut old.send_delays[j]);
@@ -435,6 +441,24 @@ impl Engine {
         self.master.clear(n);
         self.direct.clear(n);
 
+        // The automated effects take the settings made for where the
+        // transport is.
+        let start = self.transport.position;
+        for h in 0..p.song.host_count() {
+            for (e, spec) in p.song.host_effects(h).iter().enumerate() {
+                let Some((k, settings)) = spec.automation.as_ref().and_then(|a| a.stage_at(start))
+                else {
+                    continue;
+                };
+                if p.fx_stage[h][e] != Some(k) {
+                    p.fx_stage[h][e] = Some(k);
+                    if let Some(effect) = p.fx[h][e].as_deref_mut() {
+                        effect.configure(settings);
+                    }
+                }
+            }
+        }
+
         // The clips, over the stretches of the timeline this block plays
         // (the loop splits it where it jumps back).
         let t = &mut self.transport;
@@ -510,6 +534,9 @@ impl Engine {
             delay.run(&mut buf.l[..n], &mut buf.r[..n]);
         }
 
+        // Where the lanes are read: the timeline at the block's end.
+        let now = self.transport.position as f64 / self.sample_rate;
+
         // The strips (after their effects, and the wait lining them up),
         // each after what it takes audio from: the tracks feeding it, and
         // the tracks and buses keying its effects (`keys`). A source's key
@@ -576,8 +603,8 @@ impl Engine {
             keys::feed(&mut p.keys, source, Tap::PostFx, &buf.l[..n], &buf.r[..n]);
             p.channel_delays[i].run(&mut buf.l[..n], &mut buf.r[..n]);
             let target = Applied {
-                gain: track.volume * if track.audible { 1.0 } else { 0.0 },
-                pan: track.pan,
+                gain: track.volume_at(now) * if track.audible { 1.0 } else { 0.0 },
+                pan: track.pan_at(now),
             };
             let from = std::mem::replace(&mut p.track_applied[i], target);
             // The strip's output goes to its destination and its sends.

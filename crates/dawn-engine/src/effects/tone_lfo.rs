@@ -243,15 +243,28 @@ impl WaveTables {
     /// Makes them, or finds them made (not on the audio thread).
     pub fn new(wave: LfoWave, rate: f64, sample_rate: f64) -> Self {
         let size = table_size(sample_rate);
-        let (rate_scale, inv_rate_scale, lowest, ranges) = rates(size, sample_rate);
-        let frequency = inv_rate_scale * (rate as f32 * rate_scale);
-        let (i1, i2, _) = wave_data(frequency, lowest, ranges);
+        let (i1, i2) = Self::ranges(rate, sample_rate);
         Self {
             wave,
             ranges: (i1, i2),
             higher: table(wave, size, i1),
             lower: table(wave, size, i2),
         }
+    }
+
+    /// The two ranges an LFO at `rate` reads.
+    fn ranges(rate: f64, sample_rate: f64) -> (usize, usize) {
+        let size = table_size(sample_rate);
+        let (rate_scale, inv_rate_scale, lowest, ranges) = rates(size, sample_rate);
+        let frequency = inv_rate_scale * (rate as f32 * rate_scale);
+        let (i1, i2, _) = wave_data(frequency, lowest, ranges);
+        (i1, i2)
+    }
+
+    /// Whether they're the ones `new(wave, rate, sample_rate)` would make
+    /// (made at `sample_rate`: the caller knows).
+    pub fn suits(&self, wave: LfoWave, rate: f64, sample_rate: f64) -> bool {
+        self.wave == wave && self.ranges == Self::ranges(rate, sample_rate)
     }
 }
 

@@ -67,22 +67,36 @@ impl ChorusSettings {
         }
     }
 
-    /// Makes the LFOs' tables for `sample_rate` (off the audio thread).
-    pub fn prepare(&mut self, sample_rate: f64) {
-        if self
-            .tables
-            .as_ref()
-            .is_none_or(|t| t.sample_rate != sample_rate)
-        {
-            self.tables = Some(Box::new(self.make_tables(sample_rate)));
+    /// Makes the LFOs' tables for `sample_rate` (off the audio thread),
+    /// unless they're made, or `previous` (another version of this chorus)
+    /// has the same ones.
+    pub fn prepare(&mut self, sample_rate: f64, previous: Option<&Self>) {
+        let suits = |t: &Tables| {
+            t.sample_rate == sample_rate
+                && t.waves
+                    .iter()
+                    .zip(self.waves())
+                    .all(|(w, wave)| w.suits(wave, self.rate, sample_rate))
+        };
+        if self.tables.as_deref().is_some_and(suits) {
+            return;
         }
+        self.tables = match previous.and_then(|p| p.tables.as_deref()) {
+            Some(t) if suits(t) => Some(Box::new(t.clone())),
+            _ => Some(Box::new(self.make_tables(sample_rate))),
+        };
+    }
+
+    /// The left LFO's wave and the right's.
+    fn waves(&self) -> [LfoWave; 2] {
+        [0.0, self.spread].map(|phase| LfoWave {
+            shape: self.shape,
+            phase,
+        })
     }
 
     fn make_tables(&self, sample_rate: f64) -> Tables {
-        let waves = [0.0, self.spread].map(|phase| LfoWave {
-            shape: self.shape,
-            phase,
-        });
+        let waves = self.waves();
         Tables {
             sample_rate,
             waves: waves.map(|w| WaveTables::new(w, self.rate, sample_rate)),

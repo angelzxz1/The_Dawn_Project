@@ -18,8 +18,8 @@ It's early. Today:
   instrument through the mix (volume, pan, mute, solo, groups, sends), the
   dynamics and EQ effects, the Filter, the Chorus, the Delay, the Reverb,
   the Saturator, the Pitch Shift, the Furnace amp, the IR Loader and the
-  Tuner, with sidechains, delay compensation, the master limiter and the
-  metronome. Automation and recording still need the browser's engine,
+  Tuner, with sidechains, automation, delay compensation, the master
+  limiter and the metronome. Recording still needs the browser's engine,
   and the NAM Amp stays a browser effect (on the desktop, NAM models are
   meant to play through NAM's own plugin, once plugins run in the
   engine): the
@@ -222,7 +222,7 @@ the rest of the studio doesn't change while parts move over.
 The studio sends each chain's effects the engine has (with their
 parameters as the project keeps them, `NATIVE_EFFECTS` in `describe.ts`);
 a chain plays without the others. What it doesn't play yet - those
-effects, automation - the Audio panel names for the project open.
+effects - the Audio panel names for the project open.
 
 Sidechains: the studio sends each keyed effect's source (a track's or
 bus's id) and tap, for the keys the browser's engine connects (those that
@@ -232,6 +232,26 @@ effects it keys (a bus can key a track), copies each key at its tap
 (before the source's effects, after them, or after its fader) and delays
 it to line up with the effect's input, from its own latencies, as
 `keyDelay` does.
+
+Automation: the studio sends each track's lanes that have points (its
+fader's in dB, its pan's, and those of its effects the engine plays), with
+each point's bend. The engine reads them as the browser's engine does
+(`crates/dawn-engine/src/mix/automation.rs`, a port of
+`src/engine/automation.ts`): flat before the first point and after the
+last, each segment bent by `curveShape`. The fader and pan follow their
+lanes on the audio thread, in place of their own settings, gliding over
+each block to where the lane is at its end. An effect's settings are
+made from its parameters, and some make impulses or tables, so they're
+made beforehand, off the audio thread: one every 50 ms where its lanes
+move (the browser's control rate), and the engine switches to the one for
+where the transport is. A reverb's decay, damping, early reflections,
+width and mode, a chorus's spread and waveform and an IR Loader's
+normalize step at each point instead of gliding (`fx::stepped`): they
+shape an impulse or an LFO's tables, which take too long to make every
+50 ms, and the browser's reverb, too, rebuilds its impulse only once its
+decay stops moving. Delay compensation reads an effect's own setting, so
+automating a Pitch Shift's window or a Saturator's oversampling doesn't
+move it, in either engine.
 
 ### ASIO
 
@@ -402,17 +422,17 @@ crash and hang on purpose. CI runs it on Windows, macOS and Linux
 ## Next steps
 
 1. **Recording through the engine**: the interface's inputs, monitoring
-   with low latency, takes written to disk, latency compensation.
-2. **Automation in the engine.** Every instrument and effect plays
-   already, sidechains included, bar the NAM Amp, which stays in the
-   browser (on the desktop, NAM's own plugin plays NAM models).
-3. **Plugins**: finding them is done (above). Next, CLAP effects running in
+   with low latency, takes written to disk, latency compensation. Every
+   instrument, effect and lane plays already, sidechains included, bar the
+   NAM Amp, which stays in the browser (on the desktop, NAM's own plugin
+   plays NAM models).
+2. **Plugins**: finding them is done (above). Next, CLAP effects running in
    the engine on tracks, with their own windows and their state saved in
    the project; then VST3 effects the same way; then plugin instruments on
    MIDI tracks, played from clips and live; then Audio Units on macOS.
    NAM's plugin is the first VST3 to try: it's how the desktop app plays
    NAM models.
-4. **Export through the engine**, native file dialogs, signed installers.
+3. **Export through the engine**, native file dialogs, signed installers.
 
 ## Checks
 

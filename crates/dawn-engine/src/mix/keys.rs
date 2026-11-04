@@ -113,6 +113,9 @@ pub(crate) fn resolve(song: &mut Song) -> Vec<Vec<usize>> {
                 spec.key = None;
             }
             spec.settings.set_external(source.is_some());
+            if let Some(a) = &mut spec.automation {
+                a.set_external(source.is_some());
+            }
         }
     }
     graph

@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use super::automation::EffectAutomation;
 use super::clip::AudioData;
 use super::song::MAX_BLOCK;
 use crate::effects::amp::{self, AmpEffect, AmpSettings};
@@ -134,6 +135,18 @@ impl EffectSettings {
         )
     }
 
+    /// Whether its detector listens to its key rather than its own input.
+    pub fn external(&self) -> bool {
+        match self {
+            Self::Compressor(s) => s.key.external,
+            Self::Gate(s) => s.key.external,
+            Self::Glue(s) => s.key.external,
+            Self::MbDynamics(s) => s.key.external,
+            Self::Multiband(s) => s.key.external,
+            _ => false,
+        }
+    }
+
     /// Whether its detector listens to its key (connected) rather than its
     /// own input.
     pub fn set_external(&mut self, external: bool) {
@@ -184,13 +197,25 @@ impl EffectSettings {
     /// if it's the same (and a Tuner its tap).
     pub fn prepare(&mut self, sample_rate: f64, previous: Option<&Self>) {
         match (self, previous) {
-            (Self::Chorus(s), _) => s.prepare(sample_rate),
+            (Self::Chorus(s), Some(Self::Chorus(p))) => s.prepare(sample_rate, Some(p)),
+            (Self::Chorus(s), _) => s.prepare(sample_rate, None),
             (Self::Reverb(s), Some(Self::Reverb(p))) => s.prepare(sample_rate, Some(p)),
             (Self::Reverb(s), _) => s.prepare(sample_rate, None),
             (Self::IrLoader(s), Some(Self::IrLoader(p))) => s.prepare(sample_rate, Some(p)),
             (Self::IrLoader(s), _) => s.prepare(sample_rate, None),
             (Self::Tuner(s), Some(Self::Tuner(p))) => s.prepare(Some(p)),
             _ => {}
+        }
+    }
+
+    /// Whether what `prepare` makes for it would be what it made for
+    /// `other` (an impulse's shape, an LFO's waves), so it can take them.
+    pub(crate) fn prepared_alike(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Chorus(a), Self::Chorus(b)) => a.shape == b.shape && a.spread == b.spread,
+            (Self::Reverb(a), Self::Reverb(b)) => a.shape == b.shape,
+            (Self::IrLoader(a), Self::IrLoader(b)) => a.normalize == b.normalize,
+            (a, b) => a.kind() == b.kind(),
         }
     }
 
@@ -215,6 +240,19 @@ impl EffectSettings {
             Self::Tuner(_) => EffectKind::Tuner,
             Self::Utility(_) => EffectKind::Utility,
         }
+    }
+}
+
+/// Whether an automated parameter of an effect of type `kind` steps at its
+/// lane's points rather than gliding (`automation`): those that shape a
+/// reverb's impulse, a chorus's LFO tables or an IR Loader's level, which
+/// take too long to make as they move.
+pub fn stepped(kind: &str, param: &str) -> bool {
+    match kind {
+        "reverb" => matches!(param, "decay" | "damping" | "early" | "width" | "mode"),
+        "chorus" => matches!(param, "spread" | "waveform"),
+        "irLoader" => param == "normalize",
+        _ => false,
     }
 }
 
@@ -254,6 +292,8 @@ pub struct EffectSpec {
     /// drops one that would make a loop, and the effect then listens to its
     /// own input, as the browser's does.
     pub key: Option<KeySpec>,
+    /// Its parameters' lanes, if any are drawn (a track's effects).
+    pub automation: Option<Box<EffectAutomation>>,
 }
 
 impl EffectSpec {
@@ -263,6 +303,7 @@ impl EffectSpec {
             settings,
             bypass: false,
             key: None,
+            automation: None,
         }
     }
 }

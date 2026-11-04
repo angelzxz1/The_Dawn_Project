@@ -1,6 +1,6 @@
 # Improvements
 
-Checked against the code and the commit history on 2026-10-29, and again on 2026-11-02; item 7 of Part 2 was added on 2026-10-30, items 8, 9, 16, 18, 19, 20, 21 and 22 on 2026-10-31, items 11, 12, 13, 24, 25 and 28 on 2026-11-01, items 23, 10 and 26 on 2026-11-02.
+Checked against the code and the commit history on 2026-10-29, and again on 2026-11-02; item 7 of Part 2 was added on 2026-10-30, items 8, 9, 16, 18, 19, 20, 21 and 22 on 2026-10-31, items 11, 12, 13, 24, 25 and 28 on 2026-11-01, items 23, 10 and 26 on 2026-11-02. The menu bar (not a listed item) was added on 2026-11-03, and the native engine's automation (item 9) the same day.
 
 - `[x]` is done; the commit that did it is in brackets.
 - `[ ]` is still open; "Partly" says what already exists.
@@ -73,6 +73,7 @@ That is already ahead of most browser DAWs, such as BandLab or Soundtrap.
   - With the grid on, a moved clip's start or end, or a resized clip's end, snaps to another clip's edge on any track once it comes within 8 px, before the grid (`src/studio/timeline/clipSnap.ts`). Clips moving with the selection aren't snapped to. Alt drags free of both, as on the loop, marker and tempo lanes.
 - [x] **9. Velocity and automation drawing tools:** curves, ramps and line tools, as in FL and Ableton. (`06880ac`)
   - Automation: a segment can bend (a point's `curve`, -1..1, `curveShape` in `src/engine/automation.ts`, which the engine, the export and the lane all use). With the pointer tool, Alt-drag a segment to bend it and Shift-drag to draw a straight line (a ramp) over what's there, on the grid (Alt: off it). The draw tool draws freehand, a point per grid line crossed; the erase tool deletes the points it passes over (`src/project/curveEdits.ts`).
+  - The desktop's native engine plays the lanes too, bent the same way (2026-11-03, commit to come; `crates/dawn-engine/src/mix/automation.rs`): the volume and pan glide with them, and an effect's settings follow at the browser's 50 ms rate. A reverb's decay, damping, early, width and mode, a chorus's spread and waveform, and an IR Loader's normalize change at each point rather than gliding, as the browser's reverb does.
   - Velocity: drag on empty space in the piano roll's velocity lane to put the notes it spans on a line (only the selected ones, with a selection); Alt draws freehand.
   - Fixed on the way: a point added before the last one was kept out of time order, which playback assumes, so it played wrong until a reload.
 
@@ -133,9 +134,14 @@ That is already ahead of most browser DAWs, such as BandLab or Soundtrap.
   - "Pop out" in the mixer and the piano roll opens each in a window of its own, to put on another screen: a pop-up window in the browser, a native window in the desktop app. It's the same studio in another window, so what's changed there is the project's and undo takes it back; play, undo, redo and save work from it.
   - "Back to the main window", or closing the window, brings it back. Each window opens where it was last left. The piano roll's window fills it and stays open between clips.
 
+- [x] **A menu bar, and the browser shown or hidden** (not one of the listed items; asked for on 2026-11-03). (`5a380da`)
+  - File, Edit, Create, View, Options and Help across the top of the studio, as in Ableton, each command with its keys and each setting with its check (`studio/shell/MenuBar.tsx`). Once one menu is open, pointing at another opens it; the arrows, Enter and Escape work.
+  - The old header's buttons moved into the menus (the File menu, Preferences, Help, Feedback, Support, About). The studio no longer shows its own name: the browser tab and the desktop's title bar have it. The project's name and its unsaved dot sit at the bar's right.
+  - The browser down the left shows and hides from the bar's button, View > Browser or Ctrl+Alt+B, and stays as it was left.
+
 ### Accessibility and settings
 
 - [ ] **27. Keyboard navigation of the timeline, screen-reader labels, and focus handling in dialogs.**
 - [x] **28. A real Preferences window** (audio device, buffer size, default count-in, autosave, theme) instead of settings scattered across popovers. (`405b1b6`)
-  - The gear in the header or Ctrl/Cmd+, opens it (`dialogs/PreferencesWindow.tsx`). Audio: the desktop's native engine, or the browser's output device and buffer size, and delay compensation. Then Recording, Metronome, Projects (autosave into a project's folder every 1-10 minutes, the default count-in) and Appearance (item 24).
+  - Options > Preferences… in the menu bar (the header's gear before `5a380da`) or Ctrl/Cmd+, opens it (`dialogs/PreferencesWindow.tsx`). Audio: the desktop's native engine, or the browser's output device and buffer size, and delay compensation. Then Recording, Metronome, Projects (autosave into a project's folder every 1-10 minutes, the default count-in) and Appearance (item 24).
   - Autosave into a real project folder hasn't been tried end to end yet.

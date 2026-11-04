@@ -1,8 +1,8 @@
 //! The song as the studio sends it (`src/engine/native/describe.ts`): ids,
 //! seconds and dB, the routing already worked out, a MIDI track's notes and
-//! its instrument's settings. Turned into the engine's song with the audio
-//! files the studio has sent (clips' files, sample pads', the piano's
-//! samples, the synth's wavetables).
+//! its instrument's settings, a track's automation lanes. Turned into the
+//! engine's song with the audio files the studio has sent (clips' files,
+//! sample pads', the piano's samples, the synth's wavetables).
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -16,8 +16,9 @@ use dawn_engine::instruments::synth::{
 };
 use dawn_engine::mix::tempo::TempoSegment;
 use dawn_engine::mix::{
-    AudioData, Bus, Clip, ClipTiming, Destination, EffectSettings, EffectSpec, InstrumentSpec,
-    KeySource, KeySpec, Master, Note, Send, Song, Tap, Track, db_to_gain,
+    AudioData, Bus, Clip, ClipTiming, Destination, EffectAutomation, EffectSettings, EffectSpec,
+    InstrumentSpec, KeySource, KeySpec, Master, Note, ParamLane, Point, Send, Song, Tap, Track,
+    db_to_gain,
 };
 use serde::Deserialize;
 
@@ -317,6 +318,60 @@ pub struct SidechainSpec {
     pub tap: String,
 }
 
+/// A point on an automation lane (`AutomationPoint`): seconds on the
+/// timeline, the value in the target's own range, and the bend to the next.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PointSpec {
+    pub time: f64,
+    pub value: f64,
+    #[serde(default)]
+    pub curve: f64,
+}
+
+/// A track's automation lane (one with points): its fader ("volume", in
+/// dB), its pan ("pan") or a parameter of one of its effects ("effect",
+/// with the effect's id and the parameter's key).
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LaneSpec {
+    pub target: String,
+    #[serde(default)]
+    pub effect: Option<String>,
+    #[serde(default)]
+    pub param: Option<String>,
+    pub points: Vec<PointSpec>,
+}
+
+/// A lane's points, sorted, without any a value JSON can't hold.
+fn points(lane: &LaneSpec) -> Vec<Point> {
+    let mut points: Vec<Point> = lane
+        .points
+        .iter()
+        .filter(|p| p.time.is_finite() && p.value.is_finite())
+        .map(|p| Point {
+            time: p.time,
+            value: p.value,
+            curve: if p.curve.is_finite() {
+                p.curve.clamp(-1.0, 1.0)
+            } else {
+                0.0
+            },
+        })
+        .collect();
+    points.sort_by(|a, b| a.time.total_cmp(&b.time));
+    points
+}
+
+/// The lane for `target` ("volume" or "pan"), if there's one.
+fn strip_lane(lanes: &[LaneSpec], target: &str) -> Vec<Point> {
+    lanes
+        .iter()
+        .find(|l| l.target == target)
+        .map(points)
+        .unwrap_or_default()
+}
+
 fn tap(name: &str) -> Tap {
     match name {
         "preFx" => Tap::PreFx,
@@ -330,8 +385,10 @@ fn tap(name: &str) -> Tap {
 /// keeps the one it had (in `previous`, the song playing), as the
 /// browser's does, or with none plays without one. `source` finds a key's
 /// track or bus by its id; a key from one that isn't there is left out.
+/// `lanes` are the chain's track's automation, for its effects'.
 fn effects(
     specs: &[EffectSpecIn],
+    lanes: &[LaneSpec],
     source: &dyn Fn(&str) -> Option<KeySource>,
     previous: Option<&Song>,
     audio: &HashMap<String, LoadedAudio>,
@@ -367,11 +424,30 @@ fn effects(
                     tap: tap(&k.tap),
                 })
             });
+            let automated: Vec<ParamLane> = lanes
+                .iter()
+                .filter(|l| l.target == "effect" && l.effect.as_deref() == Some(e.id.as_str()))
+                .filter_map(|l| {
+                    Some(ParamLane {
+                        param: l.param.clone()?,
+                        points: points(l),
+                    })
+                })
+                .filter(|l| !l.points.is_empty())
+                .collect();
+            let automation = (!automated.is_empty()).then(|| {
+                Box::new(EffectAutomation::new(
+                    e.kind.clone(),
+                    params.into_iter().collect(),
+                    automated,
+                ))
+            });
             Some(EffectSpec {
                 id: e.id.clone(),
                 settings,
                 bypass: e.bypass,
                 key,
+                automation,
             })
         })
         .collect()
@@ -408,6 +484,9 @@ pub struct TrackSpec {
     /// Played live (the armed MIDI track): delay compensation skips it.
     #[serde(default)]
     pub live: bool,
+    /// Its automation lanes that have points.
+    #[serde(default)]
+    pub automation: Vec<LaneSpec>,
 }
 
 #[derive(Deserialize)]
@@ -649,6 +728,7 @@ pub fn build(
                 .collect(),
             effects: effects(
                 &t.effects,
+                &t.automation,
                 &source,
                 previous,
                 audio,
@@ -656,6 +736,8 @@ pub fn build(
                 &mut missing,
             ),
             live: t.live,
+            volume_automation: strip_lane(&t.automation, "volume"),
+            pan_automation: strip_lane(&t.automation, "pan"),
         })
         .collect();
     let buses = spec
@@ -671,6 +753,7 @@ pub fn build(
             pan: b.pan.clamp(-1.0, 1.0),
             effects: effects(
                 &b.effects,
+                &[],
                 &source,
                 previous,
                 audio,
@@ -696,6 +779,7 @@ pub fn build(
         .collect();
     let master_effects = effects(
         &spec.master_effects,
+        &[],
         &source,
         previous,
         audio,
@@ -927,6 +1011,57 @@ mod tests {
             song.tracks[0].instrument.as_ref().map(InstrumentSpec::kind),
             Some(InstrumentKind::Synth)
         );
+    }
+
+    #[test]
+    fn reads_a_tracks_automation_lanes() {
+        let json = r#"{
+            "tracks": [
+                { "id": "v", "volumeDb": -6, "pan": 0, "audible": true, "output": null, "sends": [], "clips": [],
+                  "effects": [
+                      { "id": "f", "type": "filter", "params": { "frequency": 800, "Q": 2 } },
+                      { "id": "u", "type": "utility", "params": { "gain": 0 } }
+                  ],
+                  "automation": [
+                      { "target": "volume", "points": [{ "time": 2, "value": -12 }, { "time": 0, "value": 0, "curve": 0.5 }] },
+                      { "target": "pan", "points": [{ "time": 1, "value": -3 }] },
+                      { "target": "effect", "effect": "f", "param": "frequency", "points": [{ "time": 0, "value": 200 }, { "time": 1, "value": 2000 }] },
+                      { "target": "effect", "effect": "gone", "param": "gain", "points": [{ "time": 0, "value": 1 }] }
+                  ] }
+            ],
+            "buses": [],
+            "master": { "volumeDb": 0, "pan": 0, "limiterDb": -1 },
+            "tempo": [{ "beat": 0, "seconds": 0, "bpm": 120 }],
+            "beatsPerBar": 4
+        }"#;
+        let spec: SongSpec = serde_json::from_str(json).unwrap();
+        let (song, _) = build(&spec, None, &HashMap::new(), 48000.0);
+        let t = &song.tracks[0];
+        // Sorted by time, each with its bend.
+        assert_eq!(
+            t.volume_automation,
+            [
+                Point {
+                    time: 0.0,
+                    value: 0.0,
+                    curve: 0.5
+                },
+                Point::new(2.0, -12.0)
+            ]
+        );
+        assert!((t.volume_at(1.0) - db_to_gain(-12.0 * curve_at_half(0.5))).abs() < 1e-12);
+        // A pan out of range is held to it.
+        assert_eq!(t.pan_at(5.0), -1.0);
+        let filter = t.effects[0].automation.as_deref().unwrap();
+        assert_eq!(filter.kind, "filter");
+        assert_eq!(filter.params.get("Q"), Some(&2.0));
+        assert_eq!(filter.lanes.len(), 1);
+        assert_eq!(filter.lanes[0].param, "frequency");
+        assert!(t.effects[1].automation.is_none());
+    }
+
+    fn curve_at_half(curve: f64) -> f64 {
+        dawn_engine::mix::automation::curve_shape(0.5, curve)
     }
 
     #[test]

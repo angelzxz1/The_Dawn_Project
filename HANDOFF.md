@@ -3,25 +3,25 @@
 Read this first in a new session. It says where the project is, how the
 work is done and what comes next, then keeps the technical notes (the
 native engine's techniques, and what each finished item changed).
-Updated 2026-11-03, at `main` = `fdc436b`, with the menu bar (not a listed step) not yet committed.
+Updated 2026-11-03, at `main` = `5a380da`, with step 25 not yet committed.
 
 ## Start here
 
-- **Where we are:** Phase 7 (native stage 4) of `nextSteps.md`: steps
-  1-24 are done (step 6, NAM in the engine, was dropped). The last four:
-  - step 21, one style for every window (2026-11-02, `54dd0d8`);
+- **Where we are:** Phase 7 (native stage 4) of `nextSteps.md` is done:
+  steps 1-25 are done (step 6, NAM in the engine, was dropped). The last
+  four:
   - step 22, the mixer view (2026-11-02, `0078489`);
   - step 23, the mixer and piano roll in windows of their own
     (2026-11-02, `4b1d2c7`; the desktop's windows fixed in `612a0c2`);
   - step 24, sidechains in the engine (2026-11-03, `fdc436b`).
   - Not a listed step: the menu bar, and the browser shown or hidden
-    (2026-11-03, commit to come; asked for by the user).
-- **Next: step 25, automation in the engine** (Phase 7): points with a
-  `curve` each, bent by `curveShape` (`src/engine/automation.ts`); then
-  tracks with automation play natively and `describe.ts`'s
-  `unsupported()` stops naming them. Mostly Rust; the cargo checks run
-  here (see Gotchas). Wait for the user to say "go" before starting a
-  step: they ask for each one ("Lets go with step N").
+    (2026-11-03, `5a380da`; asked for by the user).
+  - step 25, automation in the engine (2026-11-03, commit to come).
+- **Next: step 26, monitoring modes per track** (Phase 8, Part 2 #14):
+  In, Auto and Off, as Ableton has them, in place of the one monitor
+  toggle; settled in the studio (both engines' model) before step 29
+  takes live input into the engine. Wait for the user to say "go" before
+  starting a step: they ask for each one ("Lets go with step N").
 - **What's left after that,** in order (the full list, with sizes, is in
   `nextSteps.md`; a summary is under "The road ahead" below):
   recording (monitoring modes, punch in/out,
@@ -162,7 +162,7 @@ The Dawn Project is a browser DAW, also built as a desktop app.
 **Checks before handing a step over:**
 
 - `npx tsc --noEmit` and `npm run lint` (both clean).
-- `npx vitest run`: 802 unit and component tests on 2026-11-03, in the
+- `npx vitest run`: 803 unit and component tests on 2026-11-03, in the
   projects `unit` (Node), `components` (Chromium) and `web-audio`. The
   component tests have a 30 s limit (`vitest.config.ts`), and the slow
   unit tests their own; no `--testTimeout` needed.
@@ -222,11 +222,10 @@ L a stage of its own).
   - 23. Part 2 #26, detached or second-screen windows for the mixer and
     the piano roll: Tauri windows on the desktop, pop-outs in the browser
     (L). Done 2026-11-02.
-- **Phase 7, native stage 4:** 24, sidechains in the engine. Done
-  2026-11-03. 25 (next), automation in the engine (points with a
-  `curve`, bent by `curveShape`).
-- **Phase 8, recording, then native stage 5:** 26, monitoring modes per
-  track (In, Auto, Off; #14). 27, punch-in and punch-out in the loop
+- **Phase 7, native stage 4:** 24, sidechains in the engine. 25,
+  automation in the engine. Both done 2026-11-03.
+- **Phase 8, recording, then native stage 5:** 26 (next), monitoring
+  modes per track (In, Auto, Off; #14). 27, punch-in and punch-out in the loop
   (#15). 28, input channels on multi-input interfaces (#17). 29, live
   input and recording through the engine.
 - **Phase 9, plugins:** 30, CLAP effects (windows in #23's style, state
@@ -347,6 +346,33 @@ compensation; post-fader: its strip's output) and waits
 engine's own plan; it carries into the next version of the song as the
 other delays do. The kernels' `process_keyed` (Gate, Glue, the
 multiband two) and the Compressor's `process_in_place` take the key.
+
+**Automation** (`automation.rs`, step 25): the studio sends each track's
+lanes with points (`describe.ts` `nativeLanes`: the fader's in dB, the
+pan's, and those of its effects the engine plays; each point's `curve`).
+`automation::value_at` is `interpolateAutomation`, `curve_shape` is
+`curveShape`. `Track::volume_at` and `pan_at` read the lanes in place of
+the fader and pan, at the block's end, and the strip glides there over
+the block; a new version of the song glides on from the level and pan
+last applied (`Engine::set_song` carries `track_applied` over by id), so
+an edit doesn't dip an automated fader. An effect's lanes go in its `EffectSpec::automation`, with its
+type and parameters: `Song::prepare_effects` makes its settings every
+`STEP` (50 ms, the studio's control rate) where the lanes move, as
+`Stage`s (deduplicated; at most 12,000, further apart past that), each
+prepared (impulses, LFO tables) and taking what the stage before, the
+version playing or the effect's own already made when it's the same
+(`EffectSettings::prepared_alike`); unchanged lanes keep the stages
+made. At each block's start the engine gives an automated effect the
+stage for the transport's position (`stage_at`, `Prepared::fx_stage`
+remembering which it has), through `Effect::configure`, as a new
+version of the song does. The parameters that shape an impulse or a
+chorus's tables (`fx::stepped`: a reverb's decay, damping, early, width
+and mode, a chorus's spread and waveform, an IR Loader's normalize) take
+each point's value once it's passed rather than gliding: making them
+every 50 ms would take too long and too much memory, and the browser's
+reverb rebuilds its impulse only once its decay stops moving. A stage's
+detector switch follows `keys::resolve` (`EffectAutomation::set_external`).
+Delay compensation reads the effect's own setting (as in the browser).
 
 ### Testing in the real desktop app (the "probe")
 
@@ -593,10 +619,15 @@ ahead" above).
    for a limiter ahead of the gate), `keys.rs`'s unit tests (the studio's
    `sidechainRouting.test.ts` cases), `describe.test.ts`, and a test of
    the desktop's reader in `src-tauri/src/audio/song.rs`. Then
-   **automation**: points with straight or bent
-   segments, read by `interpolateAutomation` and `curveShape`
-   (`src/engine/automation.ts`); the engine's port has to bend them the
-   same way.
+   **automation**: done 2026-11-03 (step 25, commit to come; see
+   "Engine model" above). Tests: `crates/dawn-engine/tests/automation.rs`
+   (the fader and pan following their lanes in place of their settings,
+   a bent segment, an effect's parameter, an automated effect carrying
+   into the song's next version, an automated gate still hearing its key,
+   an edit leaving an automated fader where it is),
+   `automation.rs`'s unit tests (`interpolateAutomation`'s and
+   `curveShape`'s cases, the settings made every 50 ms, a reverb's decay
+   stepping), `describe.test.ts`, and a test of the desktop's reader.
 4. **Live input and recording through the engine:** the interface's
    inputs, low-latency monitoring, takes written to disk.
 5. **Plugins:** P2 CLAP effects in the engine (with their windows and
@@ -662,7 +693,8 @@ the order they were done, with the fixes made along the way.
     localStorage). Bundled tones (none ship yet) aren't previewed: they're
     downloaded only when added.
   - Item 28 (2026-11-01): a Preferences window (`dialogs/PreferencesWindow.tsx`;
-    the gear in the header, Ctrl/Cmd+, or `openPreferences(tab)` from
+    Options > Preferences… (the header's gear until `5a380da`),
+    Ctrl/Cmd+, or `openPreferences(tab)` from
     anywhere). Audio: the desktop's native engine section, else the
     browser's output device (`setSinkId`, where the browser has it;
     `audioPrefs.outputDevice`) and buffer size (`browserLatency`, the
@@ -833,7 +865,7 @@ the order they were done, with the fixes made along the way.
     instrument windows opened from a detached mixer open in the main
     window. Tests: `e2e/popout.spec.ts`, `src/ui/Popout.test.ts`,
     `src/ui/shortcuts.test.ts`, `Mixer.test.tsx`.
-  - The menu bar (2026-11-03, commit to come; the user asked for it, not
+  - The menu bar (2026-11-03, `5a380da`; the user asked for it, not
     a listed step): File, Edit, Create, View, Options, Help across the top
     of the studio, as desktop DAWs have it (`src/studio/shell/MenuBar.tsx`:
     menus of items with their keys, checks for settings, links, notes;
@@ -856,9 +888,10 @@ the order they were done, with the fixes made along the way.
     `e2e/menubar.spec.ts`, `MenuBar.test.tsx`; `e2e/studio.ts` has
     `menu(menu, item)`, and the tests that used the header's buttons go
     through the menus.
-  - Items 14, 15, 17 and 27 are open. Next in `nextSteps.md` is Phase 7,
-    step 25 (automation in the engine); step 24 (sidechains in the engine,
-    2026-11-03) is logged under "The native engine plan".
+  - Items 14, 15, 17 and 27 are open. Next in `nextSteps.md` is Phase 8,
+    step 26 (monitoring modes, item 14); steps 24 and 25 (sidechains and
+    automation in the engine, 2026-11-03) are logged under "The native
+    engine plan".
   - Fixed 2026-10-31: on Windows, Next's static export wrote each page's
     prefetch files as folders (`__next.!KHNpdGUp/__PAGE__.txt`, from a
     backslash it doesn't turn into a dot) where its router asks for

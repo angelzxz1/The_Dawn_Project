@@ -277,8 +277,52 @@ describe("sidechains", () => {
   });
 });
 
+describe("a track's automation", () => {
+  it("sends the lanes with points, sorted, an effect's only for one the engine plays", () => {
+    const p = project();
+    p.channelEffects = {
+      gtr: [
+        { id: "flt", type: "filter", params: { frequency: 800 } },
+        { id: "nam", type: "namAmp", params: {} },
+      ],
+    };
+    p.channels = p.channels.map((c) =>
+      c.id === "gtr"
+        ? {
+            ...c,
+            automationLanes: [
+              {
+                id: "v",
+                target: { kind: "volume" as const },
+                points: [
+                  { id: "b", time: 2, value: -12 },
+                  { id: "a", time: 0, value: 0, curve: 0.5 },
+                ],
+              },
+              { id: "p", target: { kind: "pan" as const }, points: [] },
+              { id: "f", target: { kind: "effect" as const, effectId: "flt", paramKey: "frequency" }, points: [{ id: "c", time: 1, value: 300 }] },
+              { id: "n", target: { kind: "effect" as const, effectId: "nam", paramKey: "gain" }, points: [{ id: "d", time: 1, value: 3 }] },
+            ],
+          }
+        : c
+    );
+    const song = describeSong(p, session, idOf);
+    expect(song.tracks.find((t) => t.id === "gtr")?.automation).toEqual([
+      {
+        target: "volume",
+        points: [
+          { time: 0, value: 0, curve: 0.5 },
+          { time: 2, value: -12, curve: 0 },
+        ],
+      },
+      { target: "effect", effect: "flt", param: "frequency", points: [{ time: 1, value: 300, curve: 0 }] },
+    ]);
+    expect(song.tracks.find((t) => t.id === "drums")?.automation).toEqual([]);
+  });
+});
+
 describe("what the native engine doesn't play yet", () => {
-  it("names the effects it plays chains without, and the tracks with automation", () => {
+  it("names the effects it plays chains without, not the tracks with automation", () => {
     const p = project();
     p.channels = [
       ...p.channels,
@@ -299,13 +343,13 @@ describe("what the native engine doesn't play yet", () => {
     p.channels = p.channels.map((c) =>
       c.id === "gtr" ? { ...c, automationLanes: [{ id: "l", target: { kind: "volume" }, points: [{ id: "p", time: 0, value: 0 }] }] } : c
     );
-    // Every instrument plays, and every compressor.
-    expect(unsupported(p)).toEqual({ instruments: [], effects: ["NAM Amp on drums", "NAM Amp on Master"], automation: ["gtr"] });
+    // Every instrument plays, every compressor, and the automation.
+    expect(unsupported(p)).toEqual({ instruments: [], effects: ["NAM Amp on drums", "NAM Amp on Master"] });
   });
 
   it("is nothing for audio tracks played dry", () => {
     const p = project();
     p.clipsByChannel = { drums: [audioClip("a")] };
-    expect(unsupported(p)).toEqual({ instruments: [], effects: [], automation: [] });
+    expect(unsupported(p)).toEqual({ instruments: [], effects: [] });
   });
 });

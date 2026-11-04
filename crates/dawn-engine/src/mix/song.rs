@@ -14,6 +14,7 @@
 
 use std::sync::Arc;
 
+use super::automation::{self, Point};
 use super::clip::Clip;
 use super::fx::{self, Chain, Effect, EffectSpec};
 use super::keys::{self, KeyLink, Node, Timing};
@@ -77,9 +78,24 @@ pub struct Track {
     /// Played live (the armed MIDI track): delay compensation doesn't hold
     /// it back, nor the tracks it plays through.
     pub live: bool,
+    /// Its fader's lane (dB), if one's drawn: it takes the fader's place.
+    pub volume_automation: Vec<Point>,
+    /// Its pan's lane (-1..1), likewise.
+    pub pan_automation: Vec<Point>,
 }
 
 impl Track {
+    /// Its fader (linear) at `t` (s on the timeline): its lane's, or the
+    /// fader's own.
+    pub fn volume_at(&self, t: f64) -> f64 {
+        automation::value_at(&self.volume_automation, t).map_or(self.volume, db_to_gain)
+    }
+
+    /// Its pan at `t`.
+    pub fn pan_at(&self, t: f64) -> f64 {
+        automation::value_at(&self.pan_automation, t).map_or(self.pan, |p| p.clamp(-1.0, 1.0))
+    }
+
     pub fn new(id: impl Into<String>) -> Self {
         Self {
             id: id.into(),
@@ -93,6 +109,8 @@ impl Track {
             notes: vec![],
             effects: vec![],
             live: false,
+            volume_automation: vec![],
+            pan_automation: vec![],
         }
     }
 }
@@ -233,6 +251,10 @@ pub struct Prepared {
     /// Every chain's effects (the tracks', the buses', then the master's:
     /// see `Song::host_effects`), new ones as with `players`.
     pub(crate) fx: Vec<Chain>,
+    /// For each of those effects, which of its automation's settings it
+    /// was last given (`automation`), if any: none after `Engine::set_song`
+    /// gives it its own.
+    pub(crate) fx_stage: Vec<Vec<Option<usize>>>,
     /// Delay compensation's plan, and its delays: per track on its own
     /// sources, after its effects and on its sends; per bus after its
     /// effects; on the tracks' direct path to the master; and the clicks,
@@ -292,11 +314,12 @@ impl Song {
     }
 
     /// Works out what its effects need at `sample_rate` before they play
-    /// (`EffectSettings::prepare`), keeping what the same effects in
-    /// `previous` have made. `prepare` does it; doing it first, on a song
-    /// kept to follow, lets the next version keep the impulses made.
+    /// (`EffectSettings::prepare`), and the settings the automated ones
+    /// take along the timeline (`automation`), keeping what the same
+    /// effects in `previous` have made. `prepare` does it; doing it first,
+    /// on a song kept to follow, lets the next version keep what's made.
     pub fn prepare_effects(&mut self, previous: Option<&Song>, sample_rate: f64) {
-        let before = |id: &str| previous.and_then(|p| p.effect(id)).map(|e| &e.settings);
+        let before = |id: &str| previous.and_then(|p| p.effect(id));
         let chains = self
             .tracks
             .iter_mut()
@@ -305,7 +328,13 @@ impl Song {
             .chain([&mut self.master_effects]);
         for chain in chains {
             for e in chain.iter_mut() {
-                e.settings.prepare(sample_rate, before(&e.id));
+                let was = before(&e.id);
+                e.settings.prepare(sample_rate, was.map(|w| &w.settings));
+                if let Some(a) = &mut e.automation {
+                    let external = e.key.is_some() && e.settings.takes_key();
+                    let made = was.and_then(|w| w.automation.as_deref());
+                    a.prepare(&e.settings, external, made, sample_rate);
+                }
             }
         }
     }
@@ -494,7 +523,11 @@ impl Song {
             })
             .collect();
 
+        let fx_stage = (0..self.host_count())
+            .map(|h| vec![None; self.host_effects(h).len()])
+            .collect();
         Prepared {
+            fx_stage,
             keys: key_links,
             key_of,
             own_delays: delays(&plan.own),
