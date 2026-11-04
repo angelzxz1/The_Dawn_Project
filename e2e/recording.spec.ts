@@ -51,6 +51,37 @@ test("record the microphone onto an audio track", async ({ page, studio }) => {
   await expect.poll(() => inked(studio.clipsOn("Audio 1"))).toBeGreaterThan(0);
 });
 
+test("with Punch on, a recording keeps only what's between the loop brace's ends", async ({ page, studio }) => {
+  await studio.addTrack("Audio");
+  // The brace from the second beat, two beats long; the loop stays off.
+  for (const [field, value] of [
+    ["Start", "1.2.1"],
+    ["Length", "0.2.0"],
+  ]) {
+    await page.getByLabel(field, { exact: true }).fill(value);
+    await page.keyboard.press("Enter");
+  }
+  await page.getByRole("button", { name: "Punch in and out" }).click();
+  await expect(page.getByRole("button", { name: "Punch in and out" })).toHaveAttribute("aria-pressed", "true");
+  const range = page.getByTestId("punch-range");
+  await expect(range).toBeVisible();
+
+  await studio.header("Audio 1").getByTitle("Arm this channel for recording and note input").click();
+  await page.getByTitle(/^Click or drag to move the playhead/).click({ position: { x: 1, y: 10 } });
+  const record = page.getByTitle("Record microphone input onto Audio 1");
+  await record.click();
+  await expect(record).toHaveAttribute("aria-pressed", "true");
+  // Recording from the start, on past the punch-out.
+  await page.waitForTimeout(3000);
+  await page.getByTitle("Stop").click();
+
+  const clip = studio.clipsOn("Audio 1");
+  await expect(clip).toHaveCount(1);
+  const [kept, punch] = [await clip.boundingBox(), await range.boundingBox()];
+  expect(Math.abs(kept!.x - punch!.x)).toBeLessThan(3);
+  expect(Math.abs(kept!.width - punch!.width)).toBeLessThan(4);
+});
+
 test("after a take from the interface, a note offers to measure the latency", async ({ page, studio }) => {
   await studio.addTrack("Audio");
   await studio.header("Audio 1").getByTitle("Arm this channel for recording and note input").click();

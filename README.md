@@ -40,7 +40,8 @@ Live and Reaper.
   its track while you record it.
 - **Takes and comping**: loop recording makes a take each time round, and
   recording over a clip keeps it as a take; put the comp together by
-  dragging across the takes.
+  dragging across the takes. **Punch in and out** records only between the
+  loop brace's ends.
 - **Clip names and colors**, and **consolidate**, **reverse**, **normalize**
   and **fade presets** from a clip's right-click menu.
 - **Time selection**, like Ableton's: drag across lanes to select a span of
@@ -660,6 +661,15 @@ Everything the synth can do is described in
    **MIDI overdub** (the layers button in the transport) makes a MIDI
    recording add to what's on the track instead, as before; round the loop,
    every time round goes into one clip.
+
+**Punch in and out** (the brackets button in the transport, or Options >
+Punch In/Out) records only between the loop brace's ends, whether the loop
+is on or not. Start a bar or two before the brace and play along: the take
+keeps only what you played inside it, and the song plays on after it. If
+the marker is already past the brace, recording starts a bar before it. The
+brace shows dashed red ends while Punch is on, and Punch is saved with the
+project. With the loop on too, each time round is a take, without the
+run-up.
 
 For audio:
 

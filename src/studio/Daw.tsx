@@ -71,6 +71,7 @@ import { rangeActions, tracksOf, type TimeSelection } from "@/state/rangeActions
 import { clipEditActions } from "@/state/clipEditActions";
 import { spansOfClips, type FadePreset } from "@/project/clipEdits";
 import { compSpans, mergedMidiTake, midiPassTakes, recordingPasses } from "@/project/takes";
+import { punchedPasses, punchRecordFrom } from "@/project/punch";
 import { TakeLaneHeader, TakeLaneRow } from "@/studio/tracks/TakeLanes";
 import type { TimeRange } from "@/project/timeRange";
 import { takeActions } from "@/state/takeActions";
@@ -1070,6 +1071,11 @@ export function Daw() {
   /** MIDI overdub: a MIDI recording adds to what's on the track instead of
    * replacing it (as a new take). Saved with the project. */
   const [midiOverdub, setMidiOverdub] = useState(false);
+  /** Punch-in and punch-out at the loop brace's ends (punch.ts). Saved
+   * with the project. */
+  const [punch, setPunch] = useState(false);
+  /** The punch range (s) of the recording in progress, from Record. */
+  const recordPunchRef = useRef<TimeRange | null>(null);
   /** The note offering to measure the latency, after a take (LatencyHint). */
   const [latencyHint, setLatencyHint] = useState(false);
 
@@ -1080,6 +1086,8 @@ export function Daw() {
       recordingChannelRef.current = null;
       const recLoop = recordLoopRef.current;
       recordLoopRef.current = null;
+      const recPunch = recordPunchRef.current;
+      recordPunchRef.current = null;
       if (recChannelId) {
         // The take starts where recording started (the marker); round the
         // loop, each time round is a take (takes.ts), but for a last one
@@ -1093,7 +1101,7 @@ export function Daw() {
           if (blob && blob.size > 0) {
             const decoded = await decodeAudioFile(blob);
             const channelName = channels.find((c) => c.id === recChannelId)?.name ?? "take";
-            const takes = recordingPasses(takeFrom, decoded.durationSeconds, recLoop, minLast).map(
+            const takes = punchedPasses(recordingPasses(takeFrom, decoded.durationSeconds, recLoop, minLast), recPunch).map(
               (pass): AudioClipInstance => ({
                 id: newClipId(),
                 kind: "audio",
@@ -1121,9 +1129,12 @@ export function Daw() {
           if (events.length > 0) {
             const lastEnd = events.reduce((m, n) => Math.max(m, n.time + n.duration), 0);
             // Straight through, the take runs to the end of the bar.
-            const passes = recLoop
-              ? recordingPasses(takeFrom, recordedFor, recLoop, minLast)
-              : [{ start: takeFrom, end: takeFrom + roundUpToBarFrom(tempo, takeFrom, lastEnd, beatsPerBar), at: 0 }];
+            const passes = punchedPasses(
+              recLoop
+                ? recordingPasses(takeFrom, recordedFor, recLoop, minLast)
+                : [{ start: takeFrom, end: takeFrom + roundUpToBarFrom(tempo, takeFrom, lastEnd, beatsPerBar), at: 0 }],
+              recPunch
+            );
             if (midiOverdub) {
               const merged = mergedMidiTake(events, passes, newClipId);
               if (merged) addMidiClip(recChannelId, merged.offset, merged.length, merged.notes);
@@ -1200,19 +1211,26 @@ export function Daw() {
     }
     recordingChannelRef.current = armedChannelId;
     setRecordingChannelId(armedChannelId);
+    // Punching, only what's between the loop brace's ends is kept; from
+    // the marker, or a bar before the punch-in when the marker is past it.
+    const recPunch = punch ? { start: loopStartSeconds, end: loopEndSeconds } : null;
+    recordPunchRef.current = recPunch;
+    const runUp = loopStartSeconds - secondsAtBeat(tempo, Math.max(0, loop.start - beatsPerBar));
+    const recordFrom = recPunch ? punchRecordFrom(cursorSeconds, recPunch, runUp) : cursorSeconds;
     // With the loop on, recording from before its end goes round it (like
     // playing), a take each time round.
-    const recLoop = loopsFrom(loop, beatAtSeconds(tempo, cursorSeconds)) ? { start: loopStartSeconds, end: loopEndSeconds } : null;
+    const recLoop = loopsFrom(loop, beatAtSeconds(tempo, recordFrom)) ? { start: loopStartSeconds, end: loopEndSeconds } : null;
     recordLoopRef.current = recLoop;
     if (channelTypeOf(armedChannelId) === "audio") {
       try {
-        await audioEngine.startAudioRecording(armedChannelId, countInBars * beatsPerBar, cursorSeconds, showRecording, recLoop);
+        await audioEngine.startAudioRecording(armedChannelId, countInBars * beatsPerBar, recordFrom, showRecording, recLoop);
         track("recording_started", { kind: "audio" });
         refreshInputDevices();
       } catch (error) {
         noteIssue("record.audio", error, { report: false });
         recordingChannelRef.current = null;
         recordLoopRef.current = null;
+        recordPunchRef.current = null;
         setRecordingChannelId(null);
         setMicError(
           "Couldn't access the microphone - check the browser's permission prompt or site settings."
@@ -1221,8 +1239,8 @@ export function Daw() {
       return;
     }
     track("recording_started", { kind: "midi" });
-    await audioEngine.startRecording(armedChannelId, countInBars * beatsPerBar, cursorSeconds, showRecording, recLoop);
-  }, [transportState, armedChannelId, handleStop, channelTypeOf, countInBars, beatsPerBar, refreshInputDevices, cursorSeconds, showRecording, loop, tempo, loopStartSeconds, loopEndSeconds]);
+    await audioEngine.startRecording(armedChannelId, countInBars * beatsPerBar, recordFrom, showRecording, recLoop);
+  }, [transportState, armedChannelId, handleStop, channelTypeOf, countInBars, beatsPerBar, refreshInputDevices, cursorSeconds, showRecording, loop, tempo, loopStartSeconds, loopEndSeconds, punch]);
 
   const handleAddChannel = trackActions.add;
 
@@ -2033,6 +2051,7 @@ export function Daw() {
     setCountInBars(project.countInBars);
     setMetronomeEnabled(project.metronomeEnabled);
     setMidiOverdub(project.midiOverdub);
+    setPunch(project.punch);
     restoreMonitoring(project.monitoredTracks, project.autoMonitoredTracks, state.channels);
     setLoop(project.loop);
     setSelectedClipIds(new Set());
@@ -2156,7 +2175,7 @@ export function Daw() {
     loadDemo: handleLoadDemo,
     startNew,
   } = useProjectFiles(
-    { masterLimiterThreshold, scaleSetting, snapResolution, countInBars, metronomeEnabled, midiOverdub, loop, monitoredTracks, autoMonitoredTracks },
+    { masterLimiterThreshold, scaleSetting, snapResolution, countInBars, metronomeEnabled, midiOverdub, punch, loop, monitoredTracks, autoMonitoredTracks },
     {
       beforeOpen: () => {
         audioEngine.stopAll();
@@ -2346,6 +2365,7 @@ export function Daw() {
         { label: "Metronome", checked: metronomeEnabled, onSelect: () => setMetronomeEnabled((v) => !v) },
         { label: "Loop", checked: loop.on, onSelect: toggleLoop },
         { label: "MIDI Overdub", checked: midiOverdub, onSelect: () => setMidiOverdub((v) => !v) },
+        { label: "Punch In/Out", checked: punch, onSelect: () => setPunch((v) => !v) },
         { kind: "separator" },
         { label: "Preferences…", shortcut: keyLabel("mod+,"), onSelect: () => openPreferences(prefsTab ?? "audio") },
       ],
@@ -2721,6 +2741,8 @@ export function Daw() {
           onCountInChange={setCountInBars}
           midiOverdub={midiOverdub}
           onToggleMidiOverdub={() => setMidiOverdub((v) => !v)}
+          punch={punch}
+          onTogglePunch={() => setPunch((v) => !v)}
           onPlay={handlePlay}
           onPause={handlePause}
           onStop={() => void handleStop()}
@@ -3150,6 +3172,14 @@ export function Daw() {
             {loop.on && (
               <div
                 className="pointer-events-none absolute top-0 z-10 h-full border-x border-accent/60 bg-accent/[0.07]"
+                style={{ left: loopStartSeconds * pxPerSecond, width: (loopEndSeconds - loopStartSeconds) * pxPerSecond }}
+              />
+            )}
+            {punch && (
+              // The punch-in and punch-out: what a recording keeps.
+              <div
+                data-testid="punch-range"
+                className="pointer-events-none absolute top-0 z-10 h-full border-x-2 border-dashed border-record/70"
                 style={{ left: loopStartSeconds * pxPerSecond, width: (loopEndSeconds - loopStartSeconds) * pxPerSecond }}
               />
             )}

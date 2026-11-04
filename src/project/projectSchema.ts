@@ -112,6 +112,9 @@ export interface SerializedProject {
   /** MIDI recordings add to what's on a track (rather than replace it, as
    * a new take). */
   midiOverdub: boolean;
+  /** Punch-in and punch-out: recordings keep only what's between the loop
+   * brace's ends (punch.ts). Off in an older project. */
+  punch: boolean;
   /** The arrangement loop, in beats. */
   loop: ArrangementLoop;
   /** Audio tracks always monitoring their input: In (ids). */
@@ -613,6 +616,7 @@ export function normalizeProject(raw: unknown): SerializedProject | null {
     countInBars: oneOf(r.countInBars, [0, 1, 2, 4], 0),
     metronomeEnabled: bool(r.metronomeEnabled, false),
     midiOverdub: bool(r.midiOverdub, false),
+    punch: bool(r.punch, false),
     loop: normalizeArrangementLoop(
       r.loop,
       quarterNotesPerBar(int(ts.numerator, 4, 1, 32), oneOf(ts.denominator, [1, 2, 4, 8, 16], 4))

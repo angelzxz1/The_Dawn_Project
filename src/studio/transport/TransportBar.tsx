@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Circle, Layers, Pause, Play, Square, Volume1, Volume2 } from "lucide-react";
+import { Brackets, Circle, Layers, Pause, Play, Square, Volume1, Volume2 } from "lucide-react";
 import { TransportClock } from "./TransportClock";
 import type { TimeSignature } from "@/project/types";
 import { ClickLevel } from "./ClickLevel";
@@ -38,6 +38,10 @@ interface TransportBarProps {
    * than replace it (as a new take). */
   midiOverdub?: boolean;
   onToggleMidiOverdub?: () => void;
+  /** Punch-in and punch-out: a recording keeps only what's between the
+   * loop brace's ends. */
+  punch?: boolean;
+  onTogglePunch?: () => void;
   onPlay: () => void;
   onPause: () => void;
   onStop: () => void;
@@ -63,6 +67,8 @@ export function TransportBar({
   onCountInChange,
   midiOverdub = false,
   onToggleMidiOverdub,
+  punch = false,
+  onTogglePunch,
   onPlay,
   onPause,
   onStop,
@@ -163,6 +169,24 @@ export function TransportBar({
             }`}
           >
             <Layers size={15} />
+          </button>
+        )}
+        {onTogglePunch && (
+          <button
+            type="button"
+            onClick={onTogglePunch}
+            aria-pressed={punch}
+            aria-label="Punch in and out"
+            title={
+              punch
+                ? "Punch on: recordings keep only what's between the loop brace's ends"
+                : "Punch off: click to record only between the loop brace's ends, with the song before them as a run-up"
+            }
+            className={`flex h-9 w-9 items-center justify-center rounded-full border transition-colors ${
+              punch ? "border-record bg-record/20 text-record" : "border-border text-muted hover:bg-surface-raised"
+            }`}
+          >
+            <Brackets size={15} />
           </button>
         )}
       </div>

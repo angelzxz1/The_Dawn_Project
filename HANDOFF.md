@@ -3,14 +3,14 @@
 Read this first in a new session. It says where the project is, how the
 work is done and what comes next, then keeps the technical notes (the
 native engine's techniques, and what each finished item changed).
-Updated 2026-11-04, at `main` = `d0bfbb7`, with step 26 not yet
+Updated 2026-11-04, at `main` = `f750344`, with step 27 not yet
 committed.
 
 ## Start here
 
-- **Where we are:** Phase 8 (recording) of `nextSteps.md` has begun:
-  steps 1-26 are done (step 6, NAM in the engine, was dropped). The last
-  five:
+- **Where we are:** Phase 8 (recording) of `nextSteps.md` is under way:
+  steps 1-27 are done (step 6, NAM in the engine, was dropped). The last
+  few:
   - step 22, the mixer view (2026-11-02, `0078489`);
   - step 23, the mixer and piano roll in windows of their own
     (2026-11-02, `4b1d2c7`; the desktop's windows fixed in `612a0c2`);
@@ -19,16 +19,18 @@ committed.
     (2026-11-03, `5a380da`; asked for by the user).
   - step 25, automation in the engine (2026-11-03, `d0bfbb7`).
   - Not a listed step: `DAWN_ASIO=1` in `.env` builds the desktop app
-    with ASIO, for testing on the user's machine (2026-11-04, commit to
-    come; `scripts/desktop.mjs`, docs/desktop.md "ASIO"). The user has
+    with ASIO, for testing on the user's machine (2026-11-04, `f750344`;
+    `scripts/desktop.mjs`, docs/desktop.md "ASIO"). The user has
     LLVM installed and it builds; the installers stay without it.
-  - step 26, monitoring modes per track (2026-11-04, commit to come).
-- **Next: step 27, punch-in and punch-out** within the loop (Phase 8,
-  Part 2 #15). Wait for the user to say "go" before starting a step:
-  they ask for each one ("Lets go with step N").
+  - step 26, monitoring modes per track (2026-11-04, `f750344`).
+  - step 27, punch-in and punch-out (2026-11-04, commit to come).
+- **Next: step 28, choosing input channels on multi-input interfaces**
+  (Phase 8, Part 2 #17), for example a mono guitar on input 2. Wait for
+  the user to say "go" before starting a step: they ask for each one
+  ("Lets go with step N").
 - **What's left after that,** in order (the full list, with sizes, is in
   `nextSteps.md`; a summary is under "The road ahead" below):
-  recording (punch in/out, input channels, then live
+  recording (input channels, then live
   input through the engine), plugins (CLAP, VST3, plugin instruments,
   AU), shipping (export through the engine, native dialogs, signed
   installers), an accessibility pass, and last the desktop's driver,
@@ -166,7 +168,7 @@ The Dawn Project is a browser DAW, also built as a desktop app.
 **Checks before handing a step over:**
 
 - `npx tsc --noEmit` and `npm run lint` (both clean).
-- `npx vitest run`: 811 unit and component tests on 2026-11-04, in the
+- `npx vitest run`: 819 unit and component tests on 2026-11-04, in the
   projects `unit` (Node), `components` (Chromium) and `web-audio`. The
   component tests have a 30 s limit (`vitest.config.ts`), and the slow
   unit tests their own; no `--testTimeout` needed.
@@ -892,7 +894,7 @@ the order they were done, with the fixes made along the way.
     `e2e/menubar.spec.ts`, `MenuBar.test.tsx`; `e2e/studio.ts` has
     `menu(menu, item)`, and the tests that used the header's buttons go
     through the menus.
-  - Item 14, monitoring modes per track (2026-11-04, commit to come;
+  - Item 14, monitoring modes per track (2026-11-04, `f750344`;
     step 26): each audio track is In, Auto or Off, as in Ableton, in place
     of the one toggle. `src/studio/tracks/monitoring.ts` decides which
     tracks hear their input now (`monitoredNow`): In always, Auto while
@@ -907,8 +909,22 @@ the order they were done, with the fixes made along the way.
     modes so far: the native engine takes no input until step 29, which
     uses this model. Tests: `monitoring.test.ts`, `contextMenus.test.tsx`,
     `projectSchema.test.ts`, `TrackHeader.test.tsx`, `e2e/tracks.spec.ts`.
-  - Items 15, 17 and 27 are open. Next in `nextSteps.md` is Phase 8,
-    step 27 (punch in and out, item 15); steps 24 and 25 (sidechains and
+  - Item 15, punch-in and punch-out (2026-11-04, commit to come; step
+    27): Punch (the brackets button in the transport, Options > Punch
+    In/Out, saved with the project as `punch`) makes a recording keep only
+    what's between the loop brace's ends, loop on or off.
+    `src/project/punch.ts`: `punchedPasses` cuts each of a recording's
+    passes (`recordingPasses`) to the range, for audio and MIDI alike
+    (overdub included), and `punchRecordFrom` starts recording at the
+    marker, or a bar before the punch-in when the marker is at or past the
+    punch-out. The transport plays on after the punch-out; the live take
+    still draws from where recording started, and Auto monitoring hears
+    the input for the whole recording (a DAW that switches to the input
+    only inside the range would need the playhead's position in
+    `monitoredNow`). The lanes show the range with dashed red ends. Tests:
+    `punch.test.ts`, `projectSchema.test.ts`, `e2e/recording.spec.ts`.
+  - Items 17 and 27 are open. Next in `nextSteps.md` is Phase 8,
+    step 28 (input channels, item 17); steps 24 and 25 (sidechains and
     automation in the engine, 2026-11-03) are logged under "The native
     engine plan".
   - Fixed 2026-10-31: on Windows, Next's static export wrote each page's

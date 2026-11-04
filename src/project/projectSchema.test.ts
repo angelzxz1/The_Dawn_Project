@@ -433,6 +433,12 @@ describe("monitored tracks", () => {
     expect(normalizeProject({ channels, autoMonitoredTracks: ["ch-1", "ch-2", "ch-1"] })?.autoMonitoredTracks).toEqual(["ch-1"]);
   });
 
+  it("Punch is off in an older project, and kept when saved on", () => {
+    expect(normalizeProject({ channels })?.punch).toBe(false);
+    expect(normalizeProject({ channels, punch: true })?.punch).toBe(true);
+    expect(normalizeProject({ channels, punch: "yes" })?.punch).toBe(false);
+  });
+
   it("an older project has no tracks in Auto, and a track in both is In", () => {
     expect(normalizeProject({ channels, monitoredTracks: ["ch-1"] })?.autoMonitoredTracks).toEqual([]);
     const both = normalizeProject({ channels, monitoredTracks: ["ch-1"], autoMonitoredTracks: ["ch-1"] });
