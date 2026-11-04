@@ -114,8 +114,11 @@ export interface SerializedProject {
   midiOverdub: boolean;
   /** The arrangement loop, in beats. */
   loop: ArrangementLoop;
-  /** Audio tracks monitoring their input (ids). */
+  /** Audio tracks always monitoring their input: In (ids). */
   monitoredTracks: string[];
+  /** Audio tracks monitoring it in Auto: while armed, stopped or recording
+   * (ids; none in an older project). */
+  autoMonitoredTracks: string[];
   /** How the studio was laid out when it was saved; none in a template or
    * an older project, which open with the standard layout. */
   layout?: ProjectLayout;
@@ -614,12 +617,17 @@ export function normalizeProject(raw: unknown): SerializedProject | null {
       r.loop,
       quarterNotesPerBar(int(ts.numerator, 4, 1, 32), oneOf(ts.denominator, [1, 2, 4, 8, 16], 4))
     ),
-    // Only audio tracks that exist, each once.
-    monitoredTracks: [...new Set(arr(r.monitoredTracks).filter((id): id is string => typeof id === "string"))].filter((id) =>
-      channels.some((c) => c.id === id && c.type === "audio")
-    ),
+    ...monitorModes(r.monitoredTracks, r.autoMonitoredTracks, channels),
     ...withLayout(normalizeLayout(r.layout, channels, busIds, (id) => channelEffects[id] ?? [])),
   };
+}
+
+/** Only audio tracks that exist, each once, and in one mode (In wins). */
+function monitorModes(inRaw: unknown, autoRaw: unknown, channels: ChannelConfig[]): { monitoredTracks: string[]; autoMonitoredTracks: string[] } {
+  const ids = (raw: unknown) =>
+    [...new Set(arr(raw).filter((id): id is string => typeof id === "string"))].filter((id) => channels.some((c) => c.id === id && c.type === "audio"));
+  const monitoredTracks = ids(inRaw);
+  return { monitoredTracks, autoMonitoredTracks: ids(autoRaw).filter((id) => !monitoredTracks.includes(id)) };
 }
 
 const withLayout = (layout: ProjectLayout | undefined) => (layout ? { layout } : {});

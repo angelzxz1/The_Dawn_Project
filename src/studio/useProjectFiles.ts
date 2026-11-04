@@ -57,7 +57,7 @@ export interface LayoutSource {
 
 export function useProjectFiles(session: SessionSettings, events: ProjectFilesEvents, layout?: LayoutSource) {
   const doc = useProjectDoc();
-  const { masterLimiterThreshold, scaleSetting, snapResolution, countInBars, metronomeEnabled, midiOverdub, loop, monitoredTracks } = session;
+  const { masterLimiterThreshold, scaleSetting, snapResolution, countInBars, metronomeEnabled, midiOverdub, loop, monitoredTracks, autoMonitoredTracks } = session;
 
   const eventsRef = useRef(events);
   const layoutRef = useRef(layout);
@@ -89,12 +89,12 @@ export function useProjectFiles(session: SessionSettings, events: ProjectFilesEv
    * which is what tells unsaved changes and autosave something changed. */
   const buildProject = useCallback(
     (): SerializedProject => {
-      const project = serializeProject(doc, { masterLimiterThreshold, scaleSetting, snapResolution, countInBars, metronomeEnabled, midiOverdub, loop, monitoredTracks });
+      const project = serializeProject(doc, { masterLimiterThreshold, scaleSetting, snapResolution, countInBars, metronomeEnabled, midiOverdub, loop, monitoredTracks, autoMonitoredTracks });
       // The layout as it is when saved; changing it isn't an unsaved change.
       const view = layoutRef.current?.get();
       return view ? { ...project, layout: view } : project;
     },
-    [doc, masterLimiterThreshold, scaleSetting, snapResolution, countInBars, metronomeEnabled, midiOverdub, loop, monitoredTracks]
+    [doc, masterLimiterThreshold, scaleSetting, snapResolution, countInBars, metronomeEnabled, midiOverdub, loop, monitoredTracks, autoMonitoredTracks]
   );
 
   const persistNow = useCallback(async () => {

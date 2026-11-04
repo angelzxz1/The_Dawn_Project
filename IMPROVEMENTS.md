@@ -1,11 +1,11 @@
 # Improvements
 
-Checked against the code and the commit history on 2026-10-29, and again on 2026-11-02; item 7 of Part 2 was added on 2026-10-30, items 8, 9, 16, 18, 19, 20, 21 and 22 on 2026-10-31, items 11, 12, 13, 24, 25 and 28 on 2026-11-01, items 23, 10 and 26 on 2026-11-02. The menu bar (not a listed item) was added on 2026-11-03, and the native engine's automation (item 9) the same day.
+Checked against the code and the commit history on 2026-10-29, and again on 2026-11-02; item 7 of Part 2 was added on 2026-10-30, items 8, 9, 16, 18, 19, 20, 21 and 22 on 2026-10-31, items 11, 12, 13, 24, 25 and 28 on 2026-11-01, items 23, 10 and 26 on 2026-11-02. The menu bar (not a listed item) was added on 2026-11-03, and the native engine's automation (item 9) the same day; item 14 on 2026-11-04.
 
 - `[x]` is done; the commit that did it is in brackets.
 - `[ ]` is still open; "Partly" says what already exists.
 
-**Summary:** Part 1 is all done. In Part 2, items 1–13, 16, 18–26 and 28 are done; 14, 15, 17 and 27 are open.
+**Summary:** Part 1 is all done. In Part 2, items 1–14, 16, 18–26 and 28 are done; 15, 17 and 27 are open.
 
 ## Part 1: Code improvements
 
@@ -73,7 +73,7 @@ That is already ahead of most browser DAWs, such as BandLab or Soundtrap.
   - With the grid on, a moved clip's start or end, or a resized clip's end, snaps to another clip's edge on any track once it comes within 8 px, before the grid (`src/studio/timeline/clipSnap.ts`). Clips moving with the selection aren't snapped to. Alt drags free of both, as on the loop, marker and tempo lanes.
 - [x] **9. Velocity and automation drawing tools:** curves, ramps and line tools, as in FL and Ableton. (`06880ac`)
   - Automation: a segment can bend (a point's `curve`, -1..1, `curveShape` in `src/engine/automation.ts`, which the engine, the export and the lane all use). With the pointer tool, Alt-drag a segment to bend it and Shift-drag to draw a straight line (a ramp) over what's there, on the grid (Alt: off it). The draw tool draws freehand, a point per grid line crossed; the erase tool deletes the points it passes over (`src/project/curveEdits.ts`).
-  - The desktop's native engine plays the lanes too, bent the same way (2026-11-03, commit to come; `crates/dawn-engine/src/mix/automation.rs`): the volume and pan glide with them, and an effect's settings follow at the browser's 50 ms rate. A reverb's decay, damping, early, width and mode, a chorus's spread and waveform, and an IR Loader's normalize change at each point rather than gliding, as the browser's reverb does.
+  - The desktop's native engine plays the lanes too, bent the same way (2026-11-03, `d0bfbb7`; `crates/dawn-engine/src/mix/automation.rs`): the volume and pan glide with them, and an effect's settings follow at the browser's 50 ms rate. A reverb's decay, damping, early, width and mode, a chorus's spread and waveform, and an IR Loader's normalize change at each point rather than gliding, as the browser's reverb does.
   - Velocity: drag on empty space in the piano roll's velocity lane to put the notes it spans on a line (only the selected ones, with a selection); Alt draws freehand.
   - Fixed on the way: a point added before the last one was kept out of time order, which playback assumes, so it played wrong until a reload.
 
@@ -98,7 +98,7 @@ That is already ahead of most browser DAWs, such as BandLab or Soundtrap.
 
 ### Recording
 
-- [ ] **14. Monitoring modes per track:** In / Auto / Off, as in Ableton, instead of one toggle.
+- [x] **14. Monitoring modes per track:** In / Auto / Off, as in Ableton, instead of one toggle. (2026-11-04, commit to come; `src/studio/tracks/monitoring.ts`: In always hears the input, Auto while the track is armed and stopped or recording onto it, Off never; the track's clips play in every mode)
 - [ ] **15. Punch-in/out recording** within the loop region.
 - [x] **16. A visible count-in** in the transport, and a click-volume control with click sound choices. (`84d1f02`)
   - The transport shows the count-in as it goes, the beats left (4, 3, 2, 1), the bar's first beat brighter (`CountIn.tsx`, `Transport.countInLeft`).

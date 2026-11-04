@@ -13,8 +13,8 @@
     "test:components": "vitest run --project components",
     "test:e2e": "playwright test",
     "test:engine": "cargo test -p dawn-engine",
-    "desktop": "npx --yes @tauri-apps/cli@2 dev",
-    "desktop:build": "npx --yes @tauri-apps/cli@2 build",
+    "desktop": "node scripts/desktop.mjs dev",
+    "desktop:build": "node scripts/desktop.mjs build",
     "prebuild": "node scripts/build-sw.mjs",
     "postbuild": "node scripts/fix-export-segments.mjs"
   },

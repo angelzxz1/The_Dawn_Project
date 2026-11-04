@@ -24,10 +24,10 @@ import { audioClipsOf, projectStore } from "./projectStore";
 
 /** What's saved with a project but kept by the studio rather than the
  * project store (no undo): the limiter ceiling, scale, snap, count-in,
- * metronome, the arrangement loop and which tracks are monitoring. */
+ * metronome, the arrangement loop and each track's monitoring mode. */
 export type SessionSettings = Pick<
   SerializedProject,
-  "masterLimiterThreshold" | "scaleSetting" | "snapResolution" | "countInBars" | "metronomeEnabled" | "midiOverdub" | "loop" | "monitoredTracks"
+  "masterLimiterThreshold" | "scaleSetting" | "snapResolution" | "countInBars" | "metronomeEnabled" | "midiOverdub" | "loop" | "monitoredTracks" | "autoMonitoredTracks"
 >;
 
 /** The project as saved (clips without their session-only URLs). */

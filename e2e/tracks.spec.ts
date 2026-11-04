@@ -82,12 +82,13 @@ test("arm a track for recording", async ({ page, studio }) => {
   await expect(page.getByTitle("Record MIDI onto Bass")).toBeVisible();
 });
 
-test("monitor an audio track", async ({ studio }) => {
+test("monitor an audio track: Off, In, Auto, then Off again", async ({ studio }) => {
   await studio.addTrack("Audio");
   const audio = studio.header("Audio 1");
-  await audio.getByTitle(/^Monitor - /).click();
-  await audio.getByTitle(/^Monitoring - /).click();
-  await expect(audio.getByTitle(/^Monitor - /)).toBeVisible();
+  await audio.getByTitle(/^Monitor: Off - /).click();
+  await audio.getByTitle(/^Monitor: In - /).click();
+  await audio.getByTitle(/^Monitor: Auto - /).click();
+  await expect(audio.getByTitle(/^Monitor: Off - /)).toBeVisible();
 });
 
 test("an audio track's input list fills with the inputs when opened", async ({ studio }) => {

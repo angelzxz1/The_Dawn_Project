@@ -21,6 +21,7 @@ import { ValueBar } from "./ValueBar";
 import { Meter } from "./Meter";
 import { InputMeter } from "./InputMeter";
 import { useNoInputSignal } from "./useNoInputSignal";
+import { MONITOR_LABELS, type MonitorMode } from "./monitoring";
 import type { ChannelConfig } from "@/project/types";
 import { INSTRUMENT_LABELS } from "@/instruments/registry";
 import { TRACK_COLOR_PALETTE, type TrackColor, type TrackColorPick } from "@/project/colors";
@@ -90,7 +91,7 @@ export interface TrackHeaderActions {
    * time. Only the armed channel is what Record captures and the only one
    * that sounds for incoming notes. */
   toggleArm(id: string): void;
-  /** Audio tracks: whether its input is heard live, through its effects. */
+  /** Audio tracks: the next monitoring mode, Off → In → Auto → Off. */
   toggleMonitor(id: string): void;
   /** Opens the FX window (instrument slot + effects chain). */
   openFx(id: string): void;
@@ -139,9 +140,11 @@ interface TrackHeaderProps {
   isMaster?: boolean;
   effectsCount?: number;
   actions: TrackHeaderActions;
-  /** Audio tracks only: whether this track's input is heard live, through
-   * its effects (the headphones button). */
+  /** Audio tracks only: whether this track's input is heard live now,
+   * through its effects. */
   monitoring?: boolean;
+  /** Audio tracks only: its monitoring mode (the headphones button). */
+  monitorMode?: MonitorMode;
   canMoveUp?: boolean;
   canMoveDown?: boolean;
   /** Whether this track's automation lane is currently expanded below it. */
@@ -281,6 +284,7 @@ export const TrackHeader = memo(function TrackHeader({
   effectsCount = 0,
   actions,
   monitoring = false,
+  monitorMode = "off",
   canMoveUp,
   canMoveDown,
   showAutomation,
@@ -489,18 +493,20 @@ export const TrackHeader = memo(function TrackHeader({
         {!isMaster && !isMidi && !isGroup && !oneRow && (
           <button
             type="button"
-            title={
-              monitoring
-                ? "Monitoring - hearing this track's input live through its effects. Click to stop."
-                : "Monitor - hear this track's input live through its effects (use headphones)"
-            }
-            aria-pressed={monitoring}
+            title={monitorTitle(monitorMode, monitoring)}
+            aria-label={`Monitor: ${MONITOR_LABELS[monitorMode]}`}
             onClick={(e) => {
               e.stopPropagation();
               onMonitorToggle();
             }}
             className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors ${
-              monitoring ? "border-accent bg-accent/25 text-accent" : "border-border text-muted hover:bg-surface-raised"
+              monitorMode === "auto" ? "border-dashed " : ""
+            }${
+              monitoring
+                ? "border-accent bg-accent/25 text-accent"
+                : monitorMode === "auto"
+                  ? "border-accent text-accent hover:bg-surface-raised"
+                  : "border-border text-muted hover:bg-surface-raised"
             }`}
           >
             <Headphones size={10} />
@@ -762,4 +768,18 @@ function HeightHandle({ height, onResize }: { height: number; onResize: (height:
       }}
     />
   );
+}
+
+/** The headphones button's tooltip: the mode, what it does, the next. */
+function monitorTitle(mode: MonitorMode, hearing: boolean): string {
+  switch (mode) {
+    case "in":
+      return "Monitor: In - hearing this track's input live, through its effects. Click for Auto.";
+    case "auto":
+      return `Monitor: Auto - the input is heard while the track is armed, stopped or recording; its clips while playing back${
+        hearing ? " (hearing the input now)" : ""
+      }. Click for Off.`;
+    default:
+      return "Monitor: Off - click to hear this track's input live, through its effects (use headphones).";
+  }
 }

@@ -3,29 +3,32 @@
 Read this first in a new session. It says where the project is, how the
 work is done and what comes next, then keeps the technical notes (the
 native engine's techniques, and what each finished item changed).
-Updated 2026-11-03, at `main` = `5a380da`, with step 25 not yet committed.
+Updated 2026-11-04, at `main` = `d0bfbb7`, with step 26 not yet
+committed.
 
 ## Start here
 
-- **Where we are:** Phase 7 (native stage 4) of `nextSteps.md` is done:
-  steps 1-25 are done (step 6, NAM in the engine, was dropped). The last
-  four:
+- **Where we are:** Phase 8 (recording) of `nextSteps.md` has begun:
+  steps 1-26 are done (step 6, NAM in the engine, was dropped). The last
+  five:
   - step 22, the mixer view (2026-11-02, `0078489`);
   - step 23, the mixer and piano roll in windows of their own
     (2026-11-02, `4b1d2c7`; the desktop's windows fixed in `612a0c2`);
   - step 24, sidechains in the engine (2026-11-03, `fdc436b`).
   - Not a listed step: the menu bar, and the browser shown or hidden
     (2026-11-03, `5a380da`; asked for by the user).
-  - step 25, automation in the engine (2026-11-03, commit to come).
-- **Next: step 26, monitoring modes per track** (Phase 8, Part 2 #14):
-  In, Auto and Off, as Ableton has them, in place of the one monitor
-  toggle; settled in the studio (both engines' model) before step 29
-  takes live input into the engine. Wait for the user to say "go" before
-  starting a step: they ask for each one ("Lets go with step N").
+  - step 25, automation in the engine (2026-11-03, `d0bfbb7`).
+  - Not a listed step: `DAWN_ASIO=1` in `.env` builds the desktop app
+    with ASIO, for testing on the user's machine (2026-11-04, commit to
+    come; `scripts/desktop.mjs`, docs/desktop.md "ASIO"). The user has
+    LLVM installed and it builds; the installers stay without it.
+  - step 26, monitoring modes per track (2026-11-04, commit to come).
+- **Next: step 27, punch-in and punch-out** within the loop (Phase 8,
+  Part 2 #15). Wait for the user to say "go" before starting a step:
+  they ask for each one ("Lets go with step N").
 - **What's left after that,** in order (the full list, with sizes, is in
   `nextSteps.md`; a summary is under "The road ahead" below):
-  recording (monitoring modes, punch in/out,
-  input channels, then live
+  recording (punch in/out, input channels, then live
   input through the engine), plugins (CLAP, VST3, plugin instruments,
   AU), shipping (export through the engine, native dialogs, signed
   installers), an accessibility pass, and last the desktop's driver,
@@ -69,7 +72,8 @@ The Dawn Project is a browser DAW, also built as a desktop app.
 - **Desktop app:** Tauri 2 (`src-tauri/`). It shows the same studio in a
   native window, and adds a Rust audio engine that plays through the
   interface's own driver (Core Audio, WASAPI; ASIO behind the cargo
-  feature `asio`, off).
+  feature `asio`, off; `DAWN_ASIO=1` in `.env` turns it on for local
+  builds, see docs/desktop.md).
 - **Rust workspace:**
   - `crates/dawn-engine`: the engine. Plain Rust, no dependencies.
   - `crates/dawn-plugins`: VST3/CLAP plugin scanning.
@@ -162,7 +166,7 @@ The Dawn Project is a browser DAW, also built as a desktop app.
 **Checks before handing a step over:**
 
 - `npx tsc --noEmit` and `npm run lint` (both clean).
-- `npx vitest run`: 803 unit and component tests on 2026-11-03, in the
+- `npx vitest run`: 811 unit and component tests on 2026-11-04, in the
   projects `unit` (Node), `components` (Chromium) and `web-audio`. The
   component tests have a 30 s limit (`vitest.config.ts`), and the slow
   unit tests their own; no `--testTimeout` needed.
@@ -619,7 +623,7 @@ ahead" above).
    for a limiter ahead of the gate), `keys.rs`'s unit tests (the studio's
    `sidechainRouting.test.ts` cases), `describe.test.ts`, and a test of
    the desktop's reader in `src-tauri/src/audio/song.rs`. Then
-   **automation**: done 2026-11-03 (step 25, commit to come; see
+   **automation**: done 2026-11-03 (step 25, `d0bfbb7`; see
    "Engine model" above). Tests: `crates/dawn-engine/tests/automation.rs`
    (the fader and pan following their lanes in place of their settings,
    a bent segment, an effect's parameter, an automated effect carrying
@@ -888,8 +892,23 @@ the order they were done, with the fixes made along the way.
     `e2e/menubar.spec.ts`, `MenuBar.test.tsx`; `e2e/studio.ts` has
     `menu(menu, item)`, and the tests that used the header's buttons go
     through the menus.
-  - Items 14, 15, 17 and 27 are open. Next in `nextSteps.md` is Phase 8,
-    step 26 (monitoring modes, item 14); steps 24 and 25 (sidechains and
+  - Item 14, monitoring modes per track (2026-11-04, commit to come;
+    step 26): each audio track is In, Auto or Off, as in Ableton, in place
+    of the one toggle. `src/studio/tracks/monitoring.ts` decides which
+    tracks hear their input now (`monitoredNow`): In always, Auto while
+    armed and stopped or paused, or recording onto it (playing back, the
+    clips play instead), Off never; the clips play in every mode. Daw.tsx
+    keeps the modes and opens and closes each track's input from that set,
+    which also feeds delay compensation's live tracks and the export. The
+    headphones button goes Off → In → Auto → Off (filled for In, dashed
+    for Auto, filled while Auto hears); the track's menu has a Monitor row.
+    A project saves In as `monitoredTracks` (so an older version still
+    hears them) and Auto as `autoMonitoredTracks`. Only the studio has
+    modes so far: the native engine takes no input until step 29, which
+    uses this model. Tests: `monitoring.test.ts`, `contextMenus.test.tsx`,
+    `projectSchema.test.ts`, `TrackHeader.test.tsx`, `e2e/tracks.spec.ts`.
+  - Items 15, 17 and 27 are open. Next in `nextSteps.md` is Phase 8,
+    step 27 (punch in and out, item 15); steps 24 and 25 (sidechains and
     automation in the engine, 2026-11-03) are logged under "The native
     engine plan".
   - Fixed 2026-10-31: on Windows, Next's static export wrote each page's

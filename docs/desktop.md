@@ -263,6 +263,13 @@ installed for the SDK's bindings; cpal fetches the SDK itself, or reads it
 from `CPAL_ASIO_DIR`), and the installers are made without it. WASAPI works
 in the meantime.
 
+To try it locally, put `DAWN_ASIO=1` in `.env` (which git ignores):
+`npm run desktop` and `npm run desktop:build` (`scripts/desktop.mjs`) then
+add `--features asio`. On Windows the script looks for libclang in
+`LIBCLANG_PATH` (which `.env` can set) or `C:\Program Files\LLVM\bin`
+(`winget install LLVM.LLVM`), and says so if it isn't there. Builds made
+this way are for testing only; the installers' workflow has no `.env`.
+
 ### Parity tests
 
 A kernel's parity test proves the port renders what the JavaScript renders:

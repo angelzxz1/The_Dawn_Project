@@ -36,7 +36,7 @@ function menu(id: string, channels: ChannelConfig[], ctx: Partial<MenuContext> =
       selectedClips: 0,
       trackPicks: new Set(),
       takeCount: () => 0,
-      monitored: new Set(),
+      monitorModes: new Map(),
       automationChannelId: null,
       tempo: makeTempoMap(120),
       beatsPerBar: 4,
@@ -84,13 +84,12 @@ describe("a track's header menu", () => {
   });
 
   test("each item asks for its action, for this track", () => {
-    const { item, actions } = menu("b", [track("a"), track("b", { type: "audio", instrument: undefined })], { monitored: new Set(["b"]) });
+    const { item, actions } = menu("b", [track("a"), track("b", { type: "audio", instrument: undefined })], {});
     for (const [label, action, args] of [
       ["Rename…", "renameTrack", ["b"]],
       ["Mute", "toggleMute", ["b"]],
       ["Solo", "toggleSolo", ["b"]],
       ["Arm for recording", "toggleArm", ["b"]],
-      ["Stop monitoring", "toggleMonitor", ["b"]],
       ["Effects", "openFx", ["b"]],
       ["Show automation", "toggleAutomation", ["b"]],
       ["Move up", "moveTrack", ["b", -1]],
@@ -99,6 +98,21 @@ describe("a track's header menu", () => {
       item(label).onSelect();
       expect(actions[action], label).toHaveBeenCalledWith(...args);
     }
+  });
+
+  test("an audio track's monitoring: a row of In, Auto and Off, its mode picked", () => {
+    const audio = track("b", { type: "audio", instrument: undefined });
+    const { entries, actions } = menu("b", [track("a"), audio], { monitorModes: new Map([["b", "auto"]]) });
+    const row = entries.find((e): e is ContextMenuRow => e !== "separator" && "row" in e && e.row === "Monitor");
+    expect(row?.options.map((o) => [o.label, !!o.selected])).toEqual([
+      ["In", false],
+      ["Auto", true],
+      ["Off", false],
+    ]);
+    row?.options[0].onSelect();
+    expect(actions.setMonitor).toHaveBeenCalledWith("b", "in");
+    // A MIDI track has none.
+    expect(labels(menu("a", [track("a"), audio]).entries)).not.toContain("[Monitor]");
   });
 
   test("it says what's on: muted, soloed, armed, the automation showing", () => {

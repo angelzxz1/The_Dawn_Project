@@ -35,6 +35,7 @@ import { CLIP_TOOLS, type ClipTool } from "@/studio/timeline/clipTools";
 import { keyLabel, withKeys } from "@/ui/keyLabel";
 import { TrackHeader, type TrackHeaderActions } from "@/studio/tracks/TrackHeader";
 import { TrackLane, type TrackLaneActions } from "@/studio/tracks/TrackLane";
+import { monitoredNow, monitorModeOf, nextMonitorMode, savedMonitorModes, withMonitorMode, type MonitorMode, type MonitorModes } from "@/studio/tracks/monitoring";
 import { useStableActions } from "@/ui/useStableActions";
 import { openPopout, Popout } from "@/ui/Popout";
 import type { HostWindow } from "@/ui/hostWindow";
@@ -303,10 +304,10 @@ export function Daw() {
    * recordings currently use (null = the browser's default). Refreshed on
    * mount and whenever the OS reports a device was plugged/unplugged. */
   const [inputDevices, setInputDevices] = useState<{ deviceId: string; label: string }[]>([]);
-  /** Audio tracks whose input is heard live (through their effects) - each
-   * track's headphones button. Session-only: not part of the undo-tracked
-   * document, and never reopened on load (that would prompt for the mic). */
-  const [monitoredChannelIds, setMonitoredChannelIds] = useState<ReadonlySet<string>>(() => new Set());
+  /** Each audio track's monitoring mode, In or Auto (Off: absent) - its
+   * headphones button (monitoring.ts). Saved with the project but not part
+   * of the undo-tracked document. */
+  const [monitorModes, setMonitorModes] = useState<MonitorModes>(() => new Map());
   /** Which channel (if any) currently has its automation lane expanded
    * under its track in the arrangement - a view-only toggle, not part of
    * the undo-tracked document. */
@@ -977,15 +978,25 @@ export function Daw() {
       });
   }, [refreshInputDevices]);
 
-  // Opens/closes the engine's live input for each monitored audio track.
-  // Only tracks that exist (and are audio tracks) count, so deleting one -
-  // or undoing its creation - stops its monitoring, and redo resumes it.
-  const monitoredAudioIds = useMemo(
-    () => [...monitoredChannelIds].filter((id) => channels.some((c) => c.id === id && c.type === "audio")),
-    [monitoredChannelIds, channels]
+  // Which channel a recording-in-progress targets - captured once at
+  // Record time (not read live from `armedChannelId`) so re-arming a
+  // different track mid-take (blocked by the UI, but not by anything else)
+  // can never redirect where Stop files the result.
+  const recordingChannelRef = useRef<string | null>(null);
+  /** The same, as state, for drawing the take on its track. */
+  const [recordingChannelId, setRecordingChannelId] = useState<string | null>(null);
+
+  // Opens/closes the engine's live input for each audio track hearing it
+  // now: In always, Auto while armed and stopped or recording onto it. Only
+  // tracks that exist (and are audio tracks) count, so deleting one - or
+  // undoing its creation - stops its monitoring, and redo resumes it.
+  const monitoredChannelIds = useMemo(
+    () => monitoredNow(monitorModes, channels, { state: transportState, recordingId: recordingChannelId }),
+    [monitorModes, channels, transportState, recordingChannelId]
   );
-  // Saved with the project (sorted, so the same set saves the same).
-  const monitoredTracks = useMemo(() => [...monitoredChannelIds].sort(), [monitoredChannelIds]);
+  const monitoredAudioIds = useMemo(() => [...monitoredChannelIds], [monitoredChannelIds]);
+  // Saved with the project (sorted, so the same modes save the same).
+  const { monitoredTracks, autoMonitoredTracks } = useMemo(() => savedMonitorModes(monitorModes), [monitorModes]);
 
   // The browser lets audio start only after the page is clicked or a key
   // pressed; monitors restored with a project wait for that.
@@ -1001,19 +1012,19 @@ export function Daw() {
     };
   }, [audioUnlocked]);
 
-  /** A project's monitors come back when it opens: a track listening to
-   * another track's audio always; one listening to the audio interface
-   * only if the browser already lets Dawn use it, so opening a project
-   * never asks for the microphone. */
+  /** A project's monitoring modes come back when it opens: a track
+   * listening to another track's audio always; one listening to the audio
+   * interface only if the browser already lets Dawn use it, so opening a
+   * project never asks for the microphone. */
   const restoreToken = useRef(0);
-  const restoreMonitoring = useCallback((ids: string[], tracks: ChannelConfig[]) => {
+  const restoreMonitoring = useCallback((inIds: string[], autoIds: string[], tracks: ChannelConfig[]) => {
     const token = ++restoreToken.current;
-    const fromTracks = ids.filter((id) => tracks.some((c) => c.id === id && c.input));
-    const fromInterface = ids.filter((id) => !fromTracks.includes(id));
-    setMonitoredChannelIds(new Set(fromTracks));
-    if (fromInterface.length === 0) return;
+    const modes = new Map<string, Exclude<MonitorMode, "off">>([...inIds.map((id) => [id, "in"] as const), ...autoIds.map((id) => [id, "auto"] as const)]);
+    const fromTracks = new Map([...modes].filter(([id]) => tracks.some((c) => c.id === id && c.input)));
+    setMonitorModes(fromTracks);
+    if (fromTracks.size === modes.size) return;
     void microphoneAllowed().then((allowed) => {
-      if (allowed && token === restoreToken.current) setMonitoredChannelIds((prev) => new Set([...prev, ...fromInterface]));
+      if (allowed && token === restoreToken.current) setMonitorModes(modes);
     });
   }, []);
 
@@ -1031,11 +1042,7 @@ export function Daw() {
           return;
         }
         open.delete(id);
-        setMonitoredChannelIds((prev) => {
-          const next = new Set(prev);
-          next.delete(id);
-          return next;
-        });
+        setMonitorModes((prev) => withMonitorMode(prev, id, "off"));
         setMicError(
           "Couldn't open your audio input - allow microphone access in the browser, and pick your interface in the track's Input menu."
         );
@@ -1052,22 +1059,14 @@ export function Daw() {
     return () => open.forEach((id) => void audioEngine.setInputMonitoring(id, false));
   }, []);
 
+  /** The headphones button: Off → In → Auto → Off. */
   const handleMonitorToggle = useCallback((channelId: string) => {
-    setMonitoredChannelIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(channelId)) next.delete(channelId);
-      else next.add(channelId);
-      return next;
-    });
+    setMonitorModes((prev) => withMonitorMode(prev, channelId, nextMonitorMode(monitorModeOf(prev, channelId))));
+  }, []);
+  const handleMonitorMode = useCallback((channelId: string, mode: MonitorMode) => {
+    setMonitorModes((prev) => withMonitorMode(prev, channelId, mode));
   }, []);
 
-  // Which channel a recording-in-progress targets - captured once at
-  // Record time (not read live from `armedChannelId`) so re-arming a
-  // different track mid-take (blocked by the UI, but not by anything else)
-  // can never redirect where Stop files the result.
-  const recordingChannelRef = useRef<string | null>(null);
-  /** The same, as state, for drawing the take on its track. */
-  const [recordingChannelId, setRecordingChannelId] = useState<string | null>(null);
   /** MIDI overdub: a MIDI recording adds to what's on the track instead of
    * replacing it (as a new take). Saved with the project. */
   const [midiOverdub, setMidiOverdub] = useState(false);
@@ -1862,7 +1861,7 @@ export function Daw() {
               selectedClips: selectedClipIds.size,
               trackPicks,
               takeCount: (id) => (takesByChannel[id] ?? NO_TAKES).length,
-              monitored: monitoredChannelIds,
+              monitorModes,
               automationChannelId,
               tempo,
               beatsPerBar,
@@ -1901,7 +1900,7 @@ export function Daw() {
               toggleMute: handleMuteToggle,
               toggleSolo: handleSoloToggle,
               toggleArm: handleArmToggle,
-              toggleMonitor: handleMonitorToggle,
+              setMonitor: handleMonitorMode,
               openFx,
               toggleAutomation: handleToggleAutomation,
               moveTrack: handleReorderChannel,
@@ -1937,13 +1936,13 @@ export function Daw() {
       tempo,
       beatsPerBar,
       takesByChannel,
-      monitoredChannelIds,
+      monitorModes,
       automationChannelId,
       handleRecolorChannel,
       handleMuteToggle,
       handleSoloToggle,
       handleArmToggle,
-      handleMonitorToggle,
+      handleMonitorMode,
       openFx,
       handleToggleAutomation,
       handleReorderChannel,
@@ -2034,7 +2033,7 @@ export function Daw() {
     setCountInBars(project.countInBars);
     setMetronomeEnabled(project.metronomeEnabled);
     setMidiOverdub(project.midiOverdub);
-    restoreMonitoring(project.monitoredTracks, state.channels);
+    restoreMonitoring(project.monitoredTracks, project.autoMonitoredTracks, state.channels);
     setLoop(project.loop);
     setSelectedClipIds(new Set());
     setTimeSelection(null);
@@ -2157,7 +2156,7 @@ export function Daw() {
     loadDemo: handleLoadDemo,
     startNew,
   } = useProjectFiles(
-    { masterLimiterThreshold, scaleSetting, snapResolution, countInBars, metronomeEnabled, midiOverdub, loop, monitoredTracks },
+    { masterLimiterThreshold, scaleSetting, snapResolution, countInBars, metronomeEnabled, midiOverdub, loop, monitoredTracks, autoMonitoredTracks },
     {
       beforeOpen: () => {
         audioEngine.stopAll();
@@ -3005,6 +3004,7 @@ export function Daw() {
                   showAutomation={automationChannelId === channel.id}
                   inputDevices={inputDevices}
                   monitoring={monitoredChannelIds.has(channel.id)}
+                  monitorMode={monitorModeOf(monitorModes, channel.id)}
                   takeCount={(takesByChannel[channel.id] ?? NO_TAKES).length}
                   renaming={renamingTrackId === channel.id}
                   route={routeLights?.tracks.get(channel.id) ?? null}

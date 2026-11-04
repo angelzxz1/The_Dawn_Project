@@ -46,7 +46,8 @@ import { FADE_PRESETS, presetFades, type FadePreset } from "@/project/clipEdits"
 import { bpmAtSeconds, type TempoMap } from "@/project/tempoMap";
 import { TRACK_COLOR_PALETTE, trackColorOf, type TrackColorPick } from "@/project/colors";
 import type { AudioClipInstance, AudioWarp, ChannelConfig, ClipInstance } from "@/project/types";
-import type { ContextMenuEntry, ContextMenuItem } from "@/studio/shell/ContextMenu";
+import type { ContextMenuEntry, ContextMenuItem, ContextMenuRow } from "@/studio/shell/ContextMenu";
+import { MONITOR_LABELS, MONITOR_MODES, MONITOR_TITLES, monitorModeOf, type MonitorMode, type MonitorModes } from "@/studio/tracks/monitoring";
 
 export type ContextMenuState =
   | { kind: "clip"; channelId: string; clipId: string; x: number; y: number }
@@ -102,7 +103,8 @@ export interface MenuActions {
   toggleMute: (id: string) => void;
   toggleSolo: (id: string) => void;
   toggleArm: (id: string) => void;
-  toggleMonitor: (id: string) => void;
+  /** An audio track's monitoring mode (monitoring.ts). */
+  setMonitor: (id: string, mode: MonitorMode) => void;
   openFx: (id: string) => void;
   toggleAutomation: (id: string) => void;
   moveTrack: (id: string, direction: -1 | 1) => void;
@@ -136,8 +138,8 @@ export interface MenuContext {
   trackPicks: ReadonlySet<string>;
   /** How many takes a track has (takes.ts). */
   takeCount: (channelId: string) => number;
-  /** Audio tracks monitoring their input. */
-  monitored: ReadonlySet<string>;
+  /** Audio tracks' monitoring modes. */
+  monitorModes: MonitorModes;
   /** The track whose automation lane shows. */
   automationChannelId: string | null;
   /** For the fade presets: a beat and a bar (at the clip). */
@@ -301,14 +303,23 @@ function headerMenu(id: string, ctx: MenuContext, actions: MenuActions): MenuIte
     },
     "separator",
   ];
-  const states: ContextMenuItem[] = [
+  const states: (ContextMenuItem | ContextMenuRow)[] = [
     { label: channel.muted ? "Unmute" : "Mute", icon: <VolumeX size={13} />, onSelect: () => actions.toggleMute(id) },
     { label: channel.solo ? "Unsolo" : "Solo", icon: <Headphones size={13} />, onSelect: () => actions.toggleSolo(id) },
     ...(isGroup ? [] : [{ label: channel.armed ? "Disarm" : "Arm for recording", icon: <Circle size={13} />, onSelect: () => actions.toggleArm(id) }]),
-    ...(channel.type === "audio"
-      ? [{ label: ctx.monitored.has(id) ? "Stop monitoring" : "Monitor the input", icon: <Headphones size={13} />, onSelect: () => actions.toggleMonitor(id) }]
-      : []),
   ];
+  if (channel.type === "audio") {
+    const current = monitorModeOf(ctx.monitorModes, id);
+    states.push({
+      row: "Monitor",
+      options: MONITOR_MODES.map((mode) => ({
+        label: MONITOR_LABELS[mode],
+        title: MONITOR_TITLES[mode],
+        selected: mode === current,
+        onSelect: () => actions.setMonitor(id, mode),
+      })),
+    });
+  }
   const views: ContextMenuItem[] = [
     { label: channel.type === "midi" ? "Instrument and effects" : "Effects", icon: <Sliders size={13} />, onSelect: () => actions.openFx(id) },
     {
@@ -369,7 +380,7 @@ function headerMenu(id: string, ctx: MenuContext, actions: MenuActions): MenuIte
     ...(isGroup ? [] : [{ label: "Clear all clips", icon: <Eraser size={13} />, disabled: clips.length === 0, danger: true, onSelect: () => actions.clearTrack(id) }]),
     ...(channels.length > 1 && !isGroup ? [{ label: "Remove track", icon: <X size={13} />, danger: true, onSelect: () => actions.removeTrack(id) }] : []),
   ];
-  const section = (items: ContextMenuItem[]): MenuItems => (items.length ? [...items, "separator"] : []);
+  const section = (items: (ContextMenuItem | ContextMenuRow)[]): MenuItems => (items.length ? [...items, "separator"] : []);
   const menu: MenuItems = [
     ...name,
     ...section(states),

@@ -224,7 +224,7 @@ describe("other kinds of track", () => {
       channel: channel({ id: "gtr", name: "Guitar", type: "audio", instrument: null, armed: true }),
       inputDevices: devices,
     });
-    await screen.getByTitle(/^Monitor - /).click();
+    await screen.getByTitle(/^Monitor: Off - /).click();
     expect(actions.toggleMonitor).toHaveBeenCalledWith("gtr");
 
     // Going to the input list asks for the devices (whose names the browser
