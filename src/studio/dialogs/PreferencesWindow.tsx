@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { AudioLines, FolderOpen, Mic, Palette, Settings, Timer, X } from "lucide-react";
 import { audioEngine } from "@/engine/audioEngine";
+import { nativeEngine } from "@/engine/native/nativeEngine";
 import { BROWSER_LATENCIES, METRONOME_DB_RANGE, type BrowserLatency } from "@/engine/audioPrefs";
 import { CLICK_SOUNDS, CLICK_SOUND_LABELS, type ClickSound } from "@/engine/clickSounds";
 import { pageBrowserLatency } from "@/engine/context";
@@ -168,6 +169,9 @@ function RecordingTab() {
   const [offsetDraft, setOffsetDraft] = useState(String(prefs.recordingOffsetMs));
   const info = audioEngine.getLatencyInfo();
   const roundTrip = audioEngine.getRoundTrip();
+  // Through the native engine, its drivers' round trip is its own.
+  const native = nativeEngine.current.active;
+  const measuredKey = native ? "measuredNativeRoundTrip" : "measuredRoundTrip";
 
   const runMeasure = async () => {
     setMeasure({ state: "running" });
@@ -182,11 +186,14 @@ function RecordingTab() {
         });
         return;
       }
-      update({ measuredRoundTrip: rt });
+      update({ [measuredKey]: rt });
       setMeasure({ state: "done", message: `Measured ${ms(rt)}. Recordings will be lined up using it.` });
     } catch (error) {
       noteIssue("latency.measure", error, { report: false });
-      setMeasure({ state: "failed", message: "Couldn't open the audio input - check the browser's microphone permission." });
+      setMeasure({
+        state: "failed",
+        message: native ? "Couldn't measure through the native engine - check its input in Audio settings." : "Couldn't open the audio input - check the browser's microphone permission.",
+      });
     }
   };
 
@@ -206,11 +213,11 @@ function RecordingTab() {
         >
           {measure.state === "running" ? "Listening…" : "Measure latency"}
         </button>
-        {prefs.measuredRoundTrip !== null && (
+        {prefs[measuredKey] !== null && (
           <button
             type="button"
             onClick={() => {
-              update({ measuredRoundTrip: null });
+              update({ [measuredKey]: null });
               setMeasure({ state: "idle" });
             }}
             className="text-[11px] text-muted underline hover:text-foreground"

@@ -25,17 +25,17 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 /** Turns the native engine on and off as the settings say (in the desktop
  * app), and opens the device again when they change. */
 export function useNativeEngine(prefs: AudioPrefs, available: boolean): void {
-  const { nativeEngine: on, nativeDevice, nativeSampleRate, nativeBufferSize } = prefs;
+  const { nativeEngine: on, nativeDevice, nativeSampleRate, nativeBufferSize, nativeInputDevice } = prefs;
   useEffect(() => {
     if (!available) return;
-    if (on) void nativeEngine.turnOn({ device: nativeDevice, sampleRate: nativeSampleRate, bufferSize: nativeBufferSize });
+    if (on) void nativeEngine.turnOn({ device: nativeDevice, sampleRate: nativeSampleRate, bufferSize: nativeBufferSize, inputDevice: nativeInputDevice });
     else if (nativeEngine.current.active) void nativeEngine.turnOff();
-  }, [available, on, nativeDevice, nativeSampleRate, nativeBufferSize]);
+  }, [available, on, nativeDevice, nativeSampleRate, nativeBufferSize, nativeInputDevice]);
 }
 
 /** The Audio panel's native engine section (desktop app only): on or off,
- * the driver and device, the rate and buffer size, how it's running, and
- * what of the project it doesn't play yet. */
+ * the driver, device and input, the rate and buffer size, how it's
+ * running, and what of the project it doesn't play yet. */
 export function NativeEngineSection({ prefs, update }: { prefs: AudioPrefs; update: (change: Partial<AudioPrefs>) => void }) {
   const state = useSyncExternalStore(nativeEngine.subscribe, () => nativeEngine.current, () => nativeEngine.current);
   const doc = useProjectDoc();
@@ -101,7 +101,7 @@ export function NativeEngineSection({ prefs, update }: { prefs: AudioPrefs; upda
                 setDriverId(e.target.value);
                 const next = drivers?.find((d) => d.id === e.target.value);
                 const dev = next?.devices.find((d) => d.isDefault) ?? next?.devices[0];
-                update({ nativeDevice: dev?.id ?? null, nativeSampleRate: null, nativeBufferSize: null });
+                update({ nativeDevice: dev?.id ?? null, nativeSampleRate: null, nativeBufferSize: null, nativeInputDevice: null });
               }}
             >
               {drivers === null && <option>Looking…</option>}
@@ -125,6 +125,25 @@ export function NativeEngineSection({ prefs, update }: { prefs: AudioPrefs; upda
                 <option key={d.id} value={d.id}>
                   {d.name}
                   {d.isDefault ? " (default)" : ""}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Input">
+            <select
+              className={selectClass}
+              aria-label="Input"
+              value={prefs.nativeInputDevice ?? ""}
+              onChange={(e) => update({ nativeInputDevice: e.target.value || null })}
+            >
+              <option value="">Automatic</option>
+              {prefs.nativeInputDevice && !driver?.inputs.some((d) => d.id === prefs.nativeInputDevice) && (
+                <option value={prefs.nativeInputDevice}>Not connected</option>
+              )}
+              {driver?.inputs.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                  {d.channels > 1 ? ` (${d.channels} inputs)` : ""}
                 </option>
               ))}
             </select>
@@ -174,14 +193,27 @@ export function NativeEngineSection({ prefs, update }: { prefs: AudioPrefs; upda
               </p>
             )
           )}
+          {state.active &&
+            (state.input ? (
+              <p className="text-[11px] text-muted" aria-label="Native engine input">
+                Recording from {state.input.name} ({state.input.channels === 1 ? "1 input" : `${state.input.channels} inputs`})
+              </p>
+            ) : (
+              state.inputError && (
+                <p className="rounded border border-warn/40 bg-warn/10 px-2 py-1.5 text-[11px] leading-snug text-warn">
+                  Couldn&apos;t open the input: {state.inputError}
+                </p>
+              )
+            ))}
 
           <p className="text-[11px] leading-snug text-muted">
             So far it plays audio clips and every instrument (the piano, the Drum Rack and the synth, from clips and the keys you
             play) through the mix (volume, pan, mute, solo, groups, sends), the dynamics and EQ effects (Compressor, Glue
             Compressor, Noise Gate, Limiter, the multiband effects, Parametric EQ, EQ Three, Utility), the Filter, the Chorus, the Delay, the Reverb, the Saturator, the Pitch Shift,
             the Furnace amp, the IR Loader and the Tuner, with sidechains, automation, delay compensation, the master limiter and the metronome.
-            Recording comes next: until then, turn it off to record. The NAM Amp plays only in the browser&apos;s engine; here, NAM models will play
-            through NAM&apos;s own plugin.
+            It records your interface&apos;s inputs too, monitored through the track&apos;s effects; recording another track&apos;s audio still
+            needs the browser&apos;s engine. The NAM Amp plays only in the browser&apos;s engine; here, NAM models will play through NAM&apos;s own
+            plugin.
           </p>
           {(missing.instruments.length > 0 || missing.effects.length > 0) && (
             <ul className="rounded border border-warn/40 bg-warn/10 px-2 py-1.5 text-[11px] leading-snug text-warn">

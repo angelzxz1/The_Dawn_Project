@@ -3,13 +3,13 @@
 Read this first in a new session. It says where the project is, how the
 work is done and what comes next, then keeps the technical notes (the
 native engine's techniques, and what each finished item changed).
-Updated 2026-11-04, at `main` = `2331049`, with step 28 not yet
+Updated 2026-11-04, at `main` = `9c63222`, with step 29 not yet
 committed.
 
 ## Start here
 
-- **Where we are:** Phase 8 (recording) of `nextSteps.md` is under way:
-  steps 1-28 are done (step 6, NAM in the engine, was dropped). The last
+- **Where we are:** Phase 8 (recording) of `nextSteps.md` is done:
+  steps 1-29 are done (step 6, NAM in the engine, was dropped). The last
   few:
   - step 22, the mixer view (2026-11-02, `0078489`);
   - step 23, the mixer and piano roll in windows of their own
@@ -25,23 +25,25 @@ committed.
   - step 26, monitoring modes per track (2026-11-04, `f750344`).
   - step 27, punch-in and punch-out (2026-11-04, `2331049`).
   - step 28, input channels on multi-input interfaces (2026-11-04,
-    commit to come).
-- **Next: step 29, live input and recording through the engine**: the
-  interface's inputs, low-latency monitoring and takes written to disk,
-  using the model from steps 26-28 (monitoring modes, punch, input
-  channels). Wait for the user to say "go" before starting a step: they
-  ask for each one ("Lets go with step N").
+    `9c63222`).
+  - step 29, live input and recording through the engine (2026-11-04,
+    commit to come). Not yet tried on the user's interface.
+- **Next: step 30, CLAP effects in the engine** (Phase 9, plugins), with
+  their windows (in step 23's style) and their state saved. Wait for the
+  user to say "go" before starting a step: they ask for each one ("Lets
+  go with step N").
 - **What's left after that,** in order (the full list, with sizes, is in
   `nextSteps.md`; a summary is under "The road ahead" below):
-  recording (live
-  input through the engine), plugins (CLAP, VST3, plugin instruments,
+  plugins (CLAP, VST3, plugin instruments,
   AU), shipping (export through the engine, native dialogs, signed
   installers), an accessibility pass, and last the desktop's driver,
   device and inputs picker, which waits for ASIO.
 - **Known loose ends:**
-  - With the native engine on, the meters and the loudness readout still
-    read the browser's audio, which is silent then. The engine has to
-    send its levels (with Phase 7 or 8).
+  - With the native engine on, the loudness readout still reads the
+    browser's audio, which is silent then (the track and input meters read
+    the engine's).
+  - Native recording, not yet: recording another track's audio ("Audio
+    from"), and an interface's inputs in stereo (a pair as one take).
   - `e2e/recording.spec.ts` and two piano-roll tests have failed now and
     then under load and pass when run again. Nothing to fix so far.
   - Autosave into a real project folder hasn't been tried end to end (the
@@ -171,7 +173,7 @@ The Dawn Project is a browser DAW, also built as a desktop app.
 **Checks before handing a step over:**
 
 - `npx tsc --noEmit` and `npm run lint` (both clean).
-- `npx vitest run`: 827 unit and component tests on 2026-11-04, in the
+- `npx vitest run`: 835 unit and component tests on 2026-11-04, in the
   projects `unit` (Node), `components` (Chromium) and `web-audio`. The
   component tests have a 30 s limit (`vitest.config.ts`), and the slow
   unit tests their own; no `--testTimeout` needed.
@@ -233,7 +235,7 @@ L a stage of its own).
     (L). Done 2026-11-02.
 - **Phase 7, native stage 4:** 24, sidechains in the engine. 25,
   automation in the engine. Both done 2026-11-03.
-- **Phase 8, recording, then native stage 5:** 26 (next), monitoring
+- **Phase 8, recording, then native stage 5 (done 2026-11-04):** 26, monitoring
   modes per track (In, Auto, Off; #14). 27, punch-in and punch-out in the loop
   (#15). 28, input channels on multi-input interfaces (#17). 29, live
   input and recording through the engine.
@@ -491,8 +493,12 @@ Temporary, never committed:
   - instruments it lacks;
   - effects: the NAM Amp;
   - tracks with automation.
-- **Not yet in the engine:** automation (Phase 7),
-  recording (Phase 8), sending its meter levels back to the studio. The
+- **It records** (step 29): the interface's input, opened with the
+  output; monitored tracks hear their input channel through their
+  effects; takes are written to disk and handed back from their downbeat
+  (docs/desktop.md, "Recording").
+- **Not yet in the engine:** recording another track's audio, stereo
+  takes from an input pair, the loudness readout's levels, plugins. The
   NAM Amp won't be (NAM's own plugin will play it).
 
 ## The native engine plan, stage by stage
@@ -637,8 +643,37 @@ ahead" above).
    `automation.rs`'s unit tests (`interpolateAutomation`'s and
    `curveShape`'s cases, the settings made every 50 ms, a reverb's decay
    stepping), `describe.test.ts`, and a test of the desktop's reader.
-4. **Live input and recording through the engine:** the interface's
-   inputs, low-latency monitoring, takes written to disk.
+4. **Live input and recording through the engine:** done 2026-11-04
+   (step 29, commit to come). `src-tauri/src/audio/stream.rs` opens the
+   input (`Request.input`; none named: the output device if it records,
+   else its driver's default) at the output's rate; its callback puts
+   samples on a ring, and the output's callback takes a block's worth
+   (`read_input`; more than two callbacks' worth waiting and the oldest
+   go), meters each channel and gives it to the take. The engine adds the
+   input to each monitored track's buffer ahead of its effects
+   (`Engine::render_with_input`, `LiveInput`, `input_sample`: a channel,
+   the last past the device's, or all mixed). A take (`take.rs`): the
+   `Capture` on the audio thread pushes the input's channel onto a 30 s
+   ring and the waveform's 64-frame buckets onto another; the writer
+   thread writes a 32-bit float WAV in the app's cache (`takes/`),
+   rewriting its header every second. Each take has its own end flag
+   (shared by its capture and writer). `engine_finish_take` waits for the
+   writer, then reads from `take_start` = (downbeat - capture start) +
+   the mix's latency + the round trip the studio sends, and removes the
+   file. `engine_record(probe)` plays the probe's clicks straight to the
+   output for **Measure latency**. In the studio, `nativeEngine.ts` is
+   the follower that records (`EngineFollower`'s input members); the
+   browser engine hands it the interface's monitors (moving them over
+   when it starts following, back when it stops), the input meters, takes
+   and the measurement; `getRecordingLatency` leaves the mix's latency to
+   the engine. The round trip: `measuredNativeRoundTrip`, else the
+   drivers' (`Status::round_trip`). Tests: `tests/mix.rs` (a monitored
+   track's channel through its fader, the input's mix, the count-in's
+   end), `take.rs`'s (a WAV written and read from its downbeat, where a
+   take starts, the click), `nativeTake.test.ts`, `nativeEngine.test.tsx`
+   (the input opened and metered, monitoring, a take, the measurement),
+   `NativeEngineSection.test.tsx`, `TrackHeader.test.tsx`,
+   `audioPrefs.test.ts`.
 5. **Plugins:** P2 CLAP effects in the engine (with their windows and
    state saved), P3 VST3 effects, P4 plugin instruments, P5 Audio Units.
 6. **Export** through the engine, native file dialogs, signed installers.
@@ -927,7 +962,7 @@ the order they were done, with the fixes made along the way.
     `monitoredNow`). The lanes show the range with dashed red ends. Tests:
     `punch.test.ts`, `projectSchema.test.ts`, `e2e/recording.spec.ts`.
   - Item 17, input channels on multi-input interfaces (2026-11-04,
-    commit to come; step 28): an audio track keeps `inputChannel` (0 =
+    `9c63222`; step 28): an audio track keeps `inputChannel` (0 =
     input 1; unset, the device as one channel, as before), picked in a
     small list beside its Input (In 1, In 2... or All), shown when the
     browser lists the device with more than one channel
@@ -942,10 +977,10 @@ the order they were done, with the fixes made along the way.
     `inputChannels.test.ts`, `TrackHeader.test.tsx`,
     `projectSchema.test.ts`, `e2e/recording.spec.ts` (input 2 of the
     fake microphone, which has two channels).
-  - Item 27 is open. Next in `nextSteps.md` is Phase 8, step 29 (live
-    input and recording through the engine); steps 24 and 25 (sidechains and
-    automation in the engine, 2026-11-03) are logged under "The native
-    engine plan".
+  - Item 27 is open. Next in `nextSteps.md` is Phase 9, step 30 (CLAP
+    effects in the engine); steps 24, 25 and 29 (sidechains, automation
+    and recording in the engine) are logged under "The native engine
+    plan".
   - Fixed 2026-10-31: on Windows, Next's static export wrote each page's
     prefetch files as folders (`__next.!KHNpdGUp/__PAGE__.txt`, from a
     backslash it doesn't turn into a dot) where its router asks for

@@ -10,12 +10,18 @@
 // samples). What's still on its way is
 // silent until it arrives. Keys played live, the sustain pedal, pitch bend
 // and mod wheel go straight to it.
+//
+// It opens the audio interface's input with its output: the tracks
+// monitoring it hear it live through the engine, and takes are recorded
+// there, onto disk, and handed back when they end (nativeTake.ts).
 
 import * as Tone from "tone";
 import { audioEngine } from "../audioEngine";
 import type { EngineFollower } from "../follower";
 import { warpedBuffer, warpKey } from "../warpRender";
 import { nativeBridge, type NativeStatus } from "./bridge";
+import { PROBE_CLICKS, probeClick, TakeBuckets } from "./nativeTake";
+import { detectRoundTrip } from "../latency";
 import { describeSong, SUB_TABLE, type NativeAudioIds, type NativeSession } from "./describe";
 import { decodeEffectFileAudio } from "../../effects/effectFiles";
 import { loadDrumSample } from "../../instruments/drum-rack/drumRack";
@@ -43,6 +49,9 @@ export interface NativeSettings {
   device: string | null;
   sampleRate: number | null;
   bufferSize: number | null;
+  /** The input's id (bridge.ts), or null: the device itself if it
+   * records, else its driver's default input. */
+  inputDevice: string | null;
 }
 
 export interface NativeState {
@@ -53,10 +62,13 @@ export interface NativeState {
   bufferSize: number | null;
   error: string | null;
   status: NativeStatus | null;
+  /** The interface's input, open with the device, or why it isn't. */
+  input: { name: string; channels: number } | null;
+  inputError: string | null;
 }
 
 class NativeEngine {
-  private state: NativeState = { active: false, starting: false, sampleRate: 0, bufferSize: null, error: null, status: null };
+  private state: NativeState = { active: false, starting: false, sampleRate: 0, bufferSize: null, error: null, status: null, input: null, inputError: null };
   private listeners = new Set<() => void>();
   /** Files sent (or on their way), by the id the engine knows them by. */
   private sent = new Map<string, Promise<void>>();
@@ -65,6 +77,11 @@ class NativeEngine {
   private session: NativeSession = { limiterDb: -1, beatsPerBar: 4, compensation: true, live: [] };
   private statusAt = 0;
   private polling = false;
+  /** The tracks hearing the input live, as last sent. */
+  private monitors: { track: string; channel: number | null }[] = [];
+  /** The take being recorded: its waveform so far, and where its downbeat
+   * is in its capture before the round trip (frames). */
+  private take: { buckets: TakeBuckets; downbeat: number } | null = null;
 
   get current(): NativeState {
     return this.state;
@@ -85,9 +102,13 @@ class NativeEngine {
   async turnOn(settings: NativeSettings): Promise<void> {
     this.set({ starting: true, error: null });
     try {
-      const opened = await nativeBridge.open(settings.device, settings.sampleRate, settings.bufferSize);
+      const opened = await nativeBridge.open(settings.device, settings.sampleRate, settings.bufferSize, settings.inputDevice);
       if (opened.sampleRate !== this.state.sampleRate) this.sent.clear();
-      this.set({ active: true, starting: false, sampleRate: opened.sampleRate, bufferSize: opened.bufferSize });
+      const input = opened.inputName !== null && opened.inputChannels ? { name: opened.inputName, channels: opened.inputChannels } : null;
+      this.take = null;
+      this.set({ active: true, starting: false, sampleRate: opened.sampleRate, bufferSize: opened.bufferSize, input, inputError: opened.inputError });
+      // The device opened anew hears what it heard before.
+      if (this.monitors.length > 0) this.run("monitor", nativeBridge.monitor(this.monitors));
       Tone.getDestination().mute = true;
       audioEngine.setFollower(this.follower);
       this.unsubscribe ??= projectStore.subscribe(() => this.queueSong());
@@ -103,7 +124,8 @@ class NativeEngine {
   /** Back to the browser's engine. */
   async turnOff(): Promise<void> {
     this.release();
-    this.set({ active: false, status: null });
+    this.take = null;
+    this.set({ active: false, status: null, input: null, inputError: null });
     try {
       await nativeBridge.close();
     } catch (error) {
@@ -273,6 +295,10 @@ class NativeEngine {
       try {
         const status = await nativeBridge.status();
         this.statusAt = performance.now();
+        if (status.take && this.take) {
+          this.take.buckets.add(status.take.min, status.take.max);
+          this.take.downbeat = status.take.downbeat;
+        }
         this.set({ status });
       } catch (error) {
         noteIssue("native.status", error);
@@ -289,7 +315,7 @@ class NativeEngine {
   }
 
   private readonly follower: EngineFollower = {
-    play: (from) => this.run("play", nativeBridge.play(from)),
+    play: (from, countInBeats) => this.run("play", nativeBridge.play(from, countInBeats)),
     stop: () => this.run("stop", nativeBridge.stop()),
     seek: (seconds) => this.run("seek", nativeBridge.seek(seconds)),
     loop: (range) => this.run("loop", nativeBridge.loop(range)),
@@ -318,6 +344,49 @@ class NativeEngine {
     sustain: (track, down) => this.run("sustain", nativeBridge.sustain(track, down)),
     pitchBend: (track, semitones) => this.run("bend", nativeBridge.bend(track, synthBend(semitones * 100))),
     modWheel: (track, amount) => this.run("wheel", nativeBridge.modWheel(track, amount)),
+
+    hasInput: () => this.state.input !== null,
+    monitor: (tracks) => {
+      const same = (a: typeof tracks, b: typeof tracks) =>
+        a.length === b.length && a.every((t, i) => t.track === b[i].track && t.channel === b[i].channel);
+      if (same(tracks, this.monitors)) return;
+      this.monitors = tracks;
+      if (this.state.active) this.run("monitor", nativeBridge.monitor(tracks));
+    },
+    inputPeak: (channel) => {
+      const peaks = this.state.status?.inputs;
+      if (!this.state.input || !peaks?.length) return null;
+      return channel === null ? Math.max(...peaks) : peaks[Math.min(channel, peaks.length - 1)];
+    },
+    roundTrip: () => this.state.status?.roundTrip ?? 0,
+    record: async (channel) => {
+      await nativeBridge.record(channel);
+      this.take = { buckets: new TakeBuckets(this.state.sampleRate), downbeat: 0 };
+    },
+    takePreview: (roundTrip) => {
+      const take = this.take;
+      if (!take) return null;
+      const from = take.downbeat + Math.round(roundTrip * take.buckets.sampleRate);
+      return { waveform: take.buckets.waveform(from), version: take.buckets.version };
+    },
+    finishTake: async (roundTrip) => {
+      this.take = null;
+      const sampleRate = this.state.sampleRate;
+      const samples = new Float32Array(await nativeBridge.finishTake(roundTrip));
+      return samples.length > 0 ? { samples, sampleRate } : null;
+    },
+    cancelTake: () => {
+      this.take = null;
+      this.run("cancel", nativeBridge.cancelTake());
+    },
+    measureRoundTrip: async (channel) => {
+      const sr = this.state.sampleRate;
+      await nativeBridge.record(channel, true);
+      const last = PROBE_CLICKS[PROBE_CLICKS.length - 1];
+      await new Promise((r) => setTimeout(r, (last + 0.6) * 1000));
+      const samples = new Float32Array(await nativeBridge.finishTake(null));
+      return detectRoundTrip(samples, sr, PROBE_CLICKS.map((t) => Math.round(t * sr)), probeClick(sr));
+    },
   };
 }
 

@@ -103,7 +103,7 @@ That is already ahead of most browser DAWs, such as BandLab or Soundtrap.
 - [x] **16. A visible count-in** in the transport, and a click-volume control with click sound choices. (`84d1f02`)
   - The transport shows the count-in as it goes, the beats left (4, 3, 2, 1), the bar's first beat brighter (`CountIn.tsx`, `Transport.countInLeft`).
   - Four click sounds, next to the click level: Classic (the one there was), Beep, Wood block and Cowbell (`metronomeKernel.ts` `makeClick`, and the native engine's port in `metronome.rs`). Like the level, it's a setting of this computer (`audioPrefs.ts`).
-- [x] **17. Choosing input channels on multi-input interfaces,** for example a mono guitar on input 2. (2026-11-04, commit to come; `src/engine/inputs.ts`: each audio track picks In 1, In 2... or All beside its Input, split from the device's multichannel stream)
+- [x] **17. Choosing input channels on multi-input interfaces,** for example a mono guitar on input 2. (2026-11-04, `9c63222`; `src/engine/inputs.ts`: each audio track picks In 1, In 2... or All beside its Input, split from the device's multichannel stream)
 
 ### Finding things and learning the app
 

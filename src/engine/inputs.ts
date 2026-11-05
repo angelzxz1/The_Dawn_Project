@@ -369,6 +369,16 @@ export class InputManager {
     return this.monitorNodes.has(channelId);
   }
 
+  /** The tracks whose monitors are open. */
+  monitoredIds(): string[] {
+    return [...this.monitorNodes.keys()];
+  }
+
+  /** The channel of its device a track takes (null: the device as one). */
+  channelOf(channelId: string): number | null {
+    return parseInputKey(this.deviceOf(channelId)).channel;
+  }
+
   /** Which audio tracks take another track's audio (routing.ts), as the
    * mix plan accepted them. Monitors follow. */
   setTrackInputs(inputs: Map<string, TrackInput>): void {

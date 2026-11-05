@@ -81,6 +81,10 @@ test("with Punch on, a recording keeps only what's between the loop brace's ends
     await page.getByLabel(field, { exact: true }).fill(value);
     await page.keyboard.press("Enter");
   }
+  // Setting the brace may switch the loop on: off, so it's one take.
+  const loopButton = page.getByRole("button", { name: "Loop", exact: true });
+  if ((await loopButton.getAttribute("aria-pressed")) === "true") await loopButton.click();
+  await expect(loopButton).toHaveAttribute("aria-pressed", "false");
   await page.getByRole("button", { name: "Punch in and out" }).click();
   await expect(page.getByRole("button", { name: "Punch in and out" })).toHaveAttribute("aria-pressed", "true");
   const range = page.getByTestId("punch-range");

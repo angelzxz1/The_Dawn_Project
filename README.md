@@ -705,6 +705,13 @@ For audio:
   allowed), and the choice is saved with the track. On Windows, an
   interface usually shows up as pairs of inputs ("In 1-2"), each a device
   with two channels.
+- **In the desktop app, with the native engine on**, recording goes
+  through the engine: the interface's input is picked once in the Audio
+  panel (**Input**), each track picks a channel of it, monitoring plays
+  through the track's effects at the driver's latency, and each take is
+  written to disk as it comes in. Its round trip is the drivers' own until
+  you measure it (measured separately from the browser's). Recording
+  another track's audio still needs the browser's engine.
 - Recordings are lined up with the beat automatically: each take is moved
   earlier by your setup's round trip (the time from Dawn's output to the
   speakers, and from the mic back into Dawn). Until you measure it, that's

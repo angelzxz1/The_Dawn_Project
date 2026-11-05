@@ -49,7 +49,7 @@ export function AudioStatus() {
   useEffect(() => {
     audioEngine.setDelayCompensation(prefs.delayCompensation);
     audioEngine.setReducedLatencyMonitoring(prefs.reducedLatencyMonitoring);
-    audioEngine.setRecordingCorrection(prefs.measuredRoundTrip, prefs.recordingOffsetMs);
+    audioEngine.setRecordingCorrection(prefs.measuredRoundTrip, prefs.recordingOffsetMs, prefs.measuredNativeRoundTrip);
     audioEngine.setMetronomeLevel(prefs.metronomeDb);
     audioEngine.setMetronomeSound(prefs.metronomeSound);
   }, [prefs]);

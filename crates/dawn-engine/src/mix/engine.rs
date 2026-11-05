@@ -21,7 +21,9 @@
 //! every source first. A track's automation (`automation`) moves its fader
 //! and pan, gliding over each block to where the lanes are at its end, and
 //! gives its automated effects the settings made for where the block
-//! starts.
+//! starts. A monitored track hears the audio interface's input live
+//! (`render_with_input`): a channel of it, or all of them mixed to one, as
+//! a source ahead of its effects, like its clips.
 
 use std::f64::consts::FRAC_PI_2;
 
@@ -84,6 +86,15 @@ fn keep_peak(meter: &mut [f32; 2], peak: [f32; 2]) {
     meter[1] = meter[1].max(peak[1]);
 }
 
+/// A track hearing the interface's input live (monitoring): the track
+/// `track_key` names, and the input's channel it takes (none: all of them
+/// mixed to one).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct LiveInput {
+    pub track: u64,
+    pub channel: Option<usize>,
+}
+
 /// The transport: whether it's playing, where (frames on the timeline), and
 /// the engine frame it starts moving at (after a count-in).
 #[derive(Clone, Copy, Debug)]
@@ -115,6 +126,8 @@ pub struct Engine {
     click: Vec<f32>,
     /// A track needed an instrument that wasn't there (`take_missing`).
     missing: bool,
+    /// The tracks monitoring the input (`set_monitors`).
+    monitors: Vec<LiveInput>,
 }
 
 impl Engine {
@@ -141,6 +154,7 @@ impl Engine {
             direct: Stereo::new(),
             click: vec![0.0; MAX_BLOCK],
             missing: false,
+            monitors: Vec::new(),
         }
     }
 
@@ -295,6 +309,23 @@ impl Engine {
         self.players().for_each(|p| p.release_all(at));
     }
 
+    /// Frames rendered since the engine started.
+    pub fn clock(&self) -> u64 {
+        self.clock
+    }
+
+    /// The engine frame the transport started (or starts) moving at:
+    /// after the count-in, where a take's downbeat is.
+    pub fn starts_at(&self) -> u64 {
+        self.transport.starts_at
+    }
+
+    /// The tracks that hear the input live, swapped for `monitors` (which
+    /// gets the old list back, to be freed off the audio thread).
+    pub fn set_monitors(&mut self, monitors: &mut Vec<LiveInput>) {
+        std::mem::swap(&mut self.monitors, monitors);
+    }
+
     pub fn playing(&self) -> bool {
         self.transport.playing
     }
@@ -424,16 +455,43 @@ impl Engine {
 
     /// Renders the next `out_l.len()` frames (both outputs the same length).
     pub fn render(&mut self, out_l: &mut [f32], out_r: &mut [f32]) {
+        self.render_with_input(out_l, out_r, &[], 0);
+    }
+
+    /// Renders as `render`, with the interface's input for these frames
+    /// (`channels` samples a frame, interleaved) for the monitored tracks.
+    pub fn render_with_input(
+        &mut self,
+        out_l: &mut [f32],
+        out_r: &mut [f32],
+        input: &[f32],
+        channels: usize,
+    ) {
         let total = out_l.len().min(out_r.len());
         let mut done = 0;
         while done < total {
             let n = (total - done).min(MAX_BLOCK);
-            self.render_block(&mut out_l[done..done + n], &mut out_r[done..done + n]);
+            let block = input
+                .get(done * channels..(done + n) * channels)
+                .unwrap_or(&[]);
+            let channels = if block.is_empty() { 0 } else { channels };
+            self.render_block(
+                &mut out_l[done..done + n],
+                &mut out_r[done..done + n],
+                block,
+                channels,
+            );
             done += n;
         }
     }
 
-    fn render_block(&mut self, out_l: &mut [f32], out_r: &mut [f32]) {
+    fn render_block(
+        &mut self,
+        out_l: &mut [f32],
+        out_r: &mut [f32],
+        input: &[f32],
+        channels: usize,
+    ) {
         let n = out_l.len();
         let p = &mut *self.prepared;
         p.track_bufs.iter_mut().for_each(|b| b.clear(n));
@@ -526,6 +584,21 @@ impl Engine {
                 let (l, r) = player.render(n, self.clock);
                 add(&mut buf.l[..n], l, 1.0);
                 add(&mut buf.r[..n], r, 1.0);
+            }
+        }
+
+        // The input, live, into the tracks monitoring it.
+        if channels > 0 {
+            for m in &self.monitors {
+                let Some(i) = p.track_keys.iter().position(|k| *k == m.track) else {
+                    continue;
+                };
+                let buf = &mut p.track_bufs[i];
+                for (f, frame) in input.chunks_exact(channels).take(n).enumerate() {
+                    let v = input_sample(frame, m.channel);
+                    buf.l[f] += v;
+                    buf.r[f] += v;
+                }
             }
         }
 
@@ -732,6 +805,16 @@ fn key_at<'a>(
         .copied()
         .flatten()
         .map(|k| (&links[k].buf.l[..], &links[k].buf.r[..]))
+}
+
+/// What a live input takes from one frame of the interface's input: its
+/// channel (the last, past the device's), or all of them mixed to one.
+pub fn input_sample(frame: &[f32], channel: Option<usize>) -> f32 {
+    match channel {
+        Some(c) => frame.get(c).or(frame.last()).copied().unwrap_or(0.0),
+        None if frame.is_empty() => 0.0,
+        None => frame.iter().sum::<f32>() / frame.len() as f32,
+    }
 }
 
 fn add(into: &mut [f32], from: &[f32], gain: f64) {

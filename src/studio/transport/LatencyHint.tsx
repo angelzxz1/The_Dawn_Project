@@ -2,6 +2,7 @@
 
 import { X } from "lucide-react";
 import { audioEngine } from "@/engine/audioEngine";
+import { nativeEngine } from "@/engine/native/nativeEngine";
 import { showRecordingSettings } from "./AudioStatus";
 import { useAudioPrefs } from "./useAudioPrefs";
 
@@ -11,6 +12,7 @@ import { useAudioPrefs } from "./useAudioPrefs";
 export function LatencyHint({ onClose }: { onClose: () => void }) {
   const [, update] = useAudioPrefs();
   const estimate = Math.round(audioEngine.getRoundTrip().seconds * 1000);
+  const whose = nativeEngine.current.active ? "the audio drivers'" : "the browser's";
   return (
     <div
       role="status"
@@ -19,7 +21,7 @@ export function LatencyHint({ onClose }: { onClose: () => void }) {
     >
       <span className="min-w-0 flex-1">
         Did that take land a little late? Dawn moves each take earlier by your setup&apos;s audio delay, and for now
-        that&apos;s the browser&apos;s estimate ({estimate} ms), which is often too short. Measure it once and takes land on
+        that&apos;s {whose} estimate ({estimate} ms), which is often too short. Measure it once and takes land on
         the beat.
       </span>
       <button

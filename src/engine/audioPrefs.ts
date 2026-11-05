@@ -19,6 +19,8 @@ export interface AudioPrefs {
   /** A measured round trip (output -> input, seconds), which replaces the
    * browser's own estimate when present. */
   measuredRoundTrip: number | null;
+  /** The same through the native engine (its drivers' own round trip). */
+  measuredNativeRoundTrip: number | null;
   /** The metronome's and count-in's level, in dB from their standard
    * level. */
   metronomeDb: number;
@@ -34,6 +36,9 @@ export interface AudioPrefs {
   nativeDevice: string | null;
   nativeSampleRate: number | null;
   nativeBufferSize: number | null;
+  /** The native engine's input (bridge.ts's ids; null: the output device
+   * itself if it records, else its driver's default input). */
+  nativeInputDevice: string | null;
   /** The browser's output device (enumerateDevices' audiooutput id; null:
    * the system's default), where the browser can choose one (setSinkId). */
   outputDevice: string | null;
@@ -57,6 +62,7 @@ export const DEFAULT_AUDIO_PREFS: AudioPrefs = {
   reducedLatencyMonitoring: true,
   recordingOffsetMs: 0,
   measuredRoundTrip: null,
+  measuredNativeRoundTrip: null,
   metronomeDb: 0,
   metronomeSound: "classic",
   latencyHintDismissed: false,
@@ -64,6 +70,7 @@ export const DEFAULT_AUDIO_PREFS: AudioPrefs = {
   nativeDevice: null,
   nativeSampleRate: null,
   nativeBufferSize: null,
+  nativeInputDevice: null,
   outputDevice: null,
   browserLatency: "interactive",
 };
@@ -77,6 +84,7 @@ export function parseAudioPrefs(raw: unknown): AudioPrefs {
   const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
   const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
   const roundTrip = num(r.measuredRoundTrip);
+  const nativeRoundTrip = num(r.measuredNativeRoundTrip);
   const whole = (v: unknown, lo: number, hi: number) => {
     const n = num(v);
     return n !== null && Number.isInteger(n) && n >= lo && n <= hi ? n : null;
@@ -86,6 +94,7 @@ export function parseAudioPrefs(raw: unknown): AudioPrefs {
     reducedLatencyMonitoring: bool(r.reducedLatencyMonitoring, true),
     recordingOffsetMs: clamp(num(r.recordingOffsetMs) ?? 0, -500, 500),
     measuredRoundTrip: roundTrip !== null && roundTrip > 0 && roundTrip < 2 ? roundTrip : null,
+    measuredNativeRoundTrip: nativeRoundTrip !== null && nativeRoundTrip > 0 && nativeRoundTrip < 2 ? nativeRoundTrip : null,
     metronomeDb: clamp(num(r.metronomeDb) ?? 0, METRONOME_DB_RANGE.min, METRONOME_DB_RANGE.max),
     metronomeSound: (CLICK_SOUNDS as readonly unknown[]).includes(r.metronomeSound) ? (r.metronomeSound as ClickSound) : "classic",
     latencyHintDismissed: bool(r.latencyHintDismissed, false),
@@ -93,6 +102,7 @@ export function parseAudioPrefs(raw: unknown): AudioPrefs {
     nativeDevice: typeof r.nativeDevice === "string" && r.nativeDevice ? r.nativeDevice : null,
     nativeSampleRate: whole(r.nativeSampleRate, 8000, 384000),
     nativeBufferSize: whole(r.nativeBufferSize, 16, 8192),
+    nativeInputDevice: typeof r.nativeInputDevice === "string" && r.nativeInputDevice ? r.nativeInputDevice : null,
     outputDevice: typeof r.outputDevice === "string" && r.outputDevice ? r.outputDevice : null,
     browserLatency: (BROWSER_LATENCIES as readonly unknown[]).includes(r.browserLatency) ? (r.browserLatency as BrowserLatency) : "interactive",
   };

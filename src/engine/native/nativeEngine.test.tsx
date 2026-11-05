@@ -7,18 +7,45 @@
 
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import * as Tone from "tone";
+import { userEvent } from "@vitest/browser/context";
 
 const bridge = vi.hoisted(() => ({
-  open: vi.fn(async (device: string | null, sampleRate: number | null, bufferSize: number | null) => ({ sampleRate: sampleRate ?? 44100, bufferSize, device })),
+  open: vi.fn(async (device: string | null, sampleRate: number | null, bufferSize: number | null, inputDevice: string | null) => ({
+    sampleRate: sampleRate ?? 44100,
+    bufferSize,
+    device,
+    inputDevice,
+    inputName: "Interface In" as string | null,
+    inputChannels: 2 as number | null,
+    inputError: null as string | null,
+  })),
   close: vi.fn(async () => {}),
   setSong: vi.fn<(song: unknown) => Promise<{ missing: string[] }>>(async () => ({ missing: [] })),
   loadAudio: vi.fn<(id: string, channels: Float32Array[], rate: number) => Promise<void>>(async () => {}),
-  play: vi.fn<(from: number) => Promise<void>>(async () => {}),
+  play: vi.fn<(from: number, countInBeats?: number) => Promise<void>>(async () => {}),
   stop: vi.fn(async () => {}),
   seek: vi.fn<(seconds: number) => Promise<void>>(async () => {}),
   loop: vi.fn<(range: unknown) => Promise<void>>(async () => {}),
   metronome: vi.fn<(on: boolean, db: number) => Promise<void>>(async () => {}),
-  status: vi.fn(async () => ({ open: true, sampleRate: 44100, position: 12.5, playing: false, tracks: [], buses: [], master: [0, 0], limiterGain: 1, load: 0, errors: 0 })),
+  status: vi.fn(async () => ({
+    open: true,
+    sampleRate: 44100,
+    position: 12.5,
+    playing: false,
+    tracks: [],
+    buses: [],
+    master: [0, 0],
+    limiterGain: 1,
+    load: 0,
+    errors: 0,
+    inputs: [0.1, 0.4],
+    roundTrip: 0.012,
+    take: null as { frames: number; downbeat: number; min: number[]; max: number[]; dropped: number } | null,
+  })),
+  monitor: vi.fn<(tracks: { track: string; channel: number | null }[]) => Promise<void>>(async () => {}),
+  record: vi.fn<(channel: number | null, probe?: boolean) => Promise<void>>(async () => {}),
+  finishTake: vi.fn<(roundTrip: number | null) => Promise<ArrayBuffer>>(async () => new Float32Array([0.25, 0.5, 0.25]).buffer),
+  cancelTake: vi.fn(async () => {}),
   devices: vi.fn(async () => []),
   forgetAudio: vi.fn(async () => {}),
   key: vi.fn<(track: string, key: number, velocity: number | null) => Promise<void>>(async () => {}),
@@ -91,9 +118,9 @@ describe("the native engine from the studio", () => {
     const url = wavUrl();
     projectStore.replace(project(url));
     bridge.setSong.mockResolvedValueOnce({ missing: [`48000:${url}`] });
-    await nativeEngine.turnOn({ device: "coreaudio:Interface", sampleRate: 48000, bufferSize: 128 });
+    await nativeEngine.turnOn({ device: "coreaudio:Interface", sampleRate: 48000, bufferSize: 128, inputDevice: null });
 
-    expect(bridge.open).toHaveBeenCalledWith("coreaudio:Interface", 48000, 128);
+    expect(bridge.open).toHaveBeenCalledWith("coreaudio:Interface", 48000, 128, null);
     expect(nativeEngine.current).toMatchObject({ active: true, sampleRate: 48000, bufferSize: 128 });
     expect(Tone.getDestination().mute).toBe(true);
 
@@ -114,7 +141,7 @@ describe("the native engine from the studio", () => {
   test("an edit sends the song again; a file is only sent once", async () => {
     const url = wavUrl();
     projectStore.replace(project(url));
-    await nativeEngine.turnOn({ device: null, sampleRate: null, bufferSize: null });
+    await nativeEngine.turnOn({ device: null, sampleRate: null, bufferSize: null, inputDevice: null });
     await vi.waitFor(() => expect(bridge.setSong).toHaveBeenCalled());
     bridge.setSong.mockClear();
     projectStore.set("masterVolume", -6);
@@ -124,7 +151,7 @@ describe("the native engine from the studio", () => {
 
   test("follows the transport, and the playhead takes its position", async () => {
     projectStore.replace(project(wavUrl()));
-    await nativeEngine.turnOn({ device: null, sampleRate: null, bufferSize: null });
+    await nativeEngine.turnOn({ device: null, sampleRate: null, bufferSize: null, inputDevice: null });
     // On starting to follow: the loop, metronome, limiter, bar and where the
     // transport is.
     expect(bridge.loop).toHaveBeenCalled();
@@ -144,7 +171,7 @@ describe("the native engine from the studio", () => {
     const p = project(wavUrl());
     p.channels = [...p.channels, { id: "m1", name: "Keys", volume: 0, pan: 0, colorIndex: 0, type: "midi", instrument: "piano", muted: false, solo: false, armed: true }];
     projectStore.replace(p);
-    await nativeEngine.turnOn({ device: null, sampleRate: null, bufferSize: null });
+    await nativeEngine.turnOn({ device: null, sampleRate: null, bufferSize: null, inputDevice: null });
     audioEngine.addChannel("m1", "midi", null);
     audioEngine.noteOn("m1", "C4", 0.7);
     expect(bridge.key).toHaveBeenLastCalledWith("m1", 60, 0.7);
@@ -162,7 +189,7 @@ describe("the native engine from the studio", () => {
     p.channels = [{ id: "d1", name: "Drums", volume: 0, pan: 0, colorIndex: 0, type: "midi", instrument: "drums", muted: false, solo: false, armed: false }];
     projectStore.replace(p);
     bridge.setSong.mockResolvedValueOnce({ missing: ["48000:piano:A0"] });
-    await nativeEngine.turnOn({ device: null, sampleRate: 48000, bufferSize: null });
+    await nativeEngine.turnOn({ device: null, sampleRate: 48000, bufferSize: null, inputDevice: null });
     await vi.waitFor(() => expect(bridge.setSong).toHaveBeenCalled());
     const song = bridge.setSong.mock.calls[0][0] as { tracks: { instrument: { type: string; samples: unknown[] } }[] };
     expect(song.tracks[0].instrument.type).toBe("drums");
@@ -175,7 +202,7 @@ describe("the native engine from the studio", () => {
     p.channels = [{ id: "s1", name: "Synth", volume: 0, pan: 0, colorIndex: 0, type: "midi", instrument: "synth", muted: false, solo: false, armed: false }];
     projectStore.replace(p);
     bridge.setSong.mockResolvedValueOnce({ missing: ["48000:wavetable:basic", "48000:wavetable:sub"] });
-    await nativeEngine.turnOn({ device: null, sampleRate: 48000, bufferSize: null });
+    await nativeEngine.turnOn({ device: null, sampleRate: 48000, bufferSize: null, inputDevice: null });
     await vi.waitFor(() => expect(bridge.setSong).toHaveBeenCalledTimes(2));
     const song = bridge.setSong.mock.calls[0][0] as { tracks: { instrument: { type: string; tables: string[] } }[] };
     expect(song.tracks[0].instrument.type).toBe("synth");
@@ -189,7 +216,7 @@ describe("the native engine from the studio", () => {
 
   test("the pitch bend and mod wheel go to the engine", async () => {
     projectStore.replace(project(wavUrl()));
-    await nativeEngine.turnOn({ device: null, sampleRate: null, bufferSize: null });
+    await nativeEngine.turnOn({ device: null, sampleRate: null, bufferSize: null, inputDevice: null });
     // Semitones, as the synth takes them: ±2 is a full bend.
     audioEngine.setPitchBend("m1", 1);
     expect(bridge.bend).toHaveBeenLastCalledWith("m1", 0.5);
@@ -201,7 +228,7 @@ describe("the native engine from the studio", () => {
 
   test("turned off, the browser plays again and the transport isn't followed", async () => {
     projectStore.replace(project(wavUrl()));
-    await nativeEngine.turnOn({ device: null, sampleRate: null, bufferSize: null });
+    await nativeEngine.turnOn({ device: null, sampleRate: null, bufferSize: null, inputDevice: null });
     await nativeEngine.turnOff();
     expect(bridge.close).toHaveBeenCalled();
     expect(Tone.getDestination().mute).toBe(false);
@@ -213,8 +240,86 @@ describe("the native engine from the studio", () => {
 
   test("a device that won't open says why, and leaves the browser playing", async () => {
     bridge.open.mockRejectedValueOnce("That audio device isn't connected.");
-    await nativeEngine.turnOn({ device: "asio:Gone", sampleRate: null, bufferSize: null });
+    await nativeEngine.turnOn({ device: "asio:Gone", sampleRate: null, bufferSize: null, inputDevice: null });
     expect(nativeEngine.current).toMatchObject({ active: false, error: "That audio device isn't connected." });
     expect(Tone.getDestination().mute).toBe(false);
+  });
+
+  test("opens the interface's input with the device, and its meters read the engine's", async () => {
+    const p = project(wavUrl());
+    p.channels[0] = { ...p.channels[0], inputChannel: 1 };
+    projectStore.replace(p);
+    audioEngine.addChannel("a1", "audio", null);
+    audioEngine.setInputDevices(new Map([["a1", { device: null, channel: 1 }]]));
+    await nativeEngine.turnOn({ device: null, sampleRate: 48000, bufferSize: 64, inputDevice: "asio:UMC" });
+    expect(bridge.open).toHaveBeenLastCalledWith(null, 48000, 64, "asio:UMC");
+    expect(nativeEngine.current.input).toEqual({ name: "Interface In", channels: 2 });
+    // Input 2's peak, from the engine's status.
+    await vi.waitFor(() => expect(audioEngine.getInputPeak("a1")).toBe(0.4));
+    // The drivers' round trip, until it's measured.
+    expect(audioEngine.getRoundTrip()).toEqual({ seconds: 0.012, measured: false });
+    audioEngine.setRecordingCorrection(null, 0, 0.02);
+    expect(audioEngine.getRoundTrip()).toEqual({ seconds: 0.02, measured: true });
+    audioEngine.setRecordingCorrection(null, 0, null);
+  });
+
+  test("a monitored track hears its input channel through the engine", async () => {
+    projectStore.replace(project(wavUrl()));
+    audioEngine.addChannel("a1", "audio", null);
+    audioEngine.setInputDevices(new Map([["a1", { device: null, channel: 1 }]]));
+    await nativeEngine.turnOn({ device: null, sampleRate: null, bufferSize: null, inputDevice: null });
+    expect(await audioEngine.setInputMonitoring("a1", true)).toBe(true);
+    expect(bridge.monitor).toHaveBeenLastCalledWith([{ track: "a1", channel: 1 }]);
+    expect(audioEngine.isInputMonitoring("a1")).toBe(true);
+    // Another channel: it follows.
+    audioEngine.setInputDevices(new Map([["a1", { device: null, channel: 0 }]]));
+    expect(bridge.monitor).toHaveBeenLastCalledWith([{ track: "a1", channel: 0 }]);
+    await audioEngine.setInputMonitoring("a1", false);
+    expect(bridge.monitor).toHaveBeenLastCalledWith([]);
+    expect(audioEngine.isInputMonitoring("a1")).toBe(false);
+  });
+
+  test("a take is recorded by the engine: it starts with the transport and comes back as a WAV", async () => {
+    projectStore.replace(project(wavUrl()));
+    audioEngine.addChannel("a1", "audio", null);
+    audioEngine.setInputDevices(new Map([["a1", { device: null, channel: 1 }]]));
+    await nativeEngine.turnOn({ device: null, sampleRate: 48000, bufferSize: null, inputDevice: null });
+    audioEngine.setRecordingCorrection(null, 5, 0.01);
+    // The browser's audio starts on a click, as it would in the studio.
+    const button = document.createElement("button");
+    button.textContent = "Record";
+    document.body.append(button);
+    await userEvent.click(button);
+    button.remove();
+    await audioEngine.startAudioRecording("a1", 4, 2);
+    expect(bridge.record).toHaveBeenCalledWith(1);
+    // After the capture's started: from 2 s, after a bar's count-in.
+    expect(bridge.play).toHaveBeenLastCalledWith(2, 4);
+    expect(audioEngine.recordingFrom).toBe(2);
+    const blob = await audioEngine.finishAudioRecording();
+    // The measured round trip and the 5 ms offset; the engine adds its
+    // mix's own latency.
+    expect(bridge.finishTake).toHaveBeenCalledWith(expect.closeTo(0.015, 6));
+    expect(blob?.type).toBe("audio/wav");
+    audioEngine.stopAll();
+    audioEngine.setRecordingCorrection(null, 0, null);
+  });
+
+  test("measuring the round trip plays the engine's clicks on the input's channel", async () => {
+    projectStore.replace(project(wavUrl()));
+    audioEngine.addChannel("a1", "audio", null);
+    audioEngine.setInputDevices(new Map([["a1", { device: null, channel: 1 }]]));
+    await nativeEngine.turnOn({ device: null, sampleRate: 48000, bufferSize: null, inputDevice: null });
+    vi.useFakeTimers({ toFake: ["setTimeout"] });
+    try {
+      const measuring = audioEngine.measureRoundTrip("a1");
+      await vi.advanceTimersByTimeAsync(4000);
+      // Three samples heard: no clicks in them.
+      expect(await measuring).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(bridge.record).toHaveBeenLastCalledWith(1, true);
+    expect(bridge.finishTake).toHaveBeenLastCalledWith(null);
   });
 });

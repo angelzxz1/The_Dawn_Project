@@ -161,6 +161,9 @@ interface TrackHeaderProps {
    * track so a device can be picked right on the track, without needing
    * it armed first. Unused for a MIDI track. */
   inputDevices?: { deviceId: string; label: string; channels?: number }[];
+  /** The input is the native engine's (set in Audio settings, the only
+   * one in `inputDevices`): only its channel is picked here. */
+  inputFixed?: boolean;
   /** The row's height: short when the track is folded; the header shows as
    * many of its rows as fit. */
   rowHeight?: number;
@@ -294,6 +297,7 @@ export const TrackHeader = memo(function TrackHeader({
   showAutomation,
   takeCount = 0,
   inputDevices,
+  inputFixed = false,
   rowHeight = TRACK_ROW_HEIGHT,
   groupColor,
   memberCount = 0,
@@ -328,7 +332,7 @@ export const TrackHeader = memo(function TrackHeader({
   const onToggleAutomation = () => actions.toggleAutomation(id);
   const onInputDeviceChange = (deviceId: string | null) => actions.setInputDevice(id, deviceId);
   // Its own device, or the default; one that isn't plugged in still shows.
-  const inputDevice = channel.inputDevice ?? "";
+  const inputDevice = inputFixed ? "" : (channel.inputDevice ?? "");
   const deviceMissing = !!inputDevice && !(inputDevices ?? []).some((d) => d.deviceId === inputDevice);
   const inputChannels = inputChannelChoices(inputDevices ?? [], inputDevice, channel.inputChannel);
   const onRequestInputDevices = actions.requestInputDevices;
@@ -603,6 +607,16 @@ export const TrackHeader = memo(function TrackHeader({
             >
               ← {inputName.split(" · ")[0]}
             </span>
+          ) : inputFixed ? (
+            <select
+              title="The native engine's input: change it in Audio settings"
+              aria-label="Input"
+              value=""
+              disabled
+              className="h-5 max-w-[76px] rounded border border-border bg-surface px-1 text-[10px] text-muted"
+            >
+              <option value="">{inputDevices?.[0]?.label ?? "No input"}</option>
+            </select>
           ) : (
             <select
               title="Which microphone or audio-interface input this track records from"

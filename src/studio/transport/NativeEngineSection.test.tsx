@@ -16,6 +16,10 @@ vi.mock("@/engine/native/bridge", () => ({
           { id: "wasapi:speakers", name: "Speakers", isDefault: true, sampleRates: [44100, 48000], minBuffer: 128, maxBuffer: 1024, defaultSampleRate: 48000 },
           { id: "wasapi:scarlett", name: "Scarlett 2i2", isDefault: false, sampleRates: [44100, 48000, 96000], minBuffer: 32, maxBuffer: 2048, defaultSampleRate: 44100 },
         ],
+        inputs: [
+          { id: "wasapi:mic", name: "Microphone", isDefault: true, sampleRates: [48000], minBuffer: null, maxBuffer: null, defaultSampleRate: 48000, channels: 1 },
+          { id: "wasapi:scarlett-in", name: "Scarlett 2i2 In", isDefault: false, sampleRates: [48000], minBuffer: null, maxBuffer: null, defaultSampleRate: 48000, channels: 2 },
+        ],
       },
     ],
   },
@@ -48,6 +52,11 @@ describe("the native engine section", () => {
     expect(buffers).toEqual(["Device's own", "128 samples", "256 samples", "512 samples", "1024 samples"]);
     await device.selectOptions("wasapi:scarlett");
     expect(update).toHaveBeenCalledWith({ nativeDevice: "wasapi:scarlett", nativeSampleRate: null, nativeBufferSize: null });
+    // The inputs it can record from, with how many channels each has.
+    const input = screen.getByRole("combobox", { name: "Input", exact: true });
+    await expect.element(input).toHaveTextContent("Scarlett 2i2 In (2 inputs)");
+    await input.selectOptions("wasapi:scarlett-in");
+    expect(update).toHaveBeenCalledWith({ nativeInputDevice: "wasapi:scarlett-in" });
   });
 
   test("says which effects it plays without, and plays the sidechained compressor and the automation", async () => {

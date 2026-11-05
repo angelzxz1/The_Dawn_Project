@@ -19,12 +19,12 @@ It's early. Today:
   dynamics and EQ effects, the Filter, the Chorus, the Delay, the Reverb,
   the Saturator, the Pitch Shift, the Furnace amp, the IR Loader and the
   Tuner, with sidechains, automation, delay compensation, the master
-  limiter and the metronome. Recording still needs the browser's engine,
-  and the NAM Amp stays a browser effect (on the desktop, NAM models are
-  meant to play through NAM's own plugin, once plugins run in the
-  engine): the
-  panel says what of the project it doesn't play yet, and Record asks to
-  turn it off.
+  limiter and the metronome. It records too: the interface's inputs,
+  monitored through the track's effects and written to disk as they come
+  in (below). Recording another track's audio still needs the browser's
+  engine, and the NAM Amp stays a browser effect (on the desktop, NAM
+  models are meant to play through NAM's own plugin, once plugins run in
+  the engine): the panel says what of the project it doesn't play yet.
 - **The DSP is moving over**: `crates/dawn-engine` holds the kernels ported
   to Rust so far - the instruments, the dynamics and EQ effects, the
   Filter, the Chorus, the Delay, the Reverb, the Saturator, the Pitch
@@ -253,6 +253,46 @@ decay stops moving. Delay compensation reads an effect's own setting, so
 automating a Pitch Shift's window or a Saturator's oversampling doesn't
 move it, in either engine.
 
+### Recording
+
+The engine opens the interface's input with its output: the Audio panel's
+**Input** picks it, and **Automatic** takes the output device itself when
+it records (an interface on ASIO or Core Audio is one device both ways),
+else its driver's default input. It's opened at the output's rate; an
+input that runs at another says so in the panel, and playing goes on
+without it. Its callback puts what comes in on a ring, and the output's
+callback takes as much as it renders (`src-tauri/src/audio/stream.rs`),
+keeping only the newest waiting, so the input stays as close as it can.
+
+- **Monitoring**: the tracks hearing the input (their monitoring mode,
+  `src/studio/tracks/monitoring.ts`) get it as a source ahead of their
+  effects, like their clips, on the audio thread
+  (`Engine::render_with_input`): their input channel, or all of the
+  input's mixed to one. They play live, skipping delay compensation.
+- **The track's input**: with the engine on, a track records from its
+  input (shown, greyed, in its Input list) and picks a channel of it, In 1,
+  In 2..., or All. The browser device a track had is kept for when the
+  engine is off.
+- **Takes**: Record starts a capture of the armed track's input
+  (`take.rs`) and then the transport, with its count-in. The audio thread
+  copies the input into a ring, and a thread of its own writes it to a WAV
+  file (32-bit float, mono) in the app's cache folder (`takes/`), keeping
+  its header up to date, so a take survives the app going down. Stopped,
+  the studio gets the take from where its downbeat came back in: the wait
+  for the count-in, the mix's latency (its compensation and the
+  limiter's lookahead), then the round trip and the recording offset. The
+  file goes once it's read; the take is the project's, as one recorded in
+  the browser is. Its live waveform comes with the engine's status.
+- **The round trip**: the drivers say how late their output and input are
+  (cpal's timestamps, or a buffer's length if they say less), plus the
+  input's wait on its ring. **Measure latency** (Preferences → Recording)
+  plays five clicks straight to the output and finds them on the input, as
+  in the browser; it's kept apart from the browser's measurement, since
+  the paths differ.
+
+Recording another track's audio ("Audio from") still needs the browser's
+engine, and an interface's inputs are recorded in mono.
+
 ### ASIO
 
 cpal's ASIO backend builds with Steinberg's ASIO SDK, which is GPLv3 or
@@ -428,18 +468,13 @@ crash and hang on purpose. CI runs it on Windows, macOS and Linux
 
 ## Next steps
 
-1. **Recording through the engine**: the interface's inputs, monitoring
-   with low latency, takes written to disk, latency compensation. Every
-   instrument, effect and lane plays already, sidechains included, bar the
-   NAM Amp, which stays in the browser (on the desktop, NAM's own plugin
-   plays NAM models).
-2. **Plugins**: finding them is done (above). Next, CLAP effects running in
+1. **Plugins**: finding them is done (above). Next, CLAP effects running in
    the engine on tracks, with their own windows and their state saved in
    the project; then VST3 effects the same way; then plugin instruments on
    MIDI tracks, played from clips and live; then Audio Units on macOS.
    NAM's plugin is the first VST3 to try: it's how the desktop app plays
    NAM models.
-3. **Export through the engine**, native file dialogs, signed installers.
+2. **Export through the engine**, native file dialogs, signed installers.
 
 ## Checks
 

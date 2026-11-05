@@ -937,6 +937,15 @@ export function Daw() {
   // return full, labeled devices - sometimes only a single generic one at
   // all - once permission has been granted at least once, so the list
   // starts out sparse until then).
+  // With the native engine on, the tracks record from its input (set in
+  // Audio settings): each picks only a channel of it.
+  const native = useSyncExternalStore(nativeEngine.subscribe, () => nativeEngine.current, () => nativeEngine.current);
+  const nativeOn = native.active;
+  const nativeInput = native.input;
+  const headerInputDevices = useMemo(
+    () => (nativeOn ? (nativeInput ? [{ deviceId: "", label: nativeInput.name, channels: nativeInput.channels }] : []) : inputDevices),
+    [nativeOn, nativeInput, inputDevices]
+  );
   const refreshInputDevices = useCallback(() => {
     audioEngine.listInputDevices().then(setInputDevices);
   }, []);
@@ -1122,7 +1131,8 @@ export function Daw() {
             // Its timing rests on the browser's latency estimate until it's
             // measured: offer to.
             const prefs = getAudioPrefs();
-            if (fromInterface && prefs.measuredRoundTrip === null && !prefs.latencyHintDismissed) setLatencyHint(true);
+            const measured = nativeEngine.current.active ? prefs.measuredNativeRoundTrip : prefs.measuredRoundTrip;
+            if (fromInterface && measured === null && !prefs.latencyHintDismissed) setLatencyHint(true);
           }
         } else {
           const events = audioEngine.finishRecording();
@@ -1203,12 +1213,6 @@ export function Daw() {
       return;
     }
     if (!armedChannelId) return;
-    if (nativeEngine.current.active) {
-      // Recording through the native engine comes next; until then the
-      // browser's engine records.
-      setMicError("Recording uses the browser engine for now: turn the native engine off in Audio settings to record.");
-      return;
-    }
     recordingChannelRef.current = armedChannelId;
     setRecordingChannelId(armedChannelId);
     // Punching, only what's between the loop brace's ends is kept; from
@@ -1233,7 +1237,9 @@ export function Daw() {
         recordPunchRef.current = null;
         setRecordingChannelId(null);
         setMicError(
-          "Couldn't access the microphone - check the browser's permission prompt or site settings."
+          nativeEngine.current.active
+            ? `Couldn't record through the native engine: ${error instanceof Error ? error.message : String(error)}`
+            : "Couldn't access the microphone - check the browser's permission prompt or site settings."
         );
       }
       return;
@@ -3025,7 +3031,8 @@ export function Daw() {
                   canMoveUp={canMoveTrack(channels, channel.id, -1)}
                   canMoveDown={canMoveTrack(channels, channel.id, 1)}
                   showAutomation={automationChannelId === channel.id}
-                  inputDevices={inputDevices}
+                  inputDevices={headerInputDevices}
+                  inputFixed={nativeOn}
                   monitoring={monitoredChannelIds.has(channel.id)}
                   monitorMode={monitorModeOf(monitorModes, channel.id)}
                   takeCount={(takesByChannel[channel.id] ?? NO_TAKES).length}

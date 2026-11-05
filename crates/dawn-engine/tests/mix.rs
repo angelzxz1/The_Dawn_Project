@@ -5,7 +5,10 @@
 
 use std::sync::Arc;
 
-use dawn_engine::mix::{AudioData, Bus, Clip, ClipTiming, Destination, Engine, Send, Song, Track};
+use dawn_engine::mix::{
+    AudioData, Bus, Clip, ClipTiming, Destination, Engine, LiveInput, Send, Song, Track,
+    input_sample, track_key,
+};
 
 const SR: f64 = 48000.0;
 const LAG: usize = 240;
@@ -265,4 +268,60 @@ fn meters_hold_their_peaks_until_read() {
     assert!(close(track[0], 0.5) && close(master[1], 0.5));
     let again = engine.take_peaks(|_, _| {}, |_, _| {});
     assert_eq!(again, [0.0, 0.0]);
+}
+
+#[test]
+fn a_monitored_track_hears_its_input_channel_through_its_fader() {
+    let mut engine = Engine::new(SR);
+    let track = Track {
+        volume: 0.5,
+        ..Track::new("guitar")
+    };
+    engine.set_song(Box::new(
+        song(vec![track, Track::new("other")]).prepare(None, SR),
+    ));
+    let mut monitors = vec![LiveInput {
+        track: track_key("guitar"),
+        channel: Some(1),
+    }];
+    engine.set_monitors(&mut monitors);
+    assert!(monitors.is_empty(), "the old list comes back");
+    // Two input channels: 0.2 on the first, 0.6 on the second; stopped.
+    let n = 1024;
+    let input: Vec<f32> = (0..n).flat_map(|_| [0.2, 0.6]).collect();
+    let (mut l, mut r) = (vec![0.0; n], vec![0.0; n]);
+    engine.render_with_input(&mut l, &mut r, &input, 2);
+    // Centered, the fader at half: 0.6 * 0.5 on each side, after the
+    // limiter's lookahead.
+    assert!(
+        close(l[LAG + 10], 0.3) && close(r[LAG + 10], 0.3),
+        "{}",
+        l[LAG + 10]
+    );
+    // Not monitored: silent.
+    let mut none = Vec::new();
+    engine.set_monitors(&mut none);
+    let (mut l, mut r) = (vec![0.0; n], vec![0.0; n]);
+    engine.render_with_input(&mut l, &mut r, &input, 2);
+    assert!(l[LAG + 10].abs() < 1e-6);
+}
+
+#[test]
+fn an_input_is_a_channel_or_all_of_them_mixed() {
+    assert_eq!(input_sample(&[0.2, 0.6], Some(0)), 0.2);
+    assert_eq!(input_sample(&[0.2, 0.6], Some(5)), 0.6);
+    assert!((input_sample(&[0.2, 0.6], None) - 0.4).abs() < 1e-6);
+    assert_eq!(input_sample(&[], None), 0.0);
+}
+
+#[test]
+fn the_engine_says_where_a_count_in_ends() {
+    let mut engine = Engine::new(SR);
+    engine.set_song(Box::new(song(vec![]).prepare(None, SR)));
+    let (mut l, mut r) = (vec![0.0; 480], vec![0.0; 480]);
+    engine.render(&mut l, &mut r);
+    assert_eq!(engine.clock(), 480);
+    // Two beats at 120 bpm: a second.
+    engine.play(0.0, 2.0);
+    assert_eq!(engine.starts_at(), 480 + SR as u64);
 }

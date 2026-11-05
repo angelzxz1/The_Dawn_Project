@@ -15,14 +15,42 @@ export interface AudioDevice {
   minBuffer: number | null;
   maxBuffer: number | null;
   defaultSampleRate: number | null;
+  /** How many channels it has (an input's, as it opens). */
+  channels: number;
 }
 
-/** A kind of driver on this system (ASIO, WASAPI, Core Audio, ALSA) and
- * its output devices. */
+/** A kind of driver on this system (ASIO, WASAPI, Core Audio, ALSA), its
+ * output devices and its inputs. */
 export interface AudioDriver {
   id: string;
   name: string;
   devices: AudioDevice[];
+  inputs: AudioDevice[];
+}
+
+/** What the engine knows of the take being recorded. */
+export interface NativeTakeStatus {
+  /** Frames taken so far. */
+  frames: number;
+  /** Where its downbeat is in it before the round trip (frames): the
+   * count-in and the mix's latency. */
+  downbeat: number;
+  /** Its live waveform since the last status: each 64 frames' lowest and
+   * highest. */
+  min: number[];
+  max: number[];
+  /** Samples lost because the disk fell behind. */
+  dropped: number;
+}
+
+/** What opening a device opened. */
+export interface NativeOpened {
+  sampleRate: number;
+  bufferSize: number | null;
+  /** The interface's input (its name and channels), or why it didn't open. */
+  inputName: string | null;
+  inputChannels: number | null;
+  inputError: string | null;
 }
 
 export interface NativeStatus {
@@ -40,15 +68,22 @@ export interface NativeStatus {
   load: number;
   /** Dropouts and stream errors since the device opened. */
   errors: number;
+  /** The input's peaks since the last status, per channel (0-1). */
+  inputs: number[];
+  /** The round trip as the drivers say (s): out, and back in. */
+  roundTrip: number;
+  /** The take being recorded, if one is. */
+  take: NativeTakeStatus | null;
 }
 
 export const nativeBridge = {
   devices: () => invoke<AudioDriver[]>("audio_devices"),
 
   /** Opens a device (null: the system's default) at a rate and buffer
-   * size (null: the device's own), closing the one open. */
-  open: (device: string | null, sampleRate: number | null, bufferSize: number | null) =>
-    invoke<{ sampleRate: number; bufferSize: number | null }>("audio_open", { device, sampleRate, bufferSize }),
+   * size (null: the device's own), closing the one open; and its input
+   * (null: the device itself if it records, else its driver's default). */
+  open: (device: string | null, sampleRate: number | null, bufferSize: number | null, inputDevice: string | null) =>
+    invoke<NativeOpened>("audio_open", { device, sampleRate, bufferSize, input: true, inputDevice }),
 
   close: () => invoke<void>("audio_close"),
 
@@ -81,6 +116,16 @@ export const nativeBridge = {
   /** A track's mod wheel, 0..1. */
   modWheel: (track: string, value: number) => invoke<void>("engine_mod_wheel", { track, value }),
   status: () => invoke<NativeStatus>("engine_status"),
+  /** The tracks hearing the input live, and the channel each takes (null:
+   * all of them mixed to one). */
+  monitor: (tracks: { track: string; channel: number | null }[]) => invoke<void>("engine_monitor", { tracks }),
+  /** Starts recording the input's `channel` to disk from now; `probe`
+   * measures the round trip instead (clicks at 0.3, 0.9... s). */
+  record: (channel: number | null, probe = false) => invoke<void>("engine_record", { channel, probe }),
+  /** Ends the take: its samples (mono f32s) from where its downbeat came
+   * back in after `roundTrip` s (null: from its start, for a probe). */
+  finishTake: (roundTrip: number | null) => invoke<ArrayBuffer>("engine_finish_take", { roundTrip }),
+  cancelTake: () => invoke<void>("engine_cancel_take"),
   /** What's gone into a Tuner lately (its last 4096 samples, as f32s);
    * empty when there's no such Tuner playing. */
   tuner: (effect: string) => invoke<ArrayBuffer>("engine_tuner", { effect }),

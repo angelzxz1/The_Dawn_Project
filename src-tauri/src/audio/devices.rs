@@ -1,6 +1,7 @@
 //! The audio devices the studio can play through: each driver type on this
 //! system (Core Audio; WASAPI and, when built with it, ASIO; ALSA...) and
-//! its output devices, with the sample rates and buffer sizes they take.
+//! its output devices, with the sample rates and buffer sizes they take,
+//! and the inputs it can record from, with their channels.
 
 use cpal::traits::{DeviceTrait, HostTrait};
 use cpal::{SupportedBufferSize, SupportedStreamConfigRange};
@@ -21,6 +22,8 @@ pub struct DeviceInfo {
     pub min_buffer: Option<u32>,
     pub max_buffer: Option<u32>,
     pub default_sample_rate: Option<u32>,
+    /// How many channels it has (an input's, as it opens).
+    pub channels: u16,
 }
 
 #[derive(Serialize)]
@@ -30,6 +33,7 @@ pub struct DriverInfo {
     pub id: String,
     pub name: String,
     pub devices: Vec<DeviceInfo>,
+    pub inputs: Vec<DeviceInfo>,
 }
 
 fn rates(configs: &[SupportedStreamConfigRange]) -> Vec<u32> {
@@ -67,46 +71,72 @@ fn buffers(configs: &[SupportedStreamConfigRange]) -> (Option<u32>, Option<u32>)
     )
 }
 
-/// Every driver type and its output devices. A device that can't be asked
-/// (unplugged as it's listed, busy) is left out.
+/// A device as the studio lists it, for output or input; none if it can't
+/// be asked or has nothing that way.
+fn describe(
+    device: &cpal::Device,
+    default_id: Option<&cpal::DeviceId>,
+    input: bool,
+) -> Option<DeviceInfo> {
+    let id = device.id().ok()?;
+    let name = device
+        .description()
+        .ok()
+        .map_or_else(|| device.to_string(), |d| d.name().to_owned());
+    let configs: Vec<_> = if input {
+        device.supported_input_configs().ok()?.collect()
+    } else {
+        device.supported_output_configs().ok()?.collect()
+    };
+    if configs.is_empty() {
+        return None;
+    }
+    let default = if input {
+        device.default_input_config().ok()
+    } else {
+        device.default_output_config().ok()
+    };
+    let (min_buffer, max_buffer) = buffers(&configs);
+    Some(DeviceInfo {
+        is_default: default_id == Some(&id),
+        id: id.to_string(),
+        name,
+        sample_rates: rates(&configs),
+        min_buffer,
+        max_buffer,
+        default_sample_rate: default
+            .as_ref()
+            .map(cpal::SupportedStreamConfig::sample_rate),
+        channels: default.map_or(0, |c| c.channels()),
+    })
+}
+
+/// Every driver type, its output devices and its inputs. A device that
+/// can't be asked (unplugged as it's listed, busy) is left out.
 pub fn list() -> Vec<DriverInfo> {
     cpal::available_hosts()
         .into_iter()
         .filter_map(|host_id| {
             let host = cpal::host_from_id(host_id).ok()?;
-            let default_id = host.default_output_device().and_then(|d| d.id().ok());
+            let default_out = host.default_output_device().and_then(|d| d.id().ok());
+            let default_in = host.default_input_device().and_then(|d| d.id().ok());
             let devices = host
                 .output_devices()
                 .ok()?
-                .filter_map(|device| {
-                    let id = device.id().ok()?;
-                    let name = device
-                        .description()
-                        .ok()
-                        .map_or_else(|| device.to_string(), |d| d.name().to_owned());
-                    let configs: Vec<_> = device.supported_output_configs().ok()?.collect();
-                    if configs.is_empty() {
-                        return None;
-                    }
-                    let (min_buffer, max_buffer) = buffers(&configs);
-                    Some(DeviceInfo {
-                        is_default: default_id.as_ref() == Some(&id),
-                        id: id.to_string(),
-                        name,
-                        sample_rates: rates(&configs),
-                        min_buffer,
-                        max_buffer,
-                        default_sample_rate: device
-                            .default_output_config()
-                            .ok()
-                            .map(|c| c.sample_rate()),
-                    })
-                })
+                .filter_map(|d| describe(&d, default_out.as_ref(), false))
                 .collect();
+            let inputs = host
+                .input_devices()
+                .map(|all| {
+                    all.filter_map(|d| describe(&d, default_in.as_ref(), true))
+                        .collect()
+                })
+                .unwrap_or_default();
             Some(DriverInfo {
                 id: format!("{host_id:?}"),
                 name: host_id.name().to_owned(),
                 devices,
+                inputs,
             })
         })
         .collect()

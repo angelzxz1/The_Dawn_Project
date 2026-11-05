@@ -228,6 +228,22 @@ describe("other kinds of track", () => {
     expect(actions.setInputChannel).toHaveBeenCalledWith("gtr", 1);
   });
 
+  test("on the native engine, the track takes its input and picks only a channel of it", async () => {
+    const { screen, actions } = renderHeader({
+      // A browser device saved with the track, not used here.
+      channel: channel({ id: "gtr", name: "Guitar", type: "audio", instrument: null, inputDevice: "umc", inputChannel: 0 }),
+      inputDevices: [{ deviceId: "", label: "UMC ASIO", channels: 4 }],
+      inputFixed: true,
+    });
+    const device = screen.getByRole("combobox", { name: "Input", exact: true });
+    await expect.element(device).toBeDisabled();
+    await expect.element(device).toHaveTextContent("UMC ASIO");
+    const picker = screen.getByRole("combobox", { name: "Input channel" });
+    await expect.element(picker).toHaveValue("0");
+    await picker.selectOptions("In 4");
+    expect(actions.setInputChannel).toHaveBeenCalledWith("gtr", 3);
+  });
+
   test("an input with one channel has no channel picker", async () => {
     const { screen } = renderHeader({
       channel: channel({ id: "gtr", name: "Guitar", type: "audio", instrument: null, inputDevice: "mic" }),

@@ -41,6 +41,15 @@ describe("parseAudioPrefs", () => {
       nativeBufferSize: null,
     });
   });
+
+  it("keeps the native engine's input, and its own measured round trip", () => {
+    expect(parseAudioPrefs({ nativeInputDevice: "wasapi:in", measuredNativeRoundTrip: 0.0071 })).toMatchObject({
+      nativeInputDevice: "wasapi:in",
+      measuredNativeRoundTrip: 0.0071,
+      measuredRoundTrip: null,
+    });
+    expect(parseAudioPrefs({ nativeInputDevice: "", measuredNativeRoundTrip: 5 })).toMatchObject({ nativeInputDevice: null, measuredNativeRoundTrip: null });
+  });
 });
 
 describe("the browser's output device and buffer", () => {

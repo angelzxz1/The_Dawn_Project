@@ -4,20 +4,23 @@
 //! The studio sends the song (`engine_set_song`) whenever it changes, each
 //! audio file once (`engine_load_audio`, decoded at the engine's rate), and
 //! the transport's commands; it reads back the position and meters
-//! (`engine_status`) to draw them.
+//! (`engine_status`) to draw them. With the interface's input open, it says
+//! which tracks hear it live (`engine_monitor`), and records takes onto
+//! disk (`engine_record`, then `engine_finish_take` hands it the take).
 
 pub mod devices;
 pub mod song;
 pub mod stream;
+pub mod take;
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use dawn_engine::mix::metronome::CLICK_SOUNDS;
-use dawn_engine::mix::{AudioData, Song, track_key};
-use serde::Serialize;
-use tauri::State;
+use dawn_engine::mix::{AudioData, LiveInput, Song, track_key};
+use serde::{Deserialize, Serialize};
 use tauri::ipc::{InvokeBody, Request, Response};
+use tauri::{AppHandle, Manager, State};
 
 use song::{LoadedAudio, SongSpec};
 use stream::{Command, Running};
@@ -25,6 +28,8 @@ use stream::{Command, Running};
 #[derive(Default)]
 struct Inner {
     running: Option<Running>,
+    /// The take being recorded (or the round trip being measured).
+    take: Option<take::Writer>,
     /// The audio files the studio has sent, by its ids.
     audio: HashMap<String, LoadedAudio>,
     /// The song sent last (what's playing), to glide from and to meter.
@@ -63,27 +68,46 @@ pub async fn audio_devices() -> Vec<devices::DriverInfo> {
 pub struct Opened {
     sample_rate: f64,
     buffer_size: Option<u32>,
+    /// The input that opened (its name and channel count), or why it
+    /// couldn't.
+    input_name: Option<String>,
+    input_channels: Option<usize>,
+    input_error: Option<String>,
 }
 
-/// Opens a device (none: the system's default), closing the one open.
+/// Opens a device (none: the system's default), closing the one open; with
+/// `input`, the interface's input too (`input_device`; none: the output
+/// device itself if it records, else its driver's default input).
 #[tauri::command]
 pub async fn audio_open(
     state: State<'_, AudioState>,
     device: Option<String>,
     sample_rate: Option<u32>,
     buffer_size: Option<u32>,
+    input: Option<bool>,
+    input_device: Option<String>,
 ) -> Result<Opened, String> {
     // Closed first, so a device can be reopened with other settings.
-    let previous = state.lock().running.take();
+    let (previous, take) = {
+        let mut inner = state.lock();
+        (inner.running.take(), inner.take.take())
+    };
     drop(previous);
+    // A take going on is left on disk.
+    drop(take);
     let running = stream::open(stream::Request {
         device,
         sample_rate,
         buffer_size,
+        input: input.unwrap_or(false),
+        input_device,
     })?;
     let opened = Opened {
         sample_rate: running.sample_rate,
         buffer_size: running.buffer_size,
+        input_name: running.input.as_ref().map(|i| i.name.clone()),
+        input_channels: running.input.as_ref().map(|i| i.channels),
+        input_error: running.input_error.clone(),
     };
     let mut inner = state.lock();
     inner.running = Some(running);
@@ -96,6 +120,120 @@ pub async fn audio_open(
 pub fn audio_close(state: State<'_, AudioState>) {
     let running = state.lock().running.take();
     drop(running);
+}
+
+/// A track hearing the interface's input live: its id, and the input's
+/// channel (0 = the first; none: all of them mixed to one).
+#[derive(Deserialize)]
+pub struct MonitorSpec {
+    track: String,
+    channel: Option<usize>,
+}
+
+/// The tracks hearing the input live, in place of those before.
+#[tauri::command]
+pub fn engine_monitor(
+    state: State<'_, AudioState>,
+    tracks: Vec<MonitorSpec>,
+) -> Result<(), String> {
+    let list = tracks
+        .iter()
+        .map(|t| LiveInput {
+            track: track_key(&t.track),
+            channel: t.channel,
+        })
+        .collect();
+    state.lock().send(Command::Monitors(list))
+}
+
+/// Starts recording the input (`channel`; none: all of it mixed to one)
+/// to a file, from now: the studio starts the transport with it. With
+/// `probe`, it's measuring the round trip instead: clicks play straight to
+/// the output (`take::PROBE_CLICKS`).
+#[tauri::command]
+pub fn engine_record(
+    app: AppHandle,
+    state: State<'_, AudioState>,
+    channel: Option<usize>,
+    probe: bool,
+) -> Result<(), String> {
+    let mut inner = state.lock();
+    let running = inner.running.as_ref().ok_or("No audio device is open.")?;
+    if running.input.is_none() {
+        return Err(running
+            .input_error
+            .clone()
+            .unwrap_or_else(|| "The audio input isn't open.".into()));
+    }
+    let rate = running.sample_rate as u32;
+    let folder = app
+        .path()
+        .app_cache_dir()
+        .map_err(|e| format!("{e}"))?
+        .join("takes");
+    std::fs::create_dir_all(&folder).map_err(|e| format!("{e}"))?;
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_millis());
+    let path = folder.join(format!("take-{stamp}.wav"));
+    // The one before, if it wasn't finished, stays on disk.
+    drop(inner.take.take());
+    let (capture, writer) = take::start(path, rate, channel).map_err(|e| format!("{e}"))?;
+    inner.send(Command::Record {
+        capture: Box::new(capture),
+        probe,
+    })?;
+    inner.take = Some(writer);
+    Ok(())
+}
+
+/// Ends the take and hands it over: its samples (mono f32s, little-endian)
+/// from where its downbeat came back in, `round_trip` seconds (the round
+/// trip and offset the studio uses) after the mix played it; a probe's,
+/// from its start. The file goes once read.
+#[tauri::command]
+pub async fn engine_finish_take(
+    state: State<'_, AudioState>,
+    round_trip: Option<f64>,
+) -> Result<Response, String> {
+    let (writer, status, rate) = {
+        let mut inner = state.lock();
+        let _ = inner.send(Command::EndTake);
+        let writer = inner.take.take().ok_or("Nothing is being recorded.")?;
+        let running = inner.running.as_ref().ok_or("No audio device is open.")?;
+        (writer, running.status.clone(), running.sample_rate)
+    };
+    tauri::async_runtime::spawn_blocking(move || {
+        let path = writer.path.clone();
+        writer.finish().map_err(|e| format!("{e}"))?;
+        let clock = status.take_clock();
+        let skip = match round_trip {
+            Some(rt) => take::take_start(
+                clock.started,
+                clock.downbeat,
+                clock.mix_latency,
+                (rt * rate).round() as i64,
+            ),
+            None => 0,
+        };
+        take::read_take(&path, skip)
+            .map(Response::new)
+            .map_err(|e| format!("{e}"))
+    })
+    .await
+    .map_err(|e| format!("{e}"))?
+}
+
+/// Abandons the take (its file is removed).
+#[tauri::command]
+pub fn engine_cancel_take(state: State<'_, AudioState>) {
+    let mut inner = state.lock();
+    let _ = inner.send(Command::EndTake);
+    if let Some(writer) = inner.take.take() {
+        let path = writer.path.clone();
+        let _ = writer.finish();
+        let _ = std::fs::remove_file(path);
+    }
 }
 
 /// An audio file, decoded: the body is its samples (f32, little-endian),
@@ -293,6 +431,28 @@ pub struct EngineStatus {
     load: f32,
     /// Dropouts and stream errors since the device opened.
     errors: u32,
+    /// The input's peaks since the last status, per channel (0-1).
+    inputs: Vec<f32>,
+    /// The round trip as the drivers say (s): out, and back in.
+    round_trip: f32,
+    /// The take being recorded, if one is.
+    take: Option<TakeStatus>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TakeStatus {
+    /// Frames taken so far.
+    frames: u64,
+    /// Where its downbeat is in it, before the round trip: the wait for
+    /// the count-in and the mix's latency (frames).
+    downbeat: u64,
+    /// Its live waveform since the last status: each bucket's (64 frames)
+    /// lowest and highest.
+    min: Vec<f32>,
+    max: Vec<f32>,
+    /// Samples lost because the disk fell behind.
+    dropped: u64,
 }
 
 /// What's gone into a Tuner (by its effect id) lately, for the studio to
@@ -334,6 +494,12 @@ pub fn engine_status(state: State<'_, AudioState>) -> EngineStatus {
     {
         let _ = inner.send(Command::Song(Box::new(song.prepare(None, rate))));
     }
+    let take = inner.take.as_mut().map(|w| {
+        let (min, max) = std::iter::from_fn(|| w.buckets.pop().ok())
+            .map(|[lo, hi]| (lo, hi))
+            .unzip();
+        (min, max)
+    });
     let inner = inner;
     let Some(r) = &inner.running else {
         return EngineStatus {
@@ -347,6 +513,9 @@ pub fn engine_status(state: State<'_, AudioState>) -> EngineStatus {
             limiter_gain: 1.0,
             load: 0.0,
             errors: 0,
+            inputs: vec![],
+            round_trip: 0.0,
+            take: None,
         };
     };
     let (tracks, buses) = inner
@@ -366,5 +535,17 @@ pub fn engine_status(state: State<'_, AudioState>) -> EngineStatus {
         limiter_gain: s.limiter_gain(),
         load: s.load(),
         errors: s.errors(),
+        inputs: s.take_input_peaks(r.input.as_ref().map_or(0, |i| i.channels)),
+        round_trip: s.round_trip(),
+        take: take.map(|(min, max)| {
+            let clock = s.take_clock();
+            TakeStatus {
+                frames: clock.frames,
+                downbeat: clock.downbeat.saturating_sub(clock.started) + clock.mix_latency,
+                min,
+                max,
+                dropped: clock.dropped,
+            }
+        }),
     }
 }

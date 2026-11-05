@@ -119,7 +119,8 @@ class AudioEngine {
   private readyListeners = new Set<() => void>();
   private audioRecording: {
     channelId: string;
-    recorder: InputRecorder;
+    /** The browser's capture; null when the follower records it. */
+    recorder: InputRecorder | null;
     startTime: number;
     from: number;
     latency: number;
@@ -315,7 +316,7 @@ class AudioEngine {
   private isLive(id: string, nodes: ChannelNodes): boolean {
     return (
       this.reducedLatencyMonitoring &&
-      (this.inputs.isMonitoring(id) || (nodes.channelType === "midi" && id === this.armedChannelId))
+      (this.isInputMonitoring(id) || (nodes.channelType === "midi" && id === this.armedChannelId))
     );
   }
 
@@ -1580,7 +1581,7 @@ class AudioEngine {
     // Played from a stop: the loudness is measured afresh (not after a pause).
     if (this.transport.state === "stopped") this.loudness.reset();
     this.transport.play();
-    this.follower?.play(from);
+    this.follower?.play(from, 0);
   }
 
   /** Pauses playback in place - unlike stopAll, the transport position is
@@ -1613,7 +1614,8 @@ class AudioEngine {
     // Defensive hard-stop only - a caller that wants the take should have
     // already awaited finishAudioRecording() before calling stopAll().
     if (this.audioRecording) {
-      this.audioRecording.recorder.cancel();
+      if (this.audioRecording.recorder) this.audioRecording.recorder.cancel();
+      else this.follower?.cancelTake();
       this.audioRecording = null;
     }
   }
@@ -1629,8 +1631,22 @@ class AudioEngine {
    * loop, metronome, limiter and bar now, and from then on everything the
    * transport does; the playhead takes its position. */
   setFollower(follower: EngineFollower | null): void {
+    const before = this.follower;
     this.follower = follower;
+    // The tracks monitoring the interface move between the engines.
+    if (follower && !before) {
+      for (const id of this.inputs.monitoredIds()) {
+        if (this.inputs.trackInput(id)) continue;
+        this.followerMonitors.add(id);
+        void this.inputs.setInputMonitoring(id, false);
+      }
+    } else if (!follower && before) {
+      const ids = [...this.followerMonitors];
+      this.followerMonitors.clear();
+      ids.forEach((id) => void this.inputs.setInputMonitoring(id, true));
+    }
     if (!follower) return;
+    this.sendFollowerMonitors();
     const f = this.followed;
     follower.loop(f.loop);
     follower.metronome(f.metronome, f.metronomeDb, f.metronomeSound);
@@ -1656,6 +1672,7 @@ class AudioEngine {
     beforeStart?.();
     this.loudness.reset();
     const startTime = this.transport.startRecording(countInBeats, fromSeconds, loop);
+    this.follower?.play(fromSeconds, countInBeats);
     this.take = { startTime, loop };
     // Going round a loop, the transport jumps back each time: the notes
     // are timed on the audio clock instead, from the start, and cut into
@@ -1719,7 +1736,8 @@ class AudioEngine {
     | { channelId: string; kind: "midi"; notes: readonly NoteEvent[]; held: NoteEvent[] }
     | null {
     if (this.audioRecording) {
-      const live = this.audioRecording.recorder.previewWaveform;
+      const rec = this.audioRecording;
+      const live = rec.recorder ? rec.recorder.previewWaveform : (this.follower?.takePreview(rec.latency) ?? null);
       return { channelId: this.audioRecording.channelId, kind: "audio", waveform: live?.waveform ?? null, version: live?.version ?? 0 };
     }
     const take = this.recording;
@@ -1740,12 +1758,25 @@ class AudioEngine {
     rewireTrack: (id) => this.rewireChannel(id),
   });
 
+  /** The audio tracks hearing the interface through the follower (its
+   * input), in place of the browser's. */
+  private followerMonitors = new Set<string>();
+
+  private sendFollowerMonitors(): void {
+    this.follower?.monitor(
+      [...this.followerMonitors].filter((id) => this.channels.has(id)).map((id) => ({ track: id, channel: this.inputs.channelOf(id) }))
+    );
+  }
+
   /** A track's interface input's peak level (0..1) right now, or null
-   * while its device isn't open (inputs.ts). */
+   * while its device isn't open (inputs.ts; the follower's input). */
   getInputPeak(channelId: string): number | null {
+    if (this.follower) return this.inputs.trackInput(channelId) ? null : this.follower.inputPeak(this.inputs.channelOf(channelId));
     return this.inputs.getInputPeak(channelId);
   }
   openInput(channelId: string): Promise<void> {
+    // The follower's input is open with its device.
+    if (this.follower) return Promise.resolve();
     return this.inputs.openInput(channelId);
   }
   requestMicAccess(): Promise<void> {
@@ -1755,15 +1786,31 @@ class AudioEngine {
    * channel (null: the device as one). */
   setInputDevices(devices: Map<string, InputPick>): void {
     this.inputs.setTrackDevices(devices);
+    this.sendFollowerMonitors();
   }
   listInputDevices(): Promise<InputDevice[]> {
     return this.inputs.listInputDevices();
   }
-  setInputMonitoring(channelId: string, enabled: boolean): Promise<boolean> {
+  /** Starts or stops hearing a track's input live (through the follower
+   * when there is one, for the interface); false if it couldn't open. */
+  async setInputMonitoring(channelId: string, enabled: boolean): Promise<boolean> {
+    const follower = this.follower;
+    if (follower && !this.inputs.trackInput(channelId)) {
+      const had = this.followerMonitors.has(channelId);
+      if (enabled && (!follower.hasInput() || !this.channels.has(channelId))) return false;
+      if (enabled) this.followerMonitors.add(channelId);
+      else this.followerMonitors.delete(channelId);
+      if (had !== enabled) {
+        this.sendFollowerMonitors();
+        // Live, it skips delay compensation.
+        this.refreshMix();
+      }
+      if (enabled) return true;
+    }
     return this.inputs.setInputMonitoring(channelId, enabled);
   }
   isInputMonitoring(channelId: string): boolean {
-    return this.inputs.isMonitoring(channelId);
+    return this.inputs.isMonitoring(channelId) || this.followerMonitors.has(channelId);
   }
 
   // --- Audio (microphone) recording ---
@@ -1771,16 +1818,25 @@ class AudioEngine {
   /** Recording latency correction: a measured round trip (replacing the
    * browser's estimate) and a manual offset (ms, positive = earlier). */
   private measuredRoundTrip: number | null = null;
+  private measuredNativeRoundTrip: number | null = null;
   private recordingOffsetMs = 0;
 
-  setRecordingCorrection(measuredRoundTrip: number | null, offsetMs: number): void {
+  /** The round trips measured through the browser and through the
+   * follower (the native engine's drivers), and the offset (ms). */
+  setRecordingCorrection(measuredRoundTrip: number | null, offsetMs: number, measuredNativeRoundTrip: number | null = null): void {
     this.measuredRoundTrip = measuredRoundTrip;
     this.recordingOffsetMs = offsetMs;
+    this.measuredNativeRoundTrip = measuredNativeRoundTrip;
   }
 
   /** The audio round trip (s): output to the speakers plus input from the
-   * mic - measured if available, else what the browser reports. */
+   * mic - measured if available, else what the browser reports (or the
+   * follower's drivers, when it records). */
   getRoundTrip(): { seconds: number; measured: boolean } {
+    if (this.follower) {
+      const measured = this.measuredNativeRoundTrip;
+      return measured !== null ? { seconds: measured, measured: true } : { seconds: this.follower.roundTrip(), measured: false };
+    }
     if (this.measuredRoundTrip !== null) return { seconds: this.measuredRoundTrip, measured: true };
     const info = this.getLatencyInfo();
     return { seconds: info.output + info.input, measured: false };
@@ -1790,7 +1846,9 @@ class AudioEngine {
    * the mix's latency to the speakers, through the air/cable, back in,
    * plus the manual offset. The take is trimmed by this. */
   getRecordingLatency(): number {
-    return this.compensation.total + this.getRoundTrip().seconds + this.recordingOffsetMs / 1000;
+    const own = this.getRoundTrip().seconds + this.recordingOffsetMs / 1000;
+    // The follower knows its own mix's latency, and adds it.
+    return this.follower ? own : this.compensation.total + own;
   }
 
   /**
@@ -1814,6 +1872,24 @@ class AudioEngine {
     // From another track ("Audio From"), or the audio interface.
     const trackNode = this.inputs.trackInputNode(channelId);
     if (trackNode === null) throw new Error("The track this one takes its input from is gone.");
+    const follower = this.follower;
+    if (follower) {
+      // The follower records the interface, onto disk.
+      if (trackNode) throw new Error("Recording another track's audio needs the browser's engine for now.");
+      if (!follower.hasInput()) throw new Error("The native engine's audio input isn't open.");
+      await follower.record(this.inputs.channelOf(channelId));
+      if (!this.channels.has(channelId)) {
+        follower.cancelTake();
+        return;
+      }
+      beforeStart?.();
+      this.loudness.reset();
+      const startTime = this.transport.startRecording(countInBeats, fromSeconds, loop);
+      follower.play(fromSeconds, countInBeats);
+      this.take = { startTime, loop };
+      this.audioRecording = { channelId, recorder: null, startTime, from: fromSeconds, latency: this.getRecordingLatency(), fromTrack: false };
+      return;
+    }
     // Another track's audio is stereo; the interface is recorded in mono
     // (one input, see inputs.ts).
     const recorder = trackNode
@@ -1843,6 +1919,11 @@ class AudioEngine {
     const rec = this.audioRecording;
     if (!rec) return null;
     this.audioRecording = null;
+    if (!rec.recorder) {
+      // From the follower: mono, from where its downbeat came back in.
+      const take = await this.follower?.finishTake(rec.latency);
+      return take ? takeToWav([take.samples], take.sampleRate) : null;
+    }
     const channels = await rec.recorder.stop(rec.startTime + rec.latency);
     // A take from another track can go over full scale (before its fader,
     // say): kept as float so nothing clips. An interface input can't.
@@ -1855,6 +1936,7 @@ class AudioEngine {
    * input device, or the default. Resolves with seconds, or null if they
    * weren't heard clearly. */
   async measureRoundTrip(channelId = ""): Promise<number | null> {
+    if (this.follower) return this.follower.measureRoundTrip(channelId ? this.inputs.channelOf(channelId) : null);
     await this.ensureStarted();
     const ctx = Tone.getContext();
     const recorder = await InputRecorder.start(ctx, await this.inputs.inputSource(channelId));
