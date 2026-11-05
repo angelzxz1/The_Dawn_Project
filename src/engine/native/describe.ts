@@ -82,6 +82,8 @@ export interface NativeEffect {
    * bus (a track's or bus's id); left out when it listens to its own
    * input. */
   sidechain?: { source: string; tap: SidechainTap };
+  /** A plugin effect's plugin, and the state it starts from. */
+  plugin?: { format: "clap" | "vst3"; id: string; path: string; state?: string };
 }
 
 /** An automation lane with points: a track's fader (dB), its pan, or a
@@ -192,8 +194,9 @@ function nativeInstrument(channel: ChannelConfig, ids: NativeAudioIds): NativeIn
   return null;
 }
 
-/** Whether the engine plays an effect. */
-const plays = (fx: EffectInstance) => NATIVE_EFFECTS.includes(fx.type);
+/** Whether the engine plays an effect (of plugins, the CLAP ones so far). */
+const plays = (fx: EffectInstance) =>
+  fx.type === "plugin" ? fx.plugin?.format === "clap" : NATIVE_EFFECTS.includes(fx.type);
 
 /** The sidechains to connect: effect id -> its source's id. As the
  * browser's engine connects them (mixGraph.ts): in order, leaving out a
@@ -238,6 +241,9 @@ function nativeEffects(chain: EffectInstance[] | undefined, ids: NativeAudioIds,
       bypass: !!fx.bypass,
       ...(fx.file ? { file: ids.effectFile(fx.file.id) } : {}),
       ...(source ? { sidechain: { source, tap: fx.sidechain?.tap ?? "postFx" } } : {}),
+      ...(fx.plugin
+        ? { plugin: { format: fx.plugin.format, id: fx.plugin.id, path: fx.plugin.path, ...(fx.plugin.state ? { state: fx.plugin.state } : {}) } }
+        : {}),
     };
   });
 }
@@ -319,7 +325,7 @@ export function unsupported(doc: ProjectState): { instruments: string[]; effects
   const effects = hosts.flatMap((h) =>
     h.chain
       .filter((fx) => !fx.bypass && !plays(fx))
-      .map((fx) => `${EFFECT_LABELS[fx.type]} on ${h.name}`)
+      .map((fx) => `${fx.plugin?.name ?? EFFECT_LABELS[fx.type]} on ${h.name}`)
   );
   return { instruments: named(instruments), effects };
 }

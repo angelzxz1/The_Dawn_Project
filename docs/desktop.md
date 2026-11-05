@@ -412,7 +412,8 @@ back with the song, to be freed off the audio thread.
 
 The app finds the VST3 and CLAP plugins on the computer and lists them in
 the browser's **Plugins** tab (instruments, effects and note effects, each
-with its format). Putting them on tracks comes next; the steps are below.
+with its format). CLAP effects play in the native engine (below); VST3
+effects, plugin instruments and Audio Units come next.
 
 ### Where it looks
 
@@ -457,6 +458,43 @@ What a scan finds is cached in `plugins.json` in the app's data folder, by
 file, with each binary's size and time: the next scan (each time the studio
 opens, or the Rescan button) only reads what's new or changed.
 
+### Running a CLAP effect
+
+With a track's (or a bus's, or the master's) FX rack open, clicking an
+effect in the Plugins tab adds it to that chain as a **plugin effect**: the
+project keeps which plugin it is (its format, id, name, maker and file) and
+the state it saved last, and nothing of Dawn's own. Its rack card has
+**Open its window**, which opens the plugin's own window. It plays in the
+native engine; in the browser's engine it passes the sound through, and the
+card says so.
+
+- **The host** (`crates/dawn-plugins/src/host.rs`, through clack): an
+  instance of the plugin is made on the app's main thread (CLAP asks for
+  one thread for its main-thread calls, and Tauri runs the commands that
+  aren't async there), given its saved state, and activated at the
+  device's rate. Its audio processor goes to the audio thread, in the
+  effect's slot (`PluginSlot` in `crates/dawn-engine/src/mix/fx.rs`), and
+  processes the track's sound in place, its main ports taking the stereo
+  pair (a mono one, the two mixed). When the engine drops it (the effect
+  went, or the device opened anew) it goes home, and the instance takes it
+  back, stopped and deactivated; an instance whose effect is gone is
+  destroyed then. Its latency counts for delay compensation.
+- **The app's side** (`src-tauri/src/audio/hosted.rs`): the instances by
+  the studio's effect ids. Making the song asks each plugin effect for its
+  processor; the one playing carries on while its slot is empty. The status
+  the studio reads says whose state changed (the plugin marks it so, or its
+  window closed), and the studio fetches it and keeps it in the project,
+  without an undo step. A plugin that can't run (its file gone, or it won't
+  load) says why on its card.
+- **Its window**: a window of the app's with no web page in it (Tauri's
+  `unstable` windows), the plugin's GUI put in it as CLAP's GUI extension
+  says (embedded, at the size it asks for, and resized when it asks).
+  Closing the window closes the plugin's GUI first.
+
+Not yet: parameters automated from Dawn's lanes, a plugin's sidechain
+input, and plugin presets in Dawn's preset menu (the plugin's own work in
+its window).
+
 ### Testing it
 
 `cargo test -p dawn-plugins` builds `crates/dawn-test-plugin` (a gain effect
@@ -468,12 +506,10 @@ crash and hang on purpose. CI runs it on Windows, macOS and Linux
 
 ## Next steps
 
-1. **Plugins**: finding them is done (above). Next, CLAP effects running in
-   the engine on tracks, with their own windows and their state saved in
-   the project; then VST3 effects the same way; then plugin instruments on
-   MIDI tracks, played from clips and live; then Audio Units on macOS.
-   NAM's plugin is the first VST3 to try: it's how the desktop app plays
-   NAM models.
+1. **Plugins**: finding them and CLAP effects are done (above). Next,
+   VST3 effects the same way; then plugin instruments on MIDI tracks,
+   played from clips and live; then Audio Units on macOS. NAM's plugin is
+   the first VST3 to try: it's how the desktop app plays NAM models.
 2. **Export through the engine**, native file dialogs, signed installers.
 
 ## Checks

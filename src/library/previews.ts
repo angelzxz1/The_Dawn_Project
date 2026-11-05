@@ -30,6 +30,7 @@ export const PREVIEW_SOURCE: Record<EffectType, "drums" | "pluck" | null> = {
   namAmp: "pluck",
   irLoader: "pluck",
   tuner: null,
+  plugin: null,
 };
 
 export type PreviewSource = { kind: "drums"; kit: DrumKitParams; hits: PreviewHit[] } | { kind: "pluck" };

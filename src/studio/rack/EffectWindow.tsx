@@ -48,6 +48,7 @@ export function EffectWindow({
           file={effect.file}
           sidechain={effect.sidechain}
           sidechainSources={sidechainSources}
+          plugin={effect.plugin}
           onBypassToggle={() => effectActions.toggleBypass(hostId, effect.id)}
           onClose={onClose}
           onParamChange={(key, v) => effectActions.setParam(hostId, effect.id, key, v)}

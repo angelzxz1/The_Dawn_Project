@@ -17,8 +17,8 @@ use dawn_engine::instruments::synth::{
 use dawn_engine::mix::tempo::TempoSegment;
 use dawn_engine::mix::{
     AudioData, Bus, Clip, ClipTiming, Destination, EffectAutomation, EffectSettings, EffectSpec,
-    InstrumentSpec, KeySource, KeySpec, Master, Note, ParamLane, Point, Send, Song, Tap, Track,
-    db_to_gain,
+    InstrumentSpec, KeySource, KeySpec, Master, Note, ParamLane, PluginSettings, Point, Send, Song,
+    Tap, Track, db_to_gain,
 };
 use serde::Deserialize;
 
@@ -307,7 +307,26 @@ pub struct EffectSpecIn {
     /// studio sends only those it connects).
     #[serde(default)]
     pub sidechain: Option<SidechainSpec>,
+    /// The plugin a "plugin" effect is.
+    #[serde(default)]
+    pub plugin: Option<PluginSpec>,
 }
+
+/// A plugin effect: which plugin (its format, id and file), and the state
+/// it saved last (base64), to start from.
+#[derive(Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct PluginSpec {
+    pub format: String,
+    pub id: String,
+    pub path: String,
+    #[serde(default)]
+    pub state: Option<String>,
+}
+
+/// Makes a plugin effect's settings (its processor in its slot) for the
+/// effect with this id; none when it can't run.
+pub type PluginMaker<'a> = &'a dyn Fn(&str, &PluginSpec) -> Option<PluginSettings>;
 
 /// Where a keyed effect's key comes from: a track's or bus's id, and where
 /// on it (`SidechainTap`: "preFx", "postFx", "postFader").
@@ -386,6 +405,7 @@ fn tap(name: &str) -> Tap {
 /// browser's does, or with none plays without one. `source` finds a key's
 /// track or bus by its id; a key from one that isn't there is left out.
 /// `lanes` are the chain's track's automation, for its effects'.
+#[allow(clippy::too_many_arguments)] // What a chain needs from the song being made.
 fn effects(
     specs: &[EffectSpecIn],
     lanes: &[LaneSpec],
@@ -394,6 +414,7 @@ fn effects(
     audio: &HashMap<String, LoadedAudio>,
     sample_rate: f64,
     missing: &mut Vec<String>,
+    plugins: PluginMaker,
 ) -> Vec<EffectSpec> {
     specs
         .iter()
@@ -403,7 +424,10 @@ fn effects(
                 .iter()
                 .filter_map(|(k, v)| v.map(|v| (k.clone(), v)))
                 .collect();
-            let mut settings = EffectSettings::from_params(&e.kind, &params)?;
+            let mut settings = match (e.kind.as_str(), &e.plugin) {
+                ("plugin", Some(plugin)) => EffectSettings::Plugin(plugins(&e.id, plugin)?),
+                _ => EffectSettings::from_params(&e.kind, &params)?,
+            };
             if settings.takes_file()
                 && let Some(id) = &e.file
             {
@@ -638,11 +662,23 @@ fn instrument(
 /// The engine's song, at `sample_rate`, following `previous` (the one
 /// playing). A clip whose file hasn't been sent (or was decoded at another
 /// rate) is left out; their files come back.
+#[cfg(test)]
 pub fn build(
     spec: &SongSpec,
     previous: Option<&Song>,
     audio: &HashMap<String, LoadedAudio>,
     sample_rate: f64,
+) -> (Song, Vec<String>) {
+    build_with(spec, previous, audio, sample_rate, &|_, _| None)
+}
+
+/// As `build`, with plugin effects made by `plugins`.
+pub fn build_with(
+    spec: &SongSpec,
+    previous: Option<&Song>,
+    audio: &HashMap<String, LoadedAudio>,
+    sample_rate: f64,
+    plugins: PluginMaker,
 ) -> (Song, Vec<String>) {
     let mut missing = vec![];
     let track_index: HashMap<&str, usize> = spec
@@ -734,6 +770,7 @@ pub fn build(
                 audio,
                 sample_rate,
                 &mut missing,
+                plugins,
             ),
             live: t.live,
             volume_automation: strip_lane(&t.automation, "volume"),
@@ -759,6 +796,7 @@ pub fn build(
                 audio,
                 sample_rate,
                 &mut missing,
+                plugins,
             ),
         })
         .collect();
@@ -785,6 +823,7 @@ pub fn build(
         audio,
         sample_rate,
         &mut missing,
+        plugins,
     );
     missing.sort();
     missing.dedup();
@@ -1155,6 +1194,42 @@ mod tests {
                 tap: Tap::PreFx
             })
         );
+    }
+
+    #[test]
+    fn a_plugin_effect_is_made_by_the_host_with_its_saved_state() {
+        let json = r#"{
+            "tracks": [
+                { "id": "g", "volumeDb": 0, "pan": 0, "audible": true, "output": null, "sends": [], "clips": [],
+                  "effects": [
+                    { "id": "p", "type": "plugin", "params": {},
+                      "plugin": { "format": "clap", "id": "com.vendor.verb", "path": "C:/Plugins/Verb.clap", "state": "AAAAPw==" } },
+                    { "id": "q", "type": "plugin", "params": {} }
+                  ] }
+            ],
+            "buses": [],
+            "master": { "volumeDb": 0, "pan": 0, "limiterDb": -1 },
+            "tempo": [{ "beat": 0, "seconds": 0, "bpm": 120 }],
+            "beatsPerBar": 4
+        }"#;
+        let spec: SongSpec = serde_json::from_str(json).unwrap();
+        let asked = std::cell::RefCell::new(vec![]);
+        let maker = |id: &str, plugin: &PluginSpec| {
+            asked.borrow_mut().push((id.to_owned(), plugin.clone()));
+            Some(PluginSettings {
+                slot: Arc::new(dawn_engine::mix::PluginSlot::default()),
+                latency: 64,
+            })
+        };
+        let (song, _) = build_with(&spec, None, &HashMap::new(), 48000.0, &maker);
+        // The one without its plugin is left out.
+        assert_eq!(song.tracks[0].effects.len(), 1);
+        assert_eq!(song.tracks[0].effects[0].settings.latency(48000.0), 64);
+        let asked = asked.borrow();
+        assert_eq!(asked.len(), 1);
+        assert_eq!(asked[0].0, "p");
+        assert_eq!(asked[0].1.state.as_deref(), Some("AAAAPw=="));
+        assert_eq!(asked[0].1.path, "C:/Plugins/Verb.clap");
     }
 
     #[test]

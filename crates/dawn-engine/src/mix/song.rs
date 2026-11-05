@@ -463,6 +463,14 @@ impl Song {
                 self.host_effects(h)
                     .iter()
                     .map(|spec| {
+                        // A plugin's made when the host has left it a
+                        // processor; otherwise the one playing goes on.
+                        if let fx::EffectSettings::Plugin(p) = &spec.settings {
+                            return p
+                                .slot
+                                .is_filled()
+                                .then(|| Box::new(Effect::new(&spec.settings, sample_rate)));
+                        }
                         let playing = previous.is_some_and(|p| p.has_effect(spec));
                         (!playing).then(|| Box::new(Effect::new(&spec.settings, sample_rate)))
                     })

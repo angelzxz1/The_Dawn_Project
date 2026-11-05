@@ -2725,7 +2725,17 @@ export function Daw() {
             onStopPreview={() => audioEngine.stopPreview()}
           />
         }
-        plugins={desktop ? <PluginBrowser /> : undefined}
+        plugins={
+          desktop ? (
+            <PluginBrowser
+              onAddEffect={
+                fxChannel || fxBus || fxMasterOpen
+                  ? (p) => effectActions.addPlugin(fxHostId, { format: p.format, id: p.id, name: p.name, vendor: p.vendor, path: p.path })
+                  : undefined
+              }
+            />
+          ) : undefined
+        }
       />
       )}
       <div className="flex flex-1 flex-col gap-3 overflow-hidden p-3">

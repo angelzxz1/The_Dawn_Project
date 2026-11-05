@@ -108,4 +108,18 @@ describe("effect actions", () => {
     expect(list[2].bypass).toBe(true);
     expect(engine.calls.filter((c) => c.startsWith("add"))).toEqual(["add gate at 1", "add reverb at 2"]);
   });
+
+  it("adds a plugin as an effect, and keeps the state it saves without an undo step", () => {
+    const verb = { format: "clap" as const, id: "com.vendor.verb", name: "Verb", vendor: "Vendor", path: "C:/CLAP/Verb.clap" };
+    const id = effectActions.addPlugin("vox", verb);
+    expect(engine.calls).toEqual(["add plugin at undefined"]);
+    const added = projectStore.get().channelEffects.vox.find((e) => e.id === id);
+    expect(added).toMatchObject({ type: "plugin", plugin: verb });
+
+    effectActions.setPluginState(id!, "AAAAPw==");
+    expect(projectStore.get().channelEffects.vox.find((e) => e.id === id)?.plugin?.state).toBe("AAAAPw==");
+    // One undo takes the plugin away: its state was the plugin's, not an edit.
+    projectStore.undo();
+    expect(projectStore.get().channelEffects.vox.map((e) => e.id)).toEqual(["fx-a", "fx-b"]);
+  });
 });

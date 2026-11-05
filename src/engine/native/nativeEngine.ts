@@ -14,6 +14,9 @@
 // It opens the audio interface's input with its output: the tracks
 // monitoring it hear it live through the engine, and takes are recorded
 // there, onto disk, and handed back when they end (nativeTake.ts).
+//
+// It runs the project's plugin effects (CLAP so far): the engine says
+// whose state changed, and their states are kept in the project as they do.
 
 import * as Tone from "tone";
 import { audioEngine } from "../audioEngine";
@@ -33,6 +36,7 @@ import { currentTempo, projectStore } from "../../state/projectStore";
 import { warpPieces } from "../../project/warp";
 import type { AudioClipInstance } from "../../project/types";
 import { noteIssue } from "../../services/issues";
+import { effectActions } from "../../state/effectActions";
 
 /** 32-bit FNV-1a of a string, as hex: a short id for a long key. */
 function hash(text: string): string {
@@ -65,10 +69,15 @@ export interface NativeState {
   /** The interface's input, open with the device, or why it isn't. */
   input: { name: string; channels: number } | null;
   inputError: string | null;
+  /** The plugin effects: why any couldn't run (by effect id), and those
+   * whose own window is open. */
+  plugins: { errors: Record<string, string>; windows: string[] };
 }
 
+const NO_PLUGINS: NativeState["plugins"] = { errors: {}, windows: [] };
+
 class NativeEngine {
-  private state: NativeState = { active: false, starting: false, sampleRate: 0, bufferSize: null, error: null, status: null, input: null, inputError: null };
+  private state: NativeState = { active: false, starting: false, sampleRate: 0, bufferSize: null, error: null, status: null, input: null, inputError: null, plugins: NO_PLUGINS };
   private listeners = new Set<() => void>();
   /** Files sent (or on their way), by the id the engine knows them by. */
   private sent = new Map<string, Promise<void>>();
@@ -125,7 +134,7 @@ class NativeEngine {
   async turnOff(): Promise<void> {
     this.release();
     this.take = null;
-    this.set({ active: false, status: null, input: null, inputError: null });
+    this.set({ active: false, status: null, input: null, inputError: null, plugins: NO_PLUGINS });
     try {
       await nativeBridge.close();
     } catch (error) {
@@ -299,13 +308,50 @@ class NativeEngine {
           this.take.buckets.add(status.take.min, status.take.max);
           this.take.downbeat = status.take.downbeat;
         }
-        this.set({ status });
+        status.plugins?.dirty.forEach((id) => void this.keepPluginState(id));
+        this.set({ status, plugins: this.pluginsFrom(status) });
       } catch (error) {
         noteIssue("native.status", error);
       }
       requestAnimationFrame(() => void tick());
     };
     void tick();
+  }
+
+  // --- Plugins ---
+
+  /** The plugins' errors and windows as the status says, the same object
+   * while they're the same (for the views reading it). */
+  private pluginsFrom(status: NativeStatus): NativeState["plugins"] {
+    const p = status.plugins;
+    if (!p) return NO_PLUGINS;
+    const errors = Object.fromEntries(p.errors);
+    const now = this.state.plugins;
+    const same =
+      p.windows.length === now.windows.length &&
+      p.windows.every((w, i) => w === now.windows[i]) &&
+      Object.keys(errors).length === Object.keys(now.errors).length &&
+      Object.entries(errors).every(([k, v]) => now.errors[k] === v);
+    return same ? now : { errors, windows: p.windows };
+  }
+
+  /** Keeps a plugin effect's state in the project, as the plugin has it. */
+  private async keepPluginState(effectId: string): Promise<void> {
+    try {
+      effectActions.setPluginState(effectId, await nativeBridge.pluginState(effectId));
+    } catch (error) {
+      noteIssue("native.pluginState", error);
+    }
+  }
+
+  /** Opens a plugin effect's own window. */
+  async openPluginWindow(effectId: string, title: string): Promise<void> {
+    if (!this.state.active) return;
+    try {
+      await nativeBridge.openPluginWindow(effectId, title);
+    } catch (error) {
+      noteIssue("native.pluginWindow", error);
+    }
   }
 
   // --- Following the browser engine's transport (follower.ts) ---

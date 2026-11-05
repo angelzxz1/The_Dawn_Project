@@ -6,8 +6,14 @@
 //! As in the browser's engine: a track's chain runs on what it plays and
 //! what's routed into it, ahead of its fader; a bus's on its sends, ahead
 //! of its fader; the master's after its fader, ahead of the limiter.
+//!
+//! A plugin (`EffectSettings::Plugin`) is run by the app's host: the host
+//! puts its audio processor in a slot as the song is made, and the effect
+//! takes it from there when it's made (off the audio thread). While the
+//! slot is empty, the effect already playing carries on.
 
-use std::sync::Arc;
+use std::fmt;
+use std::sync::{Arc, Mutex};
 
 use super::automation::EffectAutomation;
 use super::clip::AudioData;
@@ -33,6 +39,52 @@ use crate::effects::tuner::{TunerKernel, TunerSettings, TunerTap};
 use crate::effects::utility::{UtilityKernel, UtilitySettings};
 use crate::params::ParamSource;
 
+/// A plugin's audio processor, run by the app's host: it processes a
+/// stereo block (at most `MAX_BLOCK` frames) in place, on the audio thread.
+pub trait PluginProcessor: Send {
+    fn process(&mut self, l: &mut [f32], r: &mut [f32]);
+}
+
+/// Where the host leaves a plugin's processor for the effect to take.
+#[derive(Default)]
+pub struct PluginSlot(Mutex<Option<Box<dyn PluginProcessor>>>);
+
+impl PluginSlot {
+    pub fn new(processor: Option<Box<dyn PluginProcessor>>) -> Self {
+        Self(Mutex::new(processor))
+    }
+
+    /// The processor, if it's still waiting (off the audio thread).
+    pub fn take(&self) -> Option<Box<dyn PluginProcessor>> {
+        self.0.lock().unwrap_or_else(|e| e.into_inner()).take()
+    }
+
+    pub fn is_filled(&self) -> bool {
+        self.0.lock().unwrap_or_else(|e| e.into_inner()).is_some()
+    }
+}
+
+/// A plugin effect: its slot, and how late its sound comes out (frames).
+#[derive(Clone)]
+pub struct PluginSettings {
+    pub slot: Arc<PluginSlot>,
+    pub latency: usize,
+}
+
+impl fmt::Debug for PluginSettings {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PluginSettings")
+            .field("latency", &self.latency)
+            .finish_non_exhaustive()
+    }
+}
+
+impl PartialEq for PluginSettings {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.slot, &other.slot) && self.latency == other.latency
+    }
+}
+
 /// An effect's settings, made from its parameters.
 #[derive(Clone, Debug, PartialEq)]
 pub enum EffectSettings {
@@ -50,6 +102,7 @@ pub enum EffectSettings {
     Multiband(Box<MultibandSettings>),
     ParamEq(Box<ParamEqSettings>),
     PitchShift(PitchShiftSettings),
+    Plugin(PluginSettings),
     Reverb(Box<ReverbSettings>),
     Saturator(Box<SaturatorSettings>),
     Tuner(TunerSettings),
@@ -72,6 +125,7 @@ pub enum EffectKind {
     Multiband,
     ParamEq,
     PitchShift,
+    Plugin,
     Reverb,
     Saturator,
     Tuner,
@@ -117,6 +171,7 @@ impl EffectSettings {
             Self::Glue(s) if s.oversample => OS_LATENCY,
             Self::Limiter(_) => lookahead_frames(sample_rate),
             Self::PitchShift(s) => s.latency(sample_rate),
+            Self::Plugin(s) => s.latency,
             Self::Saturator(s) => s.latency(),
             _ => 0,
         }
@@ -235,6 +290,7 @@ impl EffectSettings {
             Self::Multiband(_) => EffectKind::Multiband,
             Self::ParamEq(_) => EffectKind::ParamEq,
             Self::PitchShift(_) => EffectKind::PitchShift,
+            Self::Plugin(_) => EffectKind::Plugin,
             Self::Reverb(_) => EffectKind::Reverb,
             Self::Saturator(_) => EffectKind::Saturator,
             Self::Tuner(_) => EffectKind::Tuner,
@@ -324,6 +380,9 @@ enum Kernel {
     Multiband(Box<MultibandKernel>),
     ParamEq(Box<ParamEqKernel>),
     PitchShift(Box<PitchShifter>),
+    /// The host's processor (none: the slot was empty, and it passes the
+    /// sound through).
+    Plugin(Option<Box<dyn PluginProcessor>>),
     Reverb(Box<ReverbKernel>),
     Saturator(Box<SaturatorKernel>),
     Tuner(Box<TunerKernel>),
@@ -374,6 +433,7 @@ impl Effect {
             EffectSettings::PitchShift(s) => {
                 Kernel::PitchShift(Box::new(PitchShifter::new(sample_rate, s)))
             }
+            EffectSettings::Plugin(s) => Kernel::Plugin(s.slot.take()),
             EffectSettings::Reverb(s) => {
                 Kernel::Reverb(Box::new(ReverbKernel::new(sample_rate, s)))
             }
@@ -404,6 +464,7 @@ impl Effect {
             Kernel::Multiband(_) => EffectKind::Multiband,
             Kernel::ParamEq(_) => EffectKind::ParamEq,
             Kernel::PitchShift(_) => EffectKind::PitchShift,
+            Kernel::Plugin(_) => EffectKind::Plugin,
             Kernel::Reverb(_) => EffectKind::Reverb,
             Kernel::Saturator(_) => EffectKind::Saturator,
             Kernel::Tuner(_) => EffectKind::Tuner,
@@ -469,6 +530,8 @@ impl Effect {
             Kernel::Multiband(k) => k.process_keyed(&mut l[..n], &mut r[..n], key),
             Kernel::ParamEq(k) => k.process_in_place(&mut l[..n], &mut r[..n]),
             Kernel::PitchShift(k) => k.process_in_place(&mut l[..n], &mut r[..n]),
+            Kernel::Plugin(Some(p)) => p.process(&mut l[..n], &mut r[..n]),
+            Kernel::Plugin(None) => {}
             Kernel::Reverb(k) => k.process_in_place(&mut l[..n], &mut r[..n]),
             Kernel::Saturator(k) => k.process_in_place(&mut l[..n], &mut r[..n]),
             Kernel::Tuner(k) => k.process_in_place(&mut l[..n], &mut r[..n]),

@@ -74,6 +74,9 @@ export interface NativeStatus {
   roundTrip: number;
   /** The take being recorded, if one is. */
   take: NativeTakeStatus | null;
+  /** The plugin effects whose state changed (to be saved), why any that
+   * couldn't run didn't ([effect id, why]), and those whose window is open. */
+  plugins: { dirty: string[]; errors: [string, string][]; windows: string[] };
 }
 
 export const nativeBridge = {
@@ -126,6 +129,11 @@ export const nativeBridge = {
    * back in after `roundTrip` s (null: from its start, for a probe). */
   finishTake: (roundTrip: number | null) => invoke<ArrayBuffer>("engine_finish_take", { roundTrip }),
   cancelTake: () => invoke<void>("engine_cancel_take"),
+  /** Opens a plugin effect's own window (or brings it forward). */
+  openPluginWindow: (effect: string, title: string) => invoke<void>("plugin_window_open", { effect, title }),
+  closePluginWindow: (effect: string) => invoke<void>("plugin_window_close", { effect }),
+  /** A plugin effect's state now, base64. */
+  pluginState: (effect: string) => invoke<string>("plugin_state", { effect }),
   /** What's gone into a Tuner lately (its last 4096 samples, as f32s);
    * empty when there's no such Tuner playing. */
   tuner: (effect: string) => invoke<ArrayBuffer>("engine_tuner", { effect }),

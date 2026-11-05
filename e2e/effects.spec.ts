@@ -2,10 +2,11 @@
 // and the sidechain's loop check.
 
 import { test, expect } from "./fixtures";
-import { EFFECT_LABELS, EFFECT_TYPES } from "../src/effects/registry";
+import { EFFECT_LABELS, EFFECT_TYPES, effectDefinition } from "../src/effects/registry";
 import { FACTORY_CABS } from "../src/effects/ir-loader/cabIrs";
 
-for (const type of EFFECT_TYPES) {
+// A plugin is added from the desktop app's Plugins tab, not the browser.
+for (const type of EFFECT_TYPES.filter((t) => !effectDefinition(t).hidden)) {
   const label = EFFECT_LABELS[type];
   test(`${label}: added from the browser, its window opens and closes`, async ({ page, studio }) => {
     await studio.open("Empty Project");

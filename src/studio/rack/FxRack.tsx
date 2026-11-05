@@ -433,11 +433,12 @@ export function FxRack({
                         onParamDragStart={onParamDragStart}
                         onLoadFile={(file) => onLoadEffectFile?.(fx.id, file) ?? Promise.resolve("Can't load files here.")}
                         onClearFile={() => onClearEffectFile?.(fx.id)}
+                        plugin={fx.plugin}
                       />
                     );
                   })()}
                   </div>
-                  {onPresetChange && (
+                  {onPresetChange && fx.type !== "plugin" && (
                     <div className="mt-1.5">
                       <PresetMenu variant="rack" effect={fx} bpm={bpm} onChange={(change) => onPresetChange(fx.id, change)} />
                     </div>

@@ -21,6 +21,7 @@ import { namAmpUi } from "../nam-amp/ui";
 import { irLoaderUi } from "../ir-loader/ui";
 import { utilityUi } from "../utility/ui";
 import { tunerUi } from "../tuner/ui";
+import { pluginUi } from "../plugin/ui";
 
 export const EFFECT_UI: Record<EffectType, EffectUi> = {
   compressor: compressorUi,
@@ -42,4 +43,5 @@ export const EFFECT_UI: Record<EffectType, EffectUi> = {
   irLoader: irLoaderUi,
   utility: utilityUi,
   tuner: tunerUi,
+  plugin: pluginUi,
 };

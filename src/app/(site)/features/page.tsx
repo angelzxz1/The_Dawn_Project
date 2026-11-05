@@ -32,6 +32,7 @@ const EFFECT_NOTES: Record<EffectType, string> = {
   irLoader: "Cabinet impulse responses for any amp.",
   utility: "Gain, pan and other everyday fixes.",
   tuner: "Tune up before you record.",
+  plugin: "A VST3 or CLAP plugin on your computer (desktop app).",
 };
 
 const EFFECTS: EffectInfo[] = EFFECT_GROUPS.flatMap((g) => g.types.map((t) => ({ category: g.name, name: EFFECT_LABELS[t], description: EFFECT_NOTES[t] })));

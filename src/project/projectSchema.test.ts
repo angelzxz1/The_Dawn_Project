@@ -433,6 +433,25 @@ describe("monitored tracks", () => {
     expect(normalizeProject({ channels, autoMonitoredTracks: ["ch-1", "ch-2", "ch-1"] })?.autoMonitoredTracks).toEqual(["ch-1"]);
   });
 
+  it("keeps a plugin effect's plugin and its state, and drops one that names none", () => {
+    const plugin = { format: "clap", id: "com.vendor.verb", name: "Verb", vendor: "Vendor", path: "C:/CLAP/Verb.clap", state: "AAAAPw==" };
+    const fx = normalizeProject({
+      channels,
+      channelEffects: {
+        "ch-1": [
+          { id: "fx-1", type: "plugin", params: {}, plugin },
+          { id: "fx-2", type: "plugin", params: {} },
+          { id: "fx-3", type: "plugin", params: {}, plugin: { ...plugin, format: "au" } },
+          { id: "fx-4", type: "plugin", params: {}, plugin: { ...plugin, state: "<not base64>" } },
+        ],
+      },
+    })?.channelEffects["ch-1"];
+    expect(fx?.map((e) => e.id)).toEqual(["fx-1", "fx-4"]);
+    expect(fx?.[0].plugin).toEqual(plugin);
+    // An unreadable state is left out: the plugin starts as it would.
+    expect(fx?.[1].plugin?.state).toBeUndefined();
+  });
+
   it("Punch is off in an older project, and kept when saved on", () => {
     expect(normalizeProject({ channels })?.punch).toBe(false);
     expect(normalizeProject({ channels, punch: true })?.punch).toBe(true);

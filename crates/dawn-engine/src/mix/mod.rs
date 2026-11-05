@@ -18,6 +18,9 @@ pub mod tempo;
 pub use automation::{EffectAutomation, ParamLane, Point};
 pub use clip::{AudioData, Clip, ClipTiming};
 pub use engine::{Engine, LiveInput, input_sample};
-pub use fx::{EffectKind, EffectSettings, EffectSpec, KeySource, KeySpec, Tap};
+pub use fx::{
+    EffectKind, EffectSettings, EffectSpec, KeySource, KeySpec, PluginProcessor, PluginSettings,
+    PluginSlot, Tap,
+};
 pub use player::{InstrumentKind, InstrumentSpec, Note, track_key};
 pub use song::{Bus, Destination, MAX_BLOCK, Master, Prepared, Send, Song, Track, db_to_gain};

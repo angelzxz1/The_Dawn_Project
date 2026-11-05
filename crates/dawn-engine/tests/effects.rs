@@ -319,3 +319,75 @@ fn every_ported_type_plays_in_a_chain() {
         }
     }
 }
+
+/// A plugin as the host gives it: it scales by `level`.
+struct Scale(f32);
+
+impl dawn_engine::mix::PluginProcessor for Scale {
+    fn process(&mut self, l: &mut [f32], r: &mut [f32]) {
+        l.iter_mut().chain(r.iter_mut()).for_each(|x| *x *= self.0);
+    }
+}
+
+fn plugin_song(
+    slot: std::sync::Arc<dawn_engine::mix::PluginSlot>,
+    latency: usize,
+) -> dawn_engine::mix::Song {
+    use dawn_engine::mix::{EffectSettings, EffectSpec, PluginSettings, Song, Track};
+    let audio = std::sync::Arc::new(dawn_engine::mix::AudioData {
+        channels: vec![vec![0.5; 48000]],
+    });
+    let clip = dawn_engine::mix::Clip::new(
+        audio,
+        48000.0,
+        dawn_engine::mix::ClipTiming {
+            offset: 0.0,
+            length: 1.0,
+            ..Default::default()
+        },
+    );
+    let mut track = Track::new("gtr");
+    track.clips = vec![clip];
+    track.effects = vec![EffectSpec::new(
+        "plug",
+        EffectSettings::Plugin(PluginSettings { slot, latency }),
+    )];
+    Song {
+        tracks: vec![track],
+        ..Song::default()
+    }
+}
+
+#[test]
+fn a_plugin_runs_in_its_chain_and_lives_on_while_its_slot_is_empty() {
+    use dawn_engine::mix::{Engine, PluginSlot};
+    use std::sync::Arc;
+    let sr = 48000.0;
+    let mut engine = Engine::new(sr);
+    let first = Arc::new(PluginSlot::new(Some(Box::new(Scale(0.5)))));
+    let song = plugin_song(first.clone(), 0);
+    let prepared = song.clone().prepare(None, sr);
+    assert!(!first.is_filled(), "the effect took its processor");
+    engine.set_song(Box::new(prepared));
+    engine.play(0.0, 0.0);
+    let (mut l, mut r) = (vec![0.0; 4800], vec![0.0; 4800]);
+    engine.render(&mut l, &mut r);
+    // 0.5 through the plugin's half, after the limiter's lookahead.
+    assert!((l[2000] - 0.25).abs() < 1e-5, "{}", l[2000]);
+
+    // The next version of the song, with nothing in its slot: the plugin
+    // playing carries on.
+    let next = plugin_song(Arc::new(PluginSlot::default()), 0);
+    let old = engine.set_song(Box::new(next.prepare(Some(&song), sr)));
+    drop(old);
+    engine.render(&mut l, &mut r);
+    assert!(
+        (l[2000] - 0.25).abs() < 1e-5,
+        "still the plugin: {}",
+        l[2000]
+    );
+
+    // Its latency counts for delay compensation.
+    let late = plugin_song(Arc::new(PluginSlot::default()), 128).prepare(None, sr);
+    assert_eq!(late.latency(), 128 + 240);
+}

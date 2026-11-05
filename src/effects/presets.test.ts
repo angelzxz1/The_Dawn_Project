@@ -19,8 +19,8 @@ beforeEach(() => {
 });
 
 describe("factory presets", () => {
-  it("every effect has at least three, with unique names and ids", () => {
-    EFFECT_TYPES.forEach((type) => {
+  it("every effect has at least three, with unique names and ids (a plugin has its own)", () => {
+    EFFECT_TYPES.filter((type) => type !== "plugin").forEach((type) => {
       const list = FACTORY_PRESETS.filter((p) => p.type === type);
       expect(list.length, type).toBeGreaterThanOrEqual(3);
       expect(new Set(list.map((p) => p.name)).size, type).toBe(list.length);

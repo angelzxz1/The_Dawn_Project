@@ -4,8 +4,8 @@ import { FACTORY_CAB_TONES } from "./tones";
 import { browserTones, PREVIEW_SOURCE, previewSourceFor, toneEffect } from "./previews";
 
 describe("previews", () => {
-  it("every effect but the Tuner has something to play through it", () => {
-    for (const type of EFFECT_TYPES) expect(PREVIEW_SOURCE[type] === null, type).toBe(type === "tuner");
+  it("every effect but the Tuner and a plugin has something to play through it", () => {
+    for (const type of EFFECT_TYPES) expect(PREVIEW_SOURCE[type] === null, type).toBe(type === "tuner" || type === "plugin");
     expect(previewSourceFor("tuner")).toBeNull();
   });
 

@@ -41,11 +41,14 @@ const bridge = vi.hoisted(() => ({
     inputs: [0.1, 0.4],
     roundTrip: 0.012,
     take: null as { frames: number; downbeat: number; min: number[]; max: number[]; dropped: number } | null,
+    plugins: { dirty: [] as string[], errors: [] as [string, string][], windows: [] as string[] },
   })),
   monitor: vi.fn<(tracks: { track: string; channel: number | null }[]) => Promise<void>>(async () => {}),
   record: vi.fn<(channel: number | null, probe?: boolean) => Promise<void>>(async () => {}),
   finishTake: vi.fn<(roundTrip: number | null) => Promise<ArrayBuffer>>(async () => new Float32Array([0.25, 0.5, 0.25]).buffer),
   cancelTake: vi.fn(async () => {}),
+  pluginState: vi.fn<(effect: string) => Promise<string>>(async () => "AAAAPw=="),
+  openPluginWindow: vi.fn<(effect: string, title: string) => Promise<void>>(async () => {}),
   devices: vi.fn(async () => []),
   forgetAudio: vi.fn(async () => {}),
   key: vi.fn<(track: string, key: number, velocity: number | null) => Promise<void>>(async () => {}),
@@ -321,5 +324,25 @@ describe("the native engine from the studio", () => {
     }
     expect(bridge.record).toHaveBeenLastCalledWith(1, true);
     expect(bridge.finishTake).toHaveBeenLastCalledWith(null);
+  });
+
+  test("a plugin whose state changed has it kept in the project; its window and errors are known", async () => {
+    const p = project(wavUrl());
+    p.channelEffects = {
+      a1: [{ id: "pl", type: "plugin", params: {}, plugin: { format: "clap", id: "com.vendor.verb", name: "Verb", vendor: "V", path: "C:/Verb.clap" } }],
+    };
+    projectStore.replace(p);
+    const base = await bridge.status();
+    bridge.status.mockResolvedValue({ ...base, plugins: { dirty: ["pl"], errors: [["gone", "It couldn't be loaded."]], windows: ["pl"] } });
+    try {
+      await nativeEngine.turnOn({ device: null, sampleRate: null, bufferSize: null, inputDevice: null });
+      await vi.waitFor(() => expect(projectStore.get().channelEffects.a1[0].plugin?.state).toBe("AAAAPw=="));
+      expect(bridge.pluginState).toHaveBeenCalledWith("pl");
+      expect(nativeEngine.current.plugins).toEqual({ errors: { gone: "It couldn't be loaded." }, windows: ["pl"] });
+      await nativeEngine.openPluginWindow("pl", "Verb");
+      expect(bridge.openPluginWindow).toHaveBeenCalledWith("pl", "Verb");
+    } finally {
+      bridge.status.mockResolvedValue(base);
+    }
   });
 });

@@ -352,4 +352,20 @@ describe("what the native engine doesn't play yet", () => {
     p.clipsByChannel = { drums: [audioClip("a")] };
     expect(unsupported(p)).toEqual({ instruments: [], effects: [] });
   });
+
+  it("sends a CLAP plugin effect with its plugin and saved state; a VST3 one isn't played yet", () => {
+    const p = project();
+    const clap = { format: "clap" as const, id: "com.vendor.verb", name: "Verb", vendor: "Vendor", path: "C:/CLAP/Verb.clap", state: "AAAAPw==" };
+    p.channelEffects = {
+      drums: [
+        { id: "pl", type: "plugin", params: {}, plugin: clap },
+        { id: "v3", type: "plugin", params: {}, plugin: { ...clap, format: "vst3", name: "Comp3", path: "C:/VST3/Comp3.vst3" } },
+      ],
+    };
+    const song = describeSong(p, session, idOf);
+    expect(song.tracks[0].effects).toEqual([
+      { id: "pl", type: "plugin", params: {}, bypass: false, plugin: { format: "clap", id: "com.vendor.verb", path: "C:/CLAP/Verb.clap", state: "AAAAPw==" } },
+    ]);
+    expect(unsupported(p).effects).toEqual(["Comp3 on drums"]);
+  });
 });

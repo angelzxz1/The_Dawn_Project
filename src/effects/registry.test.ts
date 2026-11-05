@@ -2,11 +2,12 @@ import { describe, expect, it } from "vitest";
 import { EFFECT_GROUPS, EFFECT_TYPES, effectDefinition } from "./registry";
 
 describe("effect registry", () => {
-  it("every effect has a unique key and label, and a place in the browser", () => {
+  it("every effect has a unique key and label, and a place in the browser (bar a plugin, added from the Plugins tab)", () => {
     expect(new Set(EFFECT_TYPES).size).toBe(EFFECT_TYPES.length);
     const labels = EFFECT_TYPES.map((t) => effectDefinition(t).label);
     expect(new Set(labels).size).toBe(labels.length);
-    expect(EFFECT_GROUPS.flatMap((g) => g.types).sort()).toEqual([...EFFECT_TYPES].sort());
+    expect(EFFECT_GROUPS.flatMap((g) => g.types).sort()).toEqual(EFFECT_TYPES.filter((t) => !effectDefinition(t).hidden).sort());
+    expect(EFFECT_GROUPS.flatMap((g) => g.types)).not.toContain("plugin");
     EFFECT_GROUPS.forEach((g) => expect(g.types.length, g.name).toBeGreaterThan(0));
   });
 

@@ -23,9 +23,11 @@ const matches = (p: PluginInfo, query: string) =>
  * The browser's Plugins tab (desktop app only): the VST3 and CLAP plugins
  * the desktop app found on this computer, as instruments, effects and note
  * effects, with how the scan is going, the files that couldn't be read
- * (and why), and the folders it looks in, to which more can be added.
+ * (and why), and the folders it looks in, to which more can be added. An
+ * effect is added to the chain open in the FX rack with a click
+ * (`onAddEffect`, when one is open).
  */
-export function PluginBrowser() {
+export function PluginBrowser({ onAddEffect }: { onAddEffect?: (plugin: PluginInfo) => void } = {}) {
   const { list, error } = useSyncExternalStore(pluginStore.subscribe, () => pluginStore.current, () => pluginStore.current);
   const [query, setQuery] = useState("");
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -138,16 +140,33 @@ export function PluginBrowser() {
               </button>
               {!isCollapsed && (
                 <ul className="ml-3 flex flex-col gap-0.5 border-l border-border pl-1" aria-label={group.name}>
-                  {group.plugins.map((p) => (
-                    <li
-                      key={`${p.format}:${p.id}`}
-                      title={`${p.name}${p.vendor ? ` by ${p.vendor}` : ""} · ${FORMAT_LABELS[p.format]}${p.version ? ` ${p.version}` : ""}\n${p.path}`}
-                      className="flex min-w-0 items-center gap-1 rounded px-1.5 py-1 text-[11px] text-muted"
-                    >
-                      <span className="min-w-0 flex-1 truncate">{p.name}</span>
-                      <span className="shrink-0 rounded border border-border px-1 text-[9px] font-semibold tracking-wide">{FORMAT_LABELS[p.format]}</span>
-                    </li>
-                  ))}
+                  {group.plugins.map((p) => {
+                    const about = `${p.name}${p.vendor ? ` by ${p.vendor}` : ""} · ${FORMAT_LABELS[p.format]}${p.version ? ` ${p.version}` : ""}\n${p.path}`;
+                    const row = (
+                      <>
+                        <span className="min-w-0 flex-1 truncate">{p.name}</span>
+                        <span className="shrink-0 rounded border border-border px-1 text-[9px] font-semibold tracking-wide">{FORMAT_LABELS[p.format]}</span>
+                      </>
+                    );
+                    return (
+                      <li key={`${p.format}:${p.id}`} className="min-w-0">
+                        {p.kind === "effect" && onAddEffect ? (
+                          <button
+                            type="button"
+                            onClick={() => onAddEffect(p)}
+                            title={`${about}\nClick to add it to the chain open in the FX rack.`}
+                            className="flex w-full min-w-0 items-center gap-1 rounded border border-transparent px-1.5 py-1 text-left text-[11px] text-muted hover:border-accent hover:bg-surface-raised hover:text-accent"
+                          >
+                            {row}
+                          </button>
+                        ) : (
+                          <div title={about} className="flex min-w-0 items-center gap-1 rounded px-1.5 py-1 text-[11px] text-muted">
+                            {row}
+                          </div>
+                        )}
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </div>

@@ -29,6 +29,20 @@ export interface EffectFileRef {
   name: string;
 }
 
+/** A plugin on the computer that a plugin effect is (registry.ts's
+ * EffectInstance `plugin`): as the desktop app's scan found it, and the
+ * state it saved last (base64), which it starts from. */
+export interface PluginRef {
+  format: "vst3" | "clap";
+  /** A VST3 class id or a CLAP plugin id. */
+  id: string;
+  name: string;
+  vendor: string;
+  /** Its file or bundle. */
+  path: string;
+  state?: string;
+}
+
 /** The effect browser's sections, in order. */
 export const EFFECT_GROUP_NAMES = ["Dynamics", "EQ & Filter", "Modulation", "Distortion", "Reverb & Delay", "Amp & Cab", "Utilities"] as const;
 export type EffectGroup = (typeof EFFECT_GROUP_NAMES)[number];
@@ -44,6 +58,9 @@ export interface EffectDefinition<T extends string = string> {
   /** It takes an uploaded file (an impulse response, an amp model) as well
    * as its knobs. */
   file?: boolean;
+  /** Not in the effect browser: added some other way (a plugin, from the
+   * Plugins tab). */
+  hidden?: boolean;
 }
 
 export function defineEffect<T extends string>(definition: EffectDefinition<T>): EffectDefinition<T> {

@@ -8,7 +8,9 @@
 //! it loads takes only that process with it. What a scan finds is cached
 //! by each file's size and time, so the next one only reads what changed.
 //!
-//! Running them in the native engine comes next (docs/desktop.md).
+//! `host` runs a CLAP plugin: its instance on the main thread, its audio
+//! processor on the audio thread, its state and its window. VST3 comes
+//! next (docs/desktop.md).
 
 use std::path::PathBuf;
 
@@ -16,6 +18,7 @@ use serde::{Deserialize, Serialize};
 
 pub mod clap;
 pub mod folders;
+pub mod host;
 pub mod scan;
 pub mod vst3;
 

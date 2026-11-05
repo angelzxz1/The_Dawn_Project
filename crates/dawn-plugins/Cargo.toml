@@ -1,7 +1,7 @@
 [package]
 name = "dawn-plugins"
 version = "0.1.0"
-description = "Hosting VST3 and CLAP plugins in Dawn's desktop app: finding them, and (to come) running them in the native engine."
+description = "Hosting VST3 and CLAP plugins in Dawn's desktop app: finding them, and running them in the native engine."
 edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
@@ -10,6 +10,9 @@ publish.workspace = true
 [dependencies]
 # CLAP (MIT): loading a plugin's entry and reading its factory.
 clack-host = "0.2"
+# CLAP's extensions a host uses: a plugin's state, latency, audio ports and
+# window (put in one of the app's, by its raw window handle).
+clack-extensions = { version = "0.2", features = ["clack-host", "state", "latency", "audio-ports", "gui", "raw-window-handle_06"] }
 # The library a VST3 module is loaded with on Windows and Linux.
 libloading = "0.9"
 serde = { version = "1", features = ["derive"] }

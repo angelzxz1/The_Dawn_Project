@@ -1,32 +1,78 @@
 //! The CLAP side: an entry whose factory has the gain and the tone.
 
 use std::ffi::CStr;
+use std::io::{Read, Write};
+use std::sync::atomic::{AtomicU32, Ordering};
 
+use clack_extensions::state::{PluginState, PluginStateImpl};
 use clack_plugin::entry::prelude::*;
 use clack_plugin::plugin::features::{AUDIO_EFFECT, INSTRUMENT, STEREO, SYNTHESIZER};
 use clack_plugin::prelude::*;
+use clack_plugin::stream::{InputStream, OutputStream};
 
 use crate::{GAIN_NAME, TONE_NAME, VENDOR, VERSION};
 
 pub struct Gain;
 
 impl Plugin for Gain {
-    type AudioProcessor<'a> = GainProcessor;
-    type Shared<'a> = ();
-    type MainThread<'a> = ();
+    type AudioProcessor<'a> = GainProcessor<'a>;
+    type Shared<'a> = GainShared;
+    type MainThread<'a> = GainMain<'a>;
+
+    fn declare_extensions(builder: &mut PluginExtensions<Self>, _shared: Option<&GainShared>) {
+        builder.register::<PluginState>();
+    }
 }
 
-/// Halves what goes through it.
-pub struct GainProcessor;
+/// Its level (f32 bits): a half, until a saved state says otherwise.
+pub struct GainShared {
+    level: AtomicU32,
+}
 
-impl<'a> PluginAudioProcessor<'a, (), ()> for GainProcessor {
+impl PluginShared<'_> for GainShared {}
+
+impl GainShared {
+    fn level(&self) -> f32 {
+        f32::from_bits(self.level.load(Ordering::Relaxed))
+    }
+}
+
+pub struct GainMain<'a> {
+    shared: &'a GainShared,
+}
+
+impl<'a> PluginMainThread<'a, GainShared> for GainMain<'a> {}
+
+/// Its state is its level, as four bytes.
+impl PluginStateImpl for GainMain<'_> {
+    fn save(&self, output: &mut OutputStream) -> Result<(), PluginError> {
+        output.write_all(&self.shared.level().to_le_bytes())?;
+        Ok(())
+    }
+
+    fn load(&self, input: &mut InputStream) -> Result<(), PluginError> {
+        let mut bytes = [0u8; 4];
+        input.read_exact(&mut bytes)?;
+        self.shared
+            .level
+            .store(f32::from_le_bytes(bytes).to_bits(), Ordering::Relaxed);
+        Ok(())
+    }
+}
+
+/// Scales what goes through it by its level.
+pub struct GainProcessor<'a> {
+    shared: &'a GainShared,
+}
+
+impl<'a> PluginAudioProcessor<'a, GainShared, GainMain<'a>> for GainProcessor<'a> {
     fn activate(
         _host: HostAudioProcessorHandle<'a>,
-        _main_thread: &(),
-        _shared: &'a (),
+        _main_thread: &GainMain<'a>,
+        shared: &'a GainShared,
         _config: PluginAudioConfiguration,
     ) -> Result<Self, PluginError> {
-        Ok(Self)
+        Ok(Self { shared })
     }
 
     fn process(
@@ -35,6 +81,7 @@ impl<'a> PluginAudioProcessor<'a, (), ()> for GainProcessor {
         mut audio: Audio,
         _events: Events,
     ) -> Result<ProcessStatus, PluginError> {
+        let level = self.shared.level();
         for mut port in &mut audio {
             let Some(channels) = port.channels()?.into_f32() else {
                 continue;
@@ -45,10 +92,10 @@ impl<'a> PluginAudioProcessor<'a, (), ()> for GainProcessor {
                     ChannelPair::OutputOnly(out) => out.fill(0.0),
                     ChannelPair::InputOutput(input, out) => {
                         for (i, o) in input.iter().zip(out) {
-                            *o = i * 0.5;
+                            *o = i * level;
                         }
                     }
-                    ChannelPair::InPlace(buf) => buf.iter_mut().for_each(|s| *s *= 0.5),
+                    ChannelPair::InPlace(buf) => buf.iter_mut().for_each(|s| *s *= level),
                 }
             }
         }
@@ -155,8 +202,12 @@ impl PluginFactoryImpl for TestFactory {
             Some(PluginInstance::new::<Gain>(
                 host_info,
                 &self.gain,
-                |_| Ok(()),
-                |_, _| Ok(()),
+                |_| {
+                    Ok(GainShared {
+                        level: AtomicU32::new(0.5f32.to_bits()),
+                    })
+                },
+                |_, shared| Ok(GainMain { shared }),
             ))
         } else if Some(plugin_id) == self.tone.id() {
             Some(PluginInstance::new::<Tone>(

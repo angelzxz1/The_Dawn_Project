@@ -7,7 +7,7 @@
 import type { PresetRef } from "./presets";
 import type { SidechainRouting } from "./sidechain/sidechainModel";
 import { mbBandCount } from "./multiband/multibandModel";
-import { EFFECT_GROUP_NAMES, type EffectDefinition, type EffectFileRef, type EffectGroup, type ParamSpec } from "./types";
+import { EFFECT_GROUP_NAMES, type EffectDefinition, type EffectFileRef, type EffectGroup, type ParamSpec, type PluginRef } from "./types";
 import { compressorEffect } from "./compressor";
 import { glueEffect } from "./glue";
 import { multibandEffect } from "./multiband";
@@ -27,8 +27,9 @@ import { namAmpEffect } from "./nam-amp";
 import { irLoaderEffect } from "./ir-loader";
 import { utilityEffect } from "./utility";
 import { tunerEffect } from "./tuner";
+import { pluginEffect } from "./plugin";
 
-export type { EffectFileRef, EffectGroup, ParamSpec };
+export type { EffectFileRef, EffectGroup, ParamSpec, PluginRef };
 
 /** In the effect browser's order. */
 const EFFECTS = [
@@ -51,6 +52,7 @@ const EFFECTS = [
   irLoaderEffect,
   utilityEffect,
   tunerEffect,
+  pluginEffect,
 ] as const;
 
 export type EffectType = (typeof EFFECTS)[number]["type"];
@@ -68,7 +70,7 @@ export const EFFECT_TYPES: EffectType[] = ALL.map((e) => e.type);
  * - the sidebar renders one collapsible section per group. */
 export const EFFECT_GROUPS: { name: string; types: EffectType[] }[] = EFFECT_GROUP_NAMES.map((name) => ({
   name,
-  types: ALL.filter((e) => e.group === name).map((e) => e.type),
+  types: ALL.filter((e) => e.group === name && !e.hidden).map((e) => e.type),
 }));
 
 export const EFFECT_LABELS = Object.fromEntries(ALL.map((e) => [e.type, e.label])) as Record<EffectType, string>;
@@ -97,6 +99,8 @@ export interface EffectInstance {
   sidechain?: SidechainRouting;
   /** The preset it was last loaded from or saved as (see presets.ts). */
   preset?: PresetRef;
+  /** Only for a "plugin": which plugin, and its saved state. */
+  plugin?: PluginRef;
 }
 
 /** The params an effect offers as automation targets: continuous ones, and

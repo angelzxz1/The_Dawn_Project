@@ -403,6 +403,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "clack-extensions"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "733d43b7ebd76a65931e8de2aa077200add4902514f4bda941c99326c14937dd"
+dependencies = [
+ "bitflags 2.13.2",
+ "clack-common",
+ "clack-host",
+ "clack-plugin",
+ "clap-sys",
+ "raw-window-handle",
+]
+
+[[package]]
 name = "clack-host"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -668,6 +682,7 @@ checksum = "0c87e182de0887fd5361989c677c4e8f5000cd9491d6d563161a8f3a5519fc7f"
 name = "dawn-desktop"
 version = "0.2.0"
 dependencies = [
+ "base64 0.22.1",
  "cpal",
  "dawn-engine",
  "dawn-plugins",
@@ -686,6 +701,7 @@ version = "0.1.0"
 name = "dawn-plugins"
 version = "0.1.0"
 dependencies = [
+ "clack-extensions",
  "clack-host",
  "libloading 0.9.0",
  "objc2",
@@ -700,6 +716,7 @@ dependencies = [
 name = "dawn-test-plugin"
 version = "0.1.0"
 dependencies = [
+ "clack-extensions",
  "clack-plugin",
  "vst3",
 ]

@@ -3,13 +3,13 @@
 Read this first in a new session. It says where the project is, how the
 work is done and what comes next, then keeps the technical notes (the
 native engine's techniques, and what each finished item changed).
-Updated 2026-11-04, at `main` = `9c63222`, with step 29 not yet
+Updated 2026-11-04, at `main` = `e1f0a41`, with step 30 not yet
 committed.
 
 ## Start here
 
-- **Where we are:** Phase 8 (recording) of `nextSteps.md` is done:
-  steps 1-29 are done (step 6, NAM in the engine, was dropped). The last
+- **Where we are:** Phase 9 (plugins) of `nextSteps.md` is under way:
+  steps 1-30 are done (step 6, NAM in the engine, was dropped). The last
   few:
   - step 22, the mixer view (2026-11-02, `0078489`);
   - step 23, the mixer and piano roll in windows of their own
@@ -27,14 +27,16 @@ committed.
   - step 28, input channels on multi-input interfaces (2026-11-04,
     `9c63222`).
   - step 29, live input and recording through the engine (2026-11-04,
-    commit to come). Not yet tried on the user's interface.
-- **Next: step 30, CLAP effects in the engine** (Phase 9, plugins), with
-  their windows (in step 23's style) and their state saved. Wait for the
-  user to say "go" before starting a step: they ask for each one ("Lets
-  go with step N").
+    `e1f0a41`). Not yet tried on the user's interface.
+  - step 30, CLAP effects in the engine (2026-11-04, commit to come). Not
+    yet tried with a real plugin: only the test plugin.
+- **Next: step 31, VST3 effects** (NAM's own plugin first: it's how the
+  desktop app plays NAM models), as step 30 did CLAP's. Wait for the user
+  to say "go" before starting a step: they ask for each one ("Lets go
+  with step N").
 - **What's left after that,** in order (the full list, with sizes, is in
   `nextSteps.md`; a summary is under "The road ahead" below):
-  plugins (CLAP, VST3, plugin instruments,
+  plugins (VST3, plugin instruments,
   AU), shipping (export through the engine, native dialogs, signed
   installers), an accessibility pass, and last the desktop's driver,
   device and inputs picker, which waits for ASIO.
@@ -498,7 +500,8 @@ Temporary, never committed:
   effects; takes are written to disk and handed back from their downbeat
   (docs/desktop.md, "Recording").
 - **Not yet in the engine:** recording another track's audio, stereo
-  takes from an input pair, the loudness readout's levels, plugins. The
+  takes from an input pair, the loudness readout's levels, VST3 plugins
+  and plugin instruments (CLAP effects play, step 30). The
   NAM Amp won't be (NAM's own plugin will play it).
 
 ## The native engine plan, stage by stage
@@ -644,7 +647,7 @@ ahead" above).
    `curveShape`'s cases, the settings made every 50 ms, a reverb's decay
    stepping), `describe.test.ts`, and a test of the desktop's reader.
 4. **Live input and recording through the engine:** done 2026-11-04
-   (step 29, commit to come). `src-tauri/src/audio/stream.rs` opens the
+   (step 29, `e1f0a41`). `src-tauri/src/audio/stream.rs` opens the
    input (`Request.input`; none named: the output device if it records,
    else its driver's default) at the output's rate; its callback puts
    samples on a ring, and the output's callback takes a block's worth
@@ -674,8 +677,34 @@ ahead" above).
    (the input opened and metered, monitoring, a take, the measurement),
    `NativeEngineSection.test.tsx`, `TrackHeader.test.tsx`,
    `audioPrefs.test.ts`.
-5. **Plugins:** P2 CLAP effects in the engine (with their windows and
-   state saved), P3 VST3 effects, P4 plugin instruments, P5 Audio Units.
+5. **Plugins:** P2 CLAP effects in the engine: done 2026-11-04 (step 30,
+   commit to come). `crates/dawn-plugins/src/host.rs` hosts a CLAP plugin
+   with clack (`ClapPlugin` on the main thread: state, latency, audio
+   ports, GUI; `ClapProcessor` on the audio thread, which goes back to its
+   `Home` when dropped, and `reclaim` stops and deactivates it). The engine
+   has `EffectSettings::Plugin` (`PluginSettings`: a `PluginSlot` and the
+   latency) and `Kernel::Plugin`; `Song::prepare` makes a plugin's effect
+   only when its slot holds a processor, so the one playing carries on
+   otherwise (set_song swaps it in by id and kind).
+   `src-tauri/src/audio/hosted.rs` keeps the instances in a thread-local
+   on the main thread (the sync commands run there): `make` from
+   `song::build_with`, `begin_song`/`end_song` around it (instances of
+   gone effects are destroyed once home), `tick` from `engine_status`
+   (callbacks, GUI resizes, closed windows, and the dirty states it
+   reports), and the windows (`tauri::window::WindowBuilder`, the
+   `unstable` feature; the GUI embedded via raw-window-handle). In the
+   studio: effect type `plugin` (`src/effects/plugin/`, `hidden` from the
+   effect list), `EffectInstance.plugin` (`PluginRef`, with `state` in
+   base64, checked by the schema), `effectActions.addPlugin` and
+   `setPluginState` (no undo step), the Plugins tab's click to add, and
+   `nativeEngine.ts` keeping a dirty plugin's state. The test plugin's
+   gain saves its level as its state. Tests: `crates/dawn-plugins/tests/
+   host.rs`, `tests/effects.rs`'s plugin test, the desktop's song reader
+   test, `describe.test.ts`, `effectActions.test.ts`,
+   `PluginBrowser.test.tsx`, `PluginEffectCard.test.tsx`,
+   `nativeEngine.test.tsx`, `projectSchema.test.ts`. Not yet: automating
+   a plugin's parameters, its sidechain input. Then P3 VST3 effects, P4
+   plugin instruments, P5 Audio Units.
 6. **Export** through the engine, native file dialogs, signed installers.
 
 ## Item log: the studio's improvements
@@ -977,9 +1006,9 @@ the order they were done, with the fixes made along the way.
     `inputChannels.test.ts`, `TrackHeader.test.tsx`,
     `projectSchema.test.ts`, `e2e/recording.spec.ts` (input 2 of the
     fake microphone, which has two channels).
-  - Item 27 is open. Next in `nextSteps.md` is Phase 9, step 30 (CLAP
-    effects in the engine); steps 24, 25 and 29 (sidechains, automation
-    and recording in the engine) are logged under "The native engine
+  - Item 27 is open. Next in `nextSteps.md` is Phase 9, step 31 (VST3
+    effects); steps 24, 25, 29 and 30 (sidechains, automation, recording
+    and CLAP effects in the engine) are logged under "The native engine
     plan".
   - Fixed 2026-10-31: on Windows, Next's static export wrote each page's
     prefetch files as folders (`__next.!KHNpdGUp/__PAGE__.txt`, from a

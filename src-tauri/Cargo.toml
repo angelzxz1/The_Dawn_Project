@@ -30,4 +30,7 @@ dawn-plugins = { path = "../crates/dawn-plugins" }
 rtrb = "0.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tauri = { version = "2.12", features = [] }
+# A plugin's saved state, as the project keeps it.
+base64 = "0.22"
+# "unstable": windows without a webview, for plugins' own windows.
+tauri = { version = "2.12", features = ["unstable"] }

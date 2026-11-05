@@ -8,7 +8,7 @@
 import { audioEngine } from "@/engine/audioEngine";
 import type { EffectChain } from "@/effects/chains";
 import { discardEffectFile, importAudioEffectFile, importNamModelFile } from "@/effects/effectFiles";
-import type { EffectFileRef, EffectInstance, EffectType } from "@/effects/registry";
+import type { EffectFileRef, EffectInstance, EffectType, PluginRef } from "@/effects/registry";
 import { MAX_IR_SECONDS } from "@/effects/ir-loader/irModel";
 import { findPreset, paramsFromPreset } from "@/effects/presets";
 import type { SidechainRouting } from "@/effects/sidechain/sidechainModel";
@@ -34,6 +34,15 @@ function updateEffects(hostId: string, update: (list: EffectInstance[]) => Effec
 
 const updateEffect = (hostId: string, effectId: string, change: (e: EffectInstance) => EffectInstance) =>
   updateEffects(hostId, (list) => list.map((e) => (e.id === effectId ? change(e) : e)));
+
+/** The track, bus or "master" an effect is on, if it's anywhere. */
+export function hostOfEffect(effectId: string): string | null {
+  const doc = projectStore.get();
+  if (doc.masterEffects.some((e) => e.id === effectId)) return "master";
+  const among = (chains: Record<string, EffectInstance[]>) =>
+    Object.entries(chains).find(([, list]) => list.some((e) => e.id === effectId))?.[0] ?? null;
+  return among(doc.channelEffects) ?? among(doc.busEffects);
+}
 
 /** A newly added effect with a preset loaded into it (as is, if there's no
  * such preset). */
@@ -78,6 +87,30 @@ function place(hostId: string, sources: EffectInstance[], atIndex?: number): Eff
 }
 
 export const effectActions = {
+  /** Adds a plugin (from the Plugins tab) as an effect at `atIndex` (or
+   * the end). Returns its id. */
+  addPlugin(hostId: string, plugin: PluginRef, atIndex?: number): string | null {
+    projectStore.push();
+    const added = audioEngine.addEffect(hostId, "plugin", undefined, atIndex);
+    if (!added) return null;
+    const created: EffectInstance = { ...added, plugin: { ...plugin } };
+    updateEffects(hostId, (prev) => {
+      const list = [...prev];
+      if (atIndex !== undefined && atIndex >= 0 && atIndex <= list.length) list.splice(atIndex, 0, created);
+      else list.push(created);
+      return list;
+    });
+    return created.id;
+  },
+
+  /** Keeps a plugin effect's state (base64) as the plugin saved it. Not
+   * an edit of the user's (no undo step): the plugin's own. */
+  setPluginState(effectId: string, state: string): void {
+    const hostId = hostOfEffect(effectId);
+    if (!hostId) return;
+    updateEffect(hostId, effectId, (e) => (e.plugin && e.plugin.state !== state ? { ...e, plugin: { ...e.plugin, state } } : e));
+  },
+
   /** Adds an effect at `atIndex` (or the end), optionally with a preset
    * and a file (a cabinet, an amp model) loaded. Returns its id. */
   add(hostId: string, type: EffectType, atIndex?: number, presetId?: string, file?: EffectFileRef): string | null {

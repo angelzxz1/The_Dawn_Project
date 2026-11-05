@@ -47,11 +47,11 @@ beforeEach(() => {
   bridge.list.mockResolvedValue(LIST);
 });
 
-async function renderTab() {
+async function renderTab(onAddEffect?: (p: PluginInfo) => void) {
   await plugins.refresh();
   return render(
     <div className="flex h-[600px] w-48 flex-col">
-      <PluginBrowser />
+      <PluginBrowser onAddEffect={onAddEffect} />
     </div>
   );
 }
@@ -136,5 +136,14 @@ describe("the Plugins tab", () => {
     for (const tab of tabs.elements()) expect(tab.scrollWidth).toBeLessThanOrEqual(tab.clientWidth);
     await userEvent.click(screen.getByRole("tab", { name: "Plugins" }));
     await expect.element(screen.getByText("4 plugins found")).toBeVisible();
+  });
+
+  test("an effect is added to the chain open in the rack with a click; an instrument isn't", async () => {
+    const add = vi.fn();
+    const screen = await renderTab(add);
+    const effects = screen.getByRole("list", { name: "Effects", exact: true });
+    await effects.getByRole("button").nth(1).click();
+    expect(add).toHaveBeenCalledWith(expect.objectContaining({ name: "Echoes", format: "clap" }));
+    await expect.element(screen.getByRole("list", { name: "Instruments", exact: true }).getByRole("button")).not.toBeInTheDocument();
   });
 });

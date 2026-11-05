@@ -9,6 +9,7 @@
 //! disk (`engine_record`, then `engine_finish_take` hands it the take).
 
 pub mod devices;
+pub mod hosted;
 pub mod song;
 pub mod stream;
 pub mod take;
@@ -118,8 +119,31 @@ pub async fn audio_open(
 
 #[tauri::command]
 pub fn audio_close(state: State<'_, AudioState>) {
-    let running = state.lock().running.take();
+    let running = {
+        let mut inner = state.lock();
+        inner.song = None;
+        inner.running.take()
+    };
     drop(running);
+    // The engine's gone, and with it the plugins' processors: they go too.
+    hosted::forget_all();
+}
+
+/// Opens a plugin effect's own window (or brings it forward).
+#[tauri::command]
+pub fn plugin_window_open(app: AppHandle, effect: String, title: String) -> Result<(), String> {
+    hosted::open_window(&app, &effect, &title)
+}
+
+#[tauri::command]
+pub fn plugin_window_close(effect: String) {
+    hosted::close(&effect);
+}
+
+/// A plugin effect's state now (base64), for the project to keep.
+#[tauri::command]
+pub fn plugin_state(effect: String) -> Result<String, String> {
+    hosted::state(&effect)
 }
 
 /// A track hearing the interface's input live: its id, and the input's
@@ -307,13 +331,21 @@ pub fn engine_set_song(state: State<'_, AudioState>, song: SongSpec) -> Result<S
         .as_ref()
         .ok_or("No audio device is open.")?
         .sample_rate;
-    let (mut built, missing) = song::build(&song, inner.song.as_ref(), &inner.audio, sample_rate);
+    hosted::begin_song();
+    let (mut built, missing) = song::build_with(
+        &song,
+        inner.song.as_ref(),
+        &inner.audio,
+        sample_rate,
+        &|id, spec| hosted::make(id, spec, sample_rate),
+    );
     // The effects' impulses are made on the song kept to follow, so the
     // next version keeps them when they're the same.
     built.prepare_effects(inner.song.as_ref(), sample_rate);
     let prepared = Box::new(built.clone().prepare(inner.song.as_ref(), sample_rate));
     inner.send(Command::Song(prepared))?;
     inner.song = Some(built);
+    hosted::end_song();
     Ok(SongSent { missing })
 }
 
@@ -437,6 +469,18 @@ pub struct EngineStatus {
     round_trip: f32,
     /// The take being recorded, if one is.
     take: Option<TakeStatus>,
+    /// The plugin effects whose state changed (to be saved), and why any
+    /// that couldn't run didn't.
+    plugins: PluginsStatus,
+}
+
+#[derive(Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct PluginsStatus {
+    dirty: Vec<String>,
+    errors: Vec<(String, String)>,
+    /// The effects whose plugin window is open.
+    windows: Vec<String>,
 }
 
 #[derive(Serialize)]
@@ -516,6 +560,7 @@ pub fn engine_status(state: State<'_, AudioState>) -> EngineStatus {
             inputs: vec![],
             round_trip: 0.0,
             take: None,
+            plugins: PluginsStatus::default(),
         };
     };
     let (tracks, buses) = inner
@@ -537,6 +582,11 @@ pub fn engine_status(state: State<'_, AudioState>) -> EngineStatus {
         errors: s.errors(),
         inputs: s.take_input_peaks(r.input.as_ref().map_or(0, |i| i.channels)),
         round_trip: s.round_trip(),
+        plugins: PluginsStatus {
+            dirty: hosted::tick(),
+            errors: hosted::errors(),
+            windows: hosted::open_windows(),
+        },
         take: take.map(|(min, max)| {
             let clock = s.take_clock();
             TakeStatus {

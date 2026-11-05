@@ -2,7 +2,7 @@
 // components take whichever of these they need (see each folder's ui.ts).
 
 import type { ComponentType } from "react";
-import type { EffectFileRef } from "../types";
+import type { EffectFileRef, PluginRef } from "../types";
 import type { SidechainRouting } from "../sidechain/sidechainModel";
 import type { SidechainSource } from "../sidechain/SidechainPanel";
 
@@ -24,6 +24,8 @@ export interface EffectCardProps {
   onParamDragStart?: () => void;
   onLoadFile: (file: File) => Promise<string | null>;
   onClearFile: () => void;
+  /** A plugin effect's plugin. */
+  plugin?: PluginRef;
 }
 
 export interface EffectWindowProps {
@@ -47,6 +49,8 @@ export interface EffectWindowProps {
   onClearFile: () => void;
   /** Loads one of Dawn's own files (a cabinet, a tone) by reference. */
   onPickFile: (ref: EffectFileRef) => void;
+  /** A plugin effect's plugin. */
+  plugin?: PluginRef;
 }
 
 export interface EffectUi {

@@ -24,6 +24,7 @@ import { namAmpAudio } from "./nam-amp/audio";
 import { irLoaderAudio } from "./ir-loader/audio";
 import { utilityAudio } from "./utility/audio";
 import { tunerAudio } from "./tuner/audio";
+import { pluginAudio } from "./plugin/audio";
 
 export { DelayChain } from "./delay/delayChain";
 export { ReverbChain } from "./reverb/reverbChain";
@@ -51,6 +52,7 @@ const AUDIO: Record<EffectType, EffectAudio> = {
   irLoader: irLoaderAudio,
   utility: utilityAudio,
   tuner: tunerAudio,
+  plugin: pluginAudio,
 };
 
 export function createEffectNode(type: EffectType, savedParams: Record<string, number>): Tone.ToneAudioNode {
