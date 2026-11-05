@@ -20,11 +20,9 @@ function usePluginState(effectId: string, plugin: PluginRef | undefined) {
   const error = native.plugins.errors[effectId] ?? null;
   const why = !plugin
     ? "This plugin's details are missing."
-    : plugin.format !== "clap"
-      ? "VST3 plugins play in the native engine soon; for now only CLAP ones do."
-      : !native.active
-        ? "Plays in the desktop app's native engine: turn it on in Audio settings."
-        : error;
+    : !native.active
+      ? "Plays in the desktop app's native engine: turn it on in Audio settings."
+      : error;
   return { canOpen: why === null, why, open: native.plugins.windows.includes(effectId) };
 }
 

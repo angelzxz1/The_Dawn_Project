@@ -3,13 +3,13 @@
 Read this first in a new session. It says where the project is, how the
 work is done and what comes next, then keeps the technical notes (the
 native engine's techniques, and what each finished item changed).
-Updated 2026-11-04, at `main` = `e1f0a41`, with step 30 not yet
+Updated 2026-11-04, at `main` = `3d3dbb5`, with step 31 not yet
 committed.
 
 ## Start here
 
 - **Where we are:** Phase 9 (plugins) of `nextSteps.md` is under way:
-  steps 1-30 are done (step 6, NAM in the engine, was dropped). The last
+  steps 1-31 are done (step 6, NAM in the engine, was dropped). The last
   few:
   - step 22, the mixer view (2026-11-02, `0078489`);
   - step 23, the mixer and piano roll in windows of their own
@@ -28,15 +28,16 @@ committed.
     `9c63222`).
   - step 29, live input and recording through the engine (2026-11-04,
     `e1f0a41`). Not yet tried on the user's interface.
-  - step 30, CLAP effects in the engine (2026-11-04, commit to come). Not
+  - step 30, CLAP effects in the engine (2026-11-04, `3d3dbb5`). Not
     yet tried with a real plugin: only the test plugin.
-- **Next: step 31, VST3 effects** (NAM's own plugin first: it's how the
-  desktop app plays NAM models), as step 30 did CLAP's. Wait for the user
-  to say "go" before starting a step: they ask for each one ("Lets go
-  with step N").
+  - step 31, VST3 effects in the engine (2026-11-04, commit to come). Not
+    yet tried with a real plugin either (NAM's is the first to try).
+- **Next: step 32, plugin instruments** on MIDI tracks, played from clips
+  and live (VST3 and CLAP). Wait for the user to say "go" before starting
+  a step: they ask for each one ("Lets go with step N").
 - **What's left after that,** in order (the full list, with sizes, is in
   `nextSteps.md`; a summary is under "The road ahead" below):
-  plugins (VST3, plugin instruments,
+  plugins (plugin instruments,
   AU), shipping (export through the engine, native dialogs, signed
   installers), an accessibility pass, and last the desktop's driver,
   device and inputs picker, which waits for ASIO.
@@ -500,8 +501,8 @@ Temporary, never committed:
   effects; takes are written to disk and handed back from their downbeat
   (docs/desktop.md, "Recording").
 - **Not yet in the engine:** recording another track's audio, stereo
-  takes from an input pair, the loudness readout's levels, VST3 plugins
-  and plugin instruments (CLAP effects play, step 30). The
+  takes from an input pair, the loudness readout's levels, plugin
+  instruments (VST3 and CLAP effects play, steps 30-31). The
   NAM Amp won't be (NAM's own plugin will play it).
 
 ## The native engine plan, stage by stage
@@ -678,7 +679,7 @@ ahead" above).
    `NativeEngineSection.test.tsx`, `TrackHeader.test.tsx`,
    `audioPrefs.test.ts`.
 5. **Plugins:** P2 CLAP effects in the engine: done 2026-11-04 (step 30,
-   commit to come). `crates/dawn-plugins/src/host.rs` hosts a CLAP plugin
+   `3d3dbb5`). `crates/dawn-plugins/src/host.rs` hosts a CLAP plugin
    with clack (`ClapPlugin` on the main thread: state, latency, audio
    ports, GUI; `ClapProcessor` on the audio thread, which goes back to its
    `Home` when dropped, and `reclaim` stops and deactivates it). The engine
@@ -703,8 +704,28 @@ ahead" above).
    test, `describe.test.ts`, `effectActions.test.ts`,
    `PluginBrowser.test.tsx`, `PluginEffectCard.test.tsx`,
    `nativeEngine.test.tsx`, `projectSchema.test.ts`. Not yet: automating
-   a plugin's parameters, its sidechain input. Then P3 VST3 effects, P4
-   plugin instruments, P5 Audio Units.
+   a plugin's parameters, its sidechain input. Then P3 VST3 effects: done
+   2026-11-04 (step 31, commit to come). `crates/dawn-plugins/src/
+   vst3_host.rs` (`Vst3Plugin`, `Vst3Processor`, the same home-and-reclaim
+   lifecycle as CLAP's, a shared `AtomicBool` for home): the component
+   from the factory (`initialize` with the host), its `IAudioProcessor`,
+   the controller (the component cast, or its controller class made and
+   initialized, connected both ways through `IConnectionPoint`, given the
+   component's state with `setComponentState`). The host objects are Rust
+   COM classes: `Host` (IHostApplication, whose `createInstance` makes
+   `Message`/`Attributes`; IComponentHandler, whose edits go on an rtrb
+   ring to the processor, which builds `Changes`/`Queue`
+   (IParameterChanges, made beforehand) each block; IPlugFrame, whose
+   resize is taken in `tick`) and `Stream` (IBStream). State: component
+   then controller, each length-prefixed. Activation: stereo bus
+   arrangements asked for, every audio bus activated, `setupProcessing`
+   (realtime, 32-bit, 2048), `setActive`, `setProcessing`. The editor:
+   `createView("editor")`, `setFrame`, `attached(HWND or NSView)`.
+   `hosted.rs` wraps both formats in `Instance`. The test plugin's VST3
+   gain now runs (a processor with its level as its state and parameter
+   0, and a separate controller). Tests: `tests/host.rs` (state, a block,
+   an edit from its window, home and out again). Then P4 plugin
+   instruments, P5 Audio Units.
 6. **Export** through the engine, native file dialogs, signed installers.
 
 ## Item log: the studio's improvements
@@ -1006,10 +1027,10 @@ the order they were done, with the fixes made along the way.
     `inputChannels.test.ts`, `TrackHeader.test.tsx`,
     `projectSchema.test.ts`, `e2e/recording.spec.ts` (input 2 of the
     fake microphone, which has two channels).
-  - Item 27 is open. Next in `nextSteps.md` is Phase 9, step 31 (VST3
-    effects); steps 24, 25, 29 and 30 (sidechains, automation, recording
-    and CLAP effects in the engine) are logged under "The native engine
-    plan".
+  - Item 27 is open. Next in `nextSteps.md` is Phase 9, step 32 (plugin
+    instruments); steps 24, 25 and 29-31 (sidechains, automation,
+    recording, and CLAP and VST3 effects in the engine) are logged under
+    "The native engine plan".
   - Fixed 2026-10-31: on Windows, Next's static export wrote each page's
     prefetch files as folders (`__next.!KHNpdGUp/__PAGE__.txt`, from a
     backslash it doesn't turn into a dot) where its router asks for

@@ -194,9 +194,8 @@ function nativeInstrument(channel: ChannelConfig, ids: NativeAudioIds): NativeIn
   return null;
 }
 
-/** Whether the engine plays an effect (of plugins, the CLAP ones so far). */
-const plays = (fx: EffectInstance) =>
-  fx.type === "plugin" ? fx.plugin?.format === "clap" : NATIVE_EFFECTS.includes(fx.type);
+/** Whether the engine plays an effect (a plugin, CLAP or VST3, it runs). */
+const plays = (fx: EffectInstance) => (fx.type === "plugin" ? !!fx.plugin : NATIVE_EFFECTS.includes(fx.type));
 
 /** The sidechains to connect: effect id -> its source's id. As the
  * browser's engine connects them (mixGraph.ts): in order, leaving out a

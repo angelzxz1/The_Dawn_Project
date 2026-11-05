@@ -1,8 +1,9 @@
-//! The plugins the engine runs (`dawn_plugins::host`), kept on the app's
-//! main thread: CLAP asks for an instance's main-thread calls on one
-//! thread, and Tauri runs the commands that aren't async on it (setting the
-//! song, the status, the plugins' windows and states). So this lives in a
-//! thread-local, and only those commands reach it.
+//! The plugins the engine runs (CLAP through `dawn_plugins::host`, VST3
+//! through `dawn_plugins::vst3_host`), kept on the app's main thread: both
+//! formats ask for an instance's main-thread calls on one thread, and Tauri
+//! runs the commands that aren't async on it (setting the song, the status,
+//! the plugins' windows and states). So this lives in a thread-local, and
+//! only those commands reach it.
 //!
 //! Each plugin effect (by the studio's effect id) has its instance. Making
 //! the song asks for its processor (`make`), which goes into the effect's
@@ -21,16 +22,146 @@ use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
 use dawn_engine::mix::{PluginProcessor, PluginSettings, PluginSlot};
 use dawn_plugins::host::{ClapPlugin, ClapProcessor, ParentWindow, PluginEntry, load_entry};
+use dawn_plugins::vst3::Module;
+use dawn_plugins::vst3_host::{Vst3Plugin, Vst3Processor, load_module};
+use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use tauri::{AppHandle, LogicalSize, PhysicalSize, WindowEvent};
 
 use super::song::PluginSpec;
 
-/// A plugin's processor, as the engine runs it.
-struct Running(ClapProcessor);
+/// A CLAP plugin's processor, as the engine runs it.
+struct Clap(ClapProcessor);
 
-impl PluginProcessor for Running {
+impl PluginProcessor for Clap {
     fn process(&mut self, l: &mut [f32], r: &mut [f32]) {
         self.0.process(l, r);
+    }
+}
+
+/// A VST3 plugin's.
+struct Vst3(Vst3Processor);
+
+impl PluginProcessor for Vst3 {
+    fn process(&mut self, l: &mut [f32], r: &mut [f32]) {
+        self.0.process(l, r);
+    }
+}
+
+/// An instance of a plugin, whichever its format.
+enum Instance {
+    Clap(ClapPlugin),
+    Vst3(Vst3Plugin),
+}
+
+impl Instance {
+    fn reclaim(&mut self) {
+        match self {
+            Self::Clap(p) => p.reclaim(),
+            Self::Vst3(p) => p.reclaim(),
+        }
+    }
+
+    fn is_out(&self) -> bool {
+        match self {
+            Self::Clap(p) => p.is_out(),
+            Self::Vst3(p) => p.is_out(),
+        }
+    }
+
+    fn load_state(&mut self, bytes: &[u8]) -> Result<(), String> {
+        match self {
+            Self::Clap(p) => p.load_state(bytes),
+            Self::Vst3(p) => p.load_state(bytes),
+        }
+    }
+
+    fn save_state(&mut self) -> Result<Vec<u8>, String> {
+        match self {
+            Self::Clap(p) => p.save_state(),
+            Self::Vst3(p) => p.save_state(),
+        }
+    }
+
+    fn take_dirty(&self) -> bool {
+        match self {
+            Self::Clap(p) => p.take_dirty(),
+            Self::Vst3(p) => p.take_dirty(),
+        }
+    }
+
+    fn latency(&mut self) -> u32 {
+        match self {
+            Self::Clap(p) => p.latency(),
+            Self::Vst3(p) => p.latency(),
+        }
+    }
+
+    fn processor(&mut self, sample_rate: f64) -> Result<Option<Box<dyn PluginProcessor>>, String> {
+        Ok(match self {
+            Self::Clap(p) => p
+                .processor(sample_rate)?
+                .map(|p| Box::new(Clap(p)) as Box<dyn PluginProcessor>),
+            Self::Vst3(p) => p
+                .processor(sample_rate)?
+                .map(|p| Box::new(Vst3(p)) as Box<dyn PluginProcessor>),
+        })
+    }
+
+    fn tick(&mut self) {
+        match self {
+            Self::Clap(p) => p.tick(),
+            Self::Vst3(p) => p.tick(),
+        }
+    }
+
+    fn close_gui(&mut self) {
+        match self {
+            Self::Clap(p) => p.close_gui(),
+            Self::Vst3(p) => p.close_gui(),
+        }
+    }
+
+    /// A size its window asked for: (width, height, in logical pixels).
+    fn take_gui_resize(&mut self) -> Option<(u32, u32, bool)> {
+        match self {
+            Self::Clap(p) => p.take_gui_resize().map(|s| (s.width, s.height, false)),
+            Self::Vst3(p) => p
+                .take_gui_resize()
+                .map(|(w, h)| (w.max(1) as u32, h.max(1) as u32, cfg!(target_os = "macos"))),
+        }
+    }
+
+    fn take_gui_closed(&mut self) -> bool {
+        match self {
+            Self::Clap(p) => p.take_gui_closed(),
+            Self::Vst3(_) => false,
+        }
+    }
+
+    /// Puts its window in ours: how big it is, and whether in logical pixels.
+    ///
+    /// # Safety
+    /// `window` must stay until `close_gui`.
+    unsafe fn open_gui(&mut self, window: &tauri::Window) -> Result<(u32, u32, bool), String> {
+        match self {
+            Self::Clap(p) => {
+                let parent = ParentWindow::from_window(window).ok_or("No window to put it in.")?;
+                // SAFETY: as this function's.
+                let (size, logical) = unsafe { p.open_gui(parent) }?;
+                Ok((size.width, size.height, logical))
+            }
+            Self::Vst3(p) => {
+                let handle = window.window_handle().map_err(|e| format!("{e}"))?;
+                let parent = match handle.as_raw() {
+                    RawWindowHandle::Win32(h) => h.hwnd.get() as *mut std::ffi::c_void,
+                    RawWindowHandle::AppKit(h) => h.ns_view.as_ptr(),
+                    _ => return Err("The plugin's window doesn't work on this system.".into()),
+                };
+                // SAFETY: as this function's.
+                let (w, h) = unsafe { p.open_gui(parent) }?;
+                Ok((w.max(1) as u32, h.max(1) as u32, cfg!(target_os = "macos")))
+            }
+        }
     }
 }
 
@@ -38,13 +169,14 @@ struct Hosted {
     /// Its file and plugin id: another means another instance.
     file: String,
     id: String,
-    plugin: ClapPlugin,
+    plugin: Instance,
     window: Option<tauri::Window>,
 }
 
 #[derive(Default)]
 struct Host {
     entries: HashMap<PathBuf, PluginEntry>,
+    modules: HashMap<PathBuf, Arc<Module>>,
     plugins: HashMap<String, Hosted>,
     /// The effects the song has now.
     wanted: HashSet<String>,
@@ -63,8 +195,8 @@ fn with<R>(f: impl FnOnce(&mut Host) -> R) -> R {
 
 impl Host {
     fn instance(&mut self, effect: &str, spec: &PluginSpec) -> Result<&mut Hosted, String> {
-        if spec.format != "clap" {
-            return Err("Only CLAP plugins run in the engine so far.".into());
+        if spec.format != "clap" && spec.format != "vst3" {
+            return Err("That plugin format doesn't run in the engine.".into());
         }
         let stale = self
             .plugins
@@ -81,14 +213,26 @@ impl Host {
         }
         if !self.plugins.contains_key(effect) {
             let path = PathBuf::from(&spec.path);
-            if !self.entries.contains_key(&path) {
-                // SAFETY: a plugin the user put in their project; it runs
-                // its own code, as every host lets it.
-                let entry = unsafe { load_entry(&path) }?;
-                self.entries.insert(path.clone(), entry);
-            }
-            let entry = &self.entries[&path];
-            let mut plugin = ClapPlugin::new(entry, &spec.id, Arc::new(|| {}))?;
+            let mut plugin = if spec.format == "vst3" {
+                if !self.modules.contains_key(&path) {
+                    // SAFETY: a plugin the user put in their project; it
+                    // runs its own code, as every host lets it.
+                    let module = unsafe { load_module(&path) }?;
+                    self.modules.insert(path.clone(), module);
+                }
+                Instance::Vst3(Vst3Plugin::new(self.modules[&path].clone(), &spec.id)?)
+            } else {
+                if !self.entries.contains_key(&path) {
+                    // SAFETY: as above.
+                    let entry = unsafe { load_entry(&path) }?;
+                    self.entries.insert(path.clone(), entry);
+                }
+                Instance::Clap(ClapPlugin::new(
+                    &self.entries[&path],
+                    &spec.id,
+                    Arc::new(|| {}),
+                )?)
+            };
             if let Some(state) = spec.state.as_deref().filter(|s| !s.is_empty()) {
                 let bytes = STANDARD
                     .decode(state)
@@ -145,9 +289,7 @@ pub fn make(effect: &str, spec: &PluginSpec, sample_rate: f64) -> Option<PluginS
             let processor = h.plugin.processor(sample_rate)?;
             let latency = h.plugin.latency() as usize;
             Ok(PluginSettings {
-                slot: Arc::new(PluginSlot::new(
-                    processor.map(|p| Box::new(Running(p)) as Box<dyn PluginProcessor>),
-                )),
+                slot: Arc::new(PluginSlot::new(processor)),
                 latency,
             })
         });
@@ -183,8 +325,14 @@ pub fn tick() -> Vec<String> {
         let mut dirty = Vec::new();
         for (id, h) in &mut host.plugins {
             h.plugin.tick();
-            if let (Some(size), Some(w)) = (h.plugin.take_gui_resize(), &h.window) {
-                let _ = w.set_size(PhysicalSize::new(size.width, size.height));
+            if let (Some((width, height, logical)), Some(w)) =
+                (h.plugin.take_gui_resize(), &h.window)
+            {
+                let _ = if logical {
+                    w.set_size(LogicalSize::new(width, height))
+                } else {
+                    w.set_size(PhysicalSize::new(width, height))
+                };
             }
             if h.plugin.take_gui_closed() {
                 if let Some(w) = h.window.take() {
@@ -256,14 +404,13 @@ pub fn open_window(app: &AppHandle, effect: &str, title: &str) -> Result<(), Str
             .plugins
             .get_mut(effect)
             .ok_or("That plugin isn't running.".to_owned())?;
-        let parent = ParentWindow::from_window(&window).ok_or("No window to put it in.")?;
         // SAFETY: the window stays until the plugin's GUI is closed
         // (close_window, and the close request below).
-        let (size, logical) = unsafe { h.plugin.open_gui(parent) }?;
+        let size = unsafe { h.plugin.open_gui(&window) }?;
         h.window = Some(window.clone());
-        Ok::<_, String>((size, logical))
+        Ok::<_, String>(size)
     });
-    let (size, logical) = match opened {
+    let (width, height, logical) = match opened {
         Ok(v) => v,
         Err(e) => {
             let _ = window.destroy();
@@ -271,9 +418,9 @@ pub fn open_window(app: &AppHandle, effect: &str, title: &str) -> Result<(), Str
         }
     };
     let _ = if logical {
-        window.set_size(LogicalSize::new(size.width, size.height))
+        window.set_size(LogicalSize::new(width, height))
     } else {
-        window.set_size(PhysicalSize::new(size.width, size.height))
+        window.set_size(PhysicalSize::new(width, height))
     };
     let _ = window.show();
     // Closing it closes the plugin's GUI first, then the window (on the main

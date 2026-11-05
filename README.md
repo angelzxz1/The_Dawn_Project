@@ -400,11 +400,11 @@ Ableton's device browser does it. Every effect can be bypassed, reordered,
 automated and saved as a preset, and most come with factory presets.
 
 In the desktop app, the **Plugins** tab lists the VST3 and CLAP plugins on
-your computer. With a track's FX rack open, click a CLAP effect to add it
-to the chain: it plays in the native engine, **Open its window** on its
-card shows the plugin's own window, and what you set in it is saved with
-the project. VST3 effects and plugin instruments come next
-([docs/desktop.md](docs/desktop.md)).
+your computer. With a track's FX rack open, click a VST3 or CLAP effect to
+add it to the chain: it plays in the native engine, **Open its window** on
+its card shows the plugin's own window, and what you set in it is saved
+with the project. NAM's own plugin plays NAM models this way. Plugin
+instruments come next ([docs/desktop.md](docs/desktop.md)).
 
 ### Dynamics
 

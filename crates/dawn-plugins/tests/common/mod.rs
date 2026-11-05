@@ -58,3 +58,23 @@ pub fn clap_file(folder: &Path, name: &str) -> PathBuf {
     }
     path
 }
+
+/// Lays the library out as a VST3 bundle named `name`.
+pub fn vst3_bundle(folder: &Path, name: &str) -> PathBuf {
+    let bundle = folder.join(format!("{name}.vst3"));
+    let (arch, file) = match std::env::consts::OS {
+        "windows" => ("x86_64-win".to_owned(), format!("{name}.vst3")),
+        "macos" => ("MacOS".to_owned(), name.to_owned()),
+        _ => (
+            format!("{}-linux", std::env::consts::ARCH),
+            format!("{name}.so"),
+        ),
+    };
+    let binary_folder = bundle.join("Contents").join(arch);
+    std::fs::create_dir_all(&binary_folder).unwrap();
+    std::fs::copy(test_plugin(), binary_folder.join(file)).unwrap();
+    if cfg!(target_os = "macos") {
+        info_plist(&bundle, name);
+    }
+    bundle
+}

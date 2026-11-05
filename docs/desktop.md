@@ -412,8 +412,8 @@ back with the song, to be freed off the audio thread.
 
 The app finds the VST3 and CLAP plugins on the computer and lists them in
 the browser's **Plugins** tab (instruments, effects and note effects, each
-with its format). CLAP effects play in the native engine (below); VST3
-effects, plugin instruments and Audio Units come next.
+with its format). VST3 and CLAP effects play in the native engine
+(below); plugin instruments and Audio Units come next.
 
 ### Where it looks
 
@@ -458,10 +458,11 @@ What a scan finds is cached in `plugins.json` in the app's data folder, by
 file, with each binary's size and time: the next scan (each time the studio
 opens, or the Rescan button) only reads what's new or changed.
 
-### Running a CLAP effect
+### Running a plugin effect
 
 With a track's (or a bus's, or the master's) FX rack open, clicking an
-effect in the Plugins tab adds it to that chain as a **plugin effect**: the
+effect (VST3 or CLAP) in the Plugins tab adds it to that chain as a
+**plugin effect**: the
 project keeps which plugin it is (its format, id, name, maker and file) and
 the state it saved last, and nothing of Dawn's own. Its rack card has
 **Open its window**, which opens the plugin's own window. It plays in the
@@ -491,6 +492,22 @@ card says so.
   says (embedded, at the size it asks for, and resized when it asks).
   Closing the window closes the plugin's GUI first.
 
+A **VST3** effect runs the same way (`crates/dawn-plugins/src/vst3_host.rs`,
+on the `vst3` bindings): its component is made from the module's factory
+and given the host application, its audio processor goes to the audio
+thread, and its edit controller is the component itself or an object of its
+own (made from the component's controller class, the two connected and
+kept in step: the controller is given the component's state). What a VST3
+host gives a plugin is made here: the host application (it also makes the
+messages a component and its controller send each other), a component
+handler (a knob turned in the plugin's window is an edit, carried to the
+processor with the next block, and makes its state to be saved), a plug
+frame (its window asks to be resized) and memory streams for its state,
+which is the component's and the controller's, each after its length. Its
+window is the controller's editor view, put in the app's window by its
+handle (an HWND, an NSView). NAM's own plugin is a VST3 one: on the
+desktop, it's how NAM models play.
+
 Not yet: parameters automated from Dawn's lanes, a plugin's sidechain
 input, and plugin presets in Dawn's preset menu (the plugin's own work in
 its window).
@@ -506,10 +523,9 @@ crash and hang on purpose. CI runs it on Windows, macOS and Linux
 
 ## Next steps
 
-1. **Plugins**: finding them and CLAP effects are done (above). Next,
-   VST3 effects the same way; then plugin instruments on MIDI tracks,
-   played from clips and live; then Audio Units on macOS. NAM's plugin is
-   the first VST3 to try: it's how the desktop app plays NAM models.
+1. **Plugins**: finding them, and VST3 and CLAP effects, are done
+   (above). Next, plugin instruments on MIDI tracks, played from clips and
+   live; then Audio Units on macOS.
 2. **Export through the engine**, native file dialogs, signed installers.
 
 ## Checks

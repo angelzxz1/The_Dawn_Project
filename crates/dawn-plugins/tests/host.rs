@@ -56,3 +56,54 @@ fn a_clap_effect_runs_with_its_state_and_comes_back_home() {
     drop(plugin);
     let _ = std::fs::remove_dir_all(&folder);
 }
+
+#[test]
+fn a_vst3_effect_runs_with_its_state_and_its_windows_edits() {
+    use dawn_plugins::vst3_host::{Vst3Plugin, load_module};
+    const GAIN_ID: &str = "444157444E544553544741494E000001";
+    let folder = std::env::temp_dir().join(format!("dawn-vst3-host-test-{}", std::process::id()));
+    std::fs::create_dir_all(&folder).unwrap();
+    let path = common::vst3_bundle(&folder, "Dawn Test");
+    // SAFETY: the test plugin is ours.
+    let module = unsafe { load_module(&path) }.unwrap();
+    let mut plugin = Vst3Plugin::new(module, GAIN_ID).unwrap();
+
+    // Its state: the component's (its level, a half) then the controller's.
+    let state = plugin.save_state().unwrap();
+    assert_eq!(&state[..8], &[4, 0, 0, 0, 0, 0, 0, 0x3f]);
+    let mut quarter = state.clone();
+    quarter[4..8].copy_from_slice(&0.25f32.to_le_bytes());
+    plugin.load_state(&quarter).unwrap();
+    assert_eq!(&plugin.save_state().unwrap()[4..8], &0.25f32.to_le_bytes());
+
+    let mut processor = plugin.processor(48000.0).unwrap().expect("a processor");
+    assert!(plugin.is_out());
+    let (mut l, mut r) = (vec![1.0f32; 256], vec![-0.5f32; 256]);
+    processor.process(&mut l, &mut r);
+    assert_eq!((l[100], r[100]), (0.25, -0.125));
+    assert_eq!(plugin.latency(), 0);
+
+    // A knob turned in its window reaches the processor with the next
+    // block, and its state is to be saved.
+    plugin.edit(0, 0.75);
+    assert!(plugin.take_dirty());
+    let (mut l, mut r) = (vec![1.0f32; 64], vec![1.0f32; 64]);
+    processor.process(&mut l, &mut r);
+    assert_eq!(l[10], 0.75);
+
+    // Home, and out again at another rate.
+    drop(processor);
+    plugin.reclaim();
+    assert!(!plugin.is_out());
+    let mut again = plugin
+        .processor(44100.0)
+        .unwrap()
+        .expect("a processor again");
+    let (mut l, mut r) = (vec![1.0f32; 64], vec![1.0f32; 64]);
+    again.process(&mut l, &mut r);
+    assert_eq!(l[10], 0.75, "it kept its level");
+    drop(again);
+    plugin.reclaim();
+    drop(plugin);
+    let _ = std::fs::remove_dir_all(&folder);
+}

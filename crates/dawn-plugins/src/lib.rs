@@ -9,8 +9,8 @@
 //! by each file's size and time, so the next one only reads what changed.
 //!
 //! `host` runs a CLAP plugin: its instance on the main thread, its audio
-//! processor on the audio thread, its state and its window. VST3 comes
-//! next (docs/desktop.md).
+//! processor on the audio thread, its state and its window; `vst3_host`
+//! runs a VST3 one the same way (docs/desktop.md).
 
 use std::path::PathBuf;
 
@@ -21,6 +21,7 @@ pub mod folders;
 pub mod host;
 pub mod scan;
 pub mod vst3;
+pub mod vst3_host;
 
 /// A plugin format.
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]

@@ -58,12 +58,15 @@ describe("a plugin effect's card", () => {
     expect(native.open).toHaveBeenCalledWith("pl", "Verb");
   });
 
-  test("says why a plugin can't run: a VST3 one, or one that didn't load", async () => {
+  test("says why a plugin that didn't load can't run; a VST3 one opens as a CLAP one does", async () => {
     native.state = { active: true, plugins: { errors: { pl: "It couldn't be loaded." }, windows: [] } };
     const broken = card(verb);
     await expect.element(broken.getByRole("status")).toHaveTextContent("It couldn't be loaded.");
     broken.unmount();
-    const vst3 = card({ ...verb, format: "vst3" });
-    await expect.element(vst3.getByRole("status")).toHaveTextContent("only CLAP");
+    native.state = { active: true, plugins: { errors: {}, windows: [] } };
+    const vst3 = card({ ...verb, format: "vst3", name: "Comp3" });
+    await expect.element(vst3.getByText("VST3")).toBeVisible();
+    await vst3.getByRole("button", { name: "Open its window" }).click();
+    expect(native.open).toHaveBeenCalledWith("pl", "Comp3");
   });
 });

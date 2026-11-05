@@ -9,32 +9,12 @@ use std::time::{Duration, SystemTime};
 
 mod common;
 
-use common::{clap_file, info_plist, test_plugin};
+use common::{clap_file, vst3_bundle};
 use dawn_plugins::scan::{Cache, Scanner};
 use dawn_plugins::{Format, Kind, PluginInfo};
 
 const GAIN_ID: &str = "444157444E544553544741494E000001";
 const TONE_ID: &str = "444157444E54455354544F4E45000001";
-
-/// Lays the library out as a VST3 bundle named `name`.
-fn vst3_bundle(folder: &Path, name: &str) -> PathBuf {
-    let bundle = folder.join(format!("{name}.vst3"));
-    let (arch, file) = match std::env::consts::OS {
-        "windows" => ("x86_64-win".to_owned(), format!("{name}.vst3")),
-        "macos" => ("MacOS".to_owned(), name.to_owned()),
-        _ => (
-            format!("{}-linux", std::env::consts::ARCH),
-            format!("{name}.so"),
-        ),
-    };
-    let binary_folder = bundle.join("Contents").join(arch);
-    std::fs::create_dir_all(&binary_folder).unwrap();
-    std::fs::copy(test_plugin(), binary_folder.join(file)).unwrap();
-    if cfg!(target_os = "macos") {
-        info_plist(&bundle, name);
-    }
-    bundle
-}
 
 fn scanner() -> Scanner {
     Scanner {

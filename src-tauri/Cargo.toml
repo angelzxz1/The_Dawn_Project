@@ -32,5 +32,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # A plugin's saved state, as the project keeps it.
 base64 = "0.22"
+# A window's native handle, for a VST3 plugin's editor to go in.
+raw-window-handle = "0.6"
 # "unstable": windows without a webview, for plugins' own windows.
 tauri = { version = "2.12", features = ["unstable"] }
