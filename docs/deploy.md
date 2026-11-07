@@ -24,6 +24,30 @@ unlimited bandwidth for static files, 25 MiB per file).
    it: AudioWorklets, the microphone and saving project folders only work
    on HTTPS (or `localhost`).
 
+## Cloudflare Workers
+
+**Workers & Pages → Create** now makes a Worker by default, and on a Next.js
+repository it fills in Cloudflare's Next.js server adapter
+(`opennextjs-cloudflare`). Dawn isn't a server app, so that build fails
+(it looks for `.next/standalone`, which a static export never makes).
+`wrangler.jsonc` at the root makes the Worker serve `out/` as plain files
+instead: `/features` from `features.html`, unknown addresses from
+`404.html`, and `_headers` applied as on Pages.
+
+1. In the Worker: **Settings → Build**:
+   - Build command: `npm run build`
+   - Deploy command: `npx wrangler deploy`
+   - Variables (under the build's variables): `NODE_VERSION` = `22`,
+     `NEXT_PUBLIC_SITE_URL` and the other `NEXT_PUBLIC_` ones below.
+     They're read while building, so they go with the build, not the
+     Worker's runtime variables.
+2. The Worker's name must be `name` in `wrangler.jsonc`
+   (`the-dawn-project`); change one to match the other.
+3. Nothing in the settings should say `opennextjs-cloudflare`: the build
+   log shows `next build` and then the files from `out/` being uploaded.
+4. A custom domain: the Worker's **Settings → Domains & Routes → Add →
+   Custom domain**.
+
 ## Railway
 
 Railway builds the repository with Railpack, which picks a language from

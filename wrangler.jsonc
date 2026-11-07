@@ -1,0 +1,17 @@
+// Dawn on Cloudflare Workers, as a static site (docs/deploy.md): the files
+// `npm run build` makes in out/ (Next's `output: "export"`), served as
+// they are, with no server code and no Next.js adapter. The Worker's
+// build settings: build command `npm run build`, deploy command
+// `npx wrangler deploy`.
+{
+  // Must match the Worker's name in the dashboard.
+  "name": "the-dawn-project",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    "directory": "./out",
+    // /features is served from features.html, as Pages does.
+    "html_handling": "auto-trailing-slash",
+    // Unknown addresses get the site's own 404 page (out/404.html).
+    "not_found_handling": "404-page"
+  }
+}
