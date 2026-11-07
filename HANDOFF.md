@@ -30,7 +30,7 @@ committed.
     `e1f0a41`). Not yet tried on the user's interface.
   - step 30, CLAP effects in the engine (2026-11-04, `3d3dbb5`). Not
     yet tried with a real plugin: only the test plugin.
-  - step 31, VST3 effects in the engine (2026-11-04, commit to come). Not
+  - step 31, VST3 effects in the engine (2026-11-04, `222a5da`). Not
     yet tried with a real plugin either (NAM's is the first to try).
 - **Next: step 32, plugin instruments** on MIDI tracks, played from clips
   and live (VST3 and CLAP). Wait for the user to say "go" before starting
@@ -705,7 +705,7 @@ ahead" above).
    `PluginBrowser.test.tsx`, `PluginEffectCard.test.tsx`,
    `nativeEngine.test.tsx`, `projectSchema.test.ts`. Not yet: automating
    a plugin's parameters, its sidechain input. Then P3 VST3 effects: done
-   2026-11-04 (step 31, commit to come). `crates/dawn-plugins/src/
+   2026-11-04 (step 31, `222a5da`). `crates/dawn-plugins/src/
    vst3_host.rs` (`Vst3Plugin`, `Vst3Processor`, the same home-and-reclaim
    lifecycle as CLAP's, a shared `AtomicBool` for home): the component
    from the factory (`initialize` with the host), its `IAudioProcessor`,
