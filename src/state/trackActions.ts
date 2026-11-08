@@ -10,6 +10,7 @@ import { audioEngine } from "@/engine/audioEngine";
 import type { TrackColorPick } from "@/project/colors";
 import { groupTracks, moveTrack, setTrackGroup, ungroup } from "@/engine/routing";
 import { startingSettings, type InstrumentSettings } from "@/instruments/registry";
+import type { PluginRef } from "@/effects/types";
 import { track } from "@/services/telemetry";
 import { automationTargetKey } from "@/project/automationTargets";
 import type { AutomationPoint, AutomationTarget, ChannelConfig, ChannelType, InstrumentType, TrackInput } from "@/project/types";
@@ -137,6 +138,29 @@ export const trackActions = {
     const added = startingSettings(current, type);
     audioEngine.setInstrument(id, type, { ...current, ...added });
     updateTrack(id, (c) => ({ ...c, instrument: type, ...added }));
+  },
+
+  /** Puts a plugin (from the browser's Plugins tab) on a MIDI track as its
+   * instrument, in place of what it played (one undo step). */
+  setPluginInstrument(id: string, plugin: PluginRef): void {
+    const current = channels().find((c) => c.id === id);
+    if (!current || current.type !== "midi") return;
+    projectStore.push();
+    const pluginInstrument = { ...plugin };
+    audioEngine.setInstrument(id, "plugin", { ...current, pluginInstrument });
+    updateTrack(id, (c) => ({ ...c, instrument: "plugin", pluginInstrument }));
+  },
+
+  /** Keeps a plugin instrument's state (base64) as the plugin saved it. Not
+   * an edit of the user's (no undo step): the plugin's own. Whether it was
+   * that track's plugin. */
+  setPluginInstrumentState(id: string, state: string): boolean {
+    const track = channels().find((c) => c.id === id);
+    if (!track?.pluginInstrument) return false;
+    if (track.pluginInstrument.state !== state) {
+      updateTrack(id, (c) => (c.pluginInstrument ? { ...c, pluginInstrument: { ...c.pluginInstrument, state } } : c));
+    }
+    return true;
   },
 
   /** The synth's patch, the Drum Rack's kit: only the settings that

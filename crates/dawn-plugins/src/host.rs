@@ -10,6 +10,10 @@
 //! or destroyed. The instance's state is saved and loaded as CLAP's state
 //! extension says, and its window is the plugin's own GUI, put in a window
 //! the app gives it (`open_gui`).
+//!
+//! An instrument is given its notes with each block (`play`): as CLAP's
+//! own note events when its note port takes them, as MIDI when it only
+//! takes MIDI; the pitch bend and mod wheel go as MIDI either way.
 
 use std::cell::Cell;
 use std::ffi::CString;
@@ -24,8 +28,16 @@ use clack_extensions::gui::{
     GuiApiType, GuiConfiguration, GuiSize, HostGui, HostGuiImpl, PluginGui, Window,
 };
 use clack_extensions::latency::{HostLatency, HostLatencyImpl, PluginLatency};
+use clack_extensions::note_ports::{
+    HostNotePorts, HostNotePortsImpl, NoteDialect, NoteDialects, NotePortInfoBuffer,
+    NotePortRescanFlags, PluginNotePorts,
+};
 use clack_extensions::state::{HostState, HostStateImpl, PluginState};
+use clack_host::events::event_types::{MidiEvent, NoteOffEvent, NoteOnEvent};
+use clack_host::events::{Match, Pckn};
 use clack_host::prelude::*;
+
+use crate::NoteEvent;
 
 /// What a plugin's window goes in (a window of the app's, by its handle).
 pub use clack_extensions::gui::Window as ParentWindow;
@@ -34,6 +46,8 @@ pub use clack_host::prelude::PluginEntry;
 
 /// The most frames processed in one go: the engine's block.
 pub const MAX_FRAMES: u32 = 2048;
+/// The most events a block carries to a plugin without allocating.
+const MAX_EVENTS: usize = 1024;
 
 /// What the plugin can ask of the host from any thread, kept for the main
 /// thread to act on (`ClapPlugin::tick`).
@@ -53,6 +67,7 @@ pub struct Shared {
     latency: OnceLock<Option<PluginLatency>>,
     gui: OnceLock<Option<PluginGui>>,
     ports: OnceLock<Option<PluginAudioPorts>>,
+    note_ports: OnceLock<Option<PluginNotePorts>>,
 }
 
 impl<'a> SharedHandler<'a> for Shared {
@@ -61,6 +76,7 @@ impl<'a> SharedHandler<'a> for Shared {
         let _ = self.latency.set(instance.get_extension());
         let _ = self.gui.set(instance.get_extension());
         let _ = self.ports.set(instance.get_extension());
+        let _ = self.note_ports.set(instance.get_extension());
     }
 
     fn request_restart(&self) {
@@ -118,6 +134,14 @@ impl HostLatencyImpl for MainThread<'_> {
     }
 }
 
+impl HostNotePortsImpl for MainThread<'_> {
+    fn supported_dialects(&self) -> NoteDialects {
+        NoteDialects::CLAP | NoteDialects::MIDI
+    }
+
+    fn rescan(&self, _flags: NotePortRescanFlags) {}
+}
+
 impl HostAudioPortsImpl for MainThread<'_> {
     fn is_rescan_flag_supported(&self, _flag: AudioPortRescanFlags) -> bool {
         false
@@ -138,6 +162,7 @@ impl HostHandlers for DawnHost {
             .register::<HostState>()
             .register::<HostLatency>()
             .register::<HostGui>()
+            .register::<HostNotePorts>()
             .register::<clack_extensions::audio_ports::HostAudioPorts>();
     }
 }
@@ -146,6 +171,32 @@ type Processor = StartedPluginAudioProcessor<DawnHost>;
 
 /// Where a processor goes back to when it's dropped.
 type Home = Arc<Mutex<Option<Processor>>>;
+
+/// How a plugin takes notes: its first note port's dialect.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Notes {
+    /// CLAP's note events.
+    Clap,
+    /// MIDI 1.0.
+    Midi,
+    /// It takes none (an effect).
+    None,
+}
+
+/// A note as MIDI (channel 1): a velocity 0-1 as 1-127 (a note-on's zero
+/// would be an off), a bend -1..1 as 0-16383 (8192 its middle).
+fn midi(event: NoteEvent) -> [u8; 3] {
+    let seven = |v: f32| (v.clamp(0.0, 1.0) * 127.0).round() as u8;
+    match event {
+        NoteEvent::On { key, velocity } => [0x90, key.min(127), seven(velocity).max(1)],
+        NoteEvent::Off { key } => [0x80, key.min(127), 64],
+        NoteEvent::Bend(b) => {
+            let v = (((b.clamp(-1.0, 1.0) + 1.0) * 0.5) * 16383.0).round() as u16;
+            [0xE0, (v & 0x7f) as u8, (v >> 7) as u8]
+        }
+        NoteEvent::ModWheel(m) => [0xB0, 1, seven(m)],
+    }
+}
 
 /// The channels of each of a plugin's audio ports, inputs and outputs.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -167,6 +218,10 @@ pub struct ClapProcessor {
     events_in: EventBuffer,
     events_out: EventBuffer,
     steady: u64,
+    notes: Notes,
+    /// Events a block carried, so a full buffer stops taking more rather
+    /// than allocate.
+    queued: usize,
 }
 
 impl ClapProcessor {
@@ -174,7 +229,44 @@ impl ClapProcessor {
     /// both sides mixed and gives its one to both). A plugin that fails
     /// leaves the sound as it was.
     pub fn process(&mut self, l: &mut [f32], r: &mut [f32]) {
+        self.play(&[], l, r);
+    }
+
+    /// How it takes notes.
+    pub fn notes(&self) -> Notes {
+        self.notes
+    }
+
+    fn queue(&mut self, event: &impl AsRef<UnknownEvent>) {
+        if self.queued < MAX_EVENTS {
+            self.events_in.push(event);
+            self.queued += 1;
+        }
+    }
+
+    /// As `process`, with the notes for the block (each at its frame, in
+    /// order): what an instrument plays.
+    pub fn play(&mut self, notes: &[(u32, NoteEvent)], l: &mut [f32], r: &mut [f32]) {
         let n = l.len().min(r.len()).min(MAX_FRAMES as usize);
+        self.events_in.clear();
+        self.queued = 0;
+        for &(at, event) in notes {
+            let at = at.min(n.saturating_sub(1) as u32);
+            match (self.notes, event) {
+                (Notes::None, _) => {}
+                (Notes::Clap, NoteEvent::On { key, velocity }) => self.queue(&NoteOnEvent::new(
+                    at,
+                    Pckn::new(0u16, 0u16, u16::from(key), Match::All),
+                    f64::from(velocity),
+                )),
+                (Notes::Clap, NoteEvent::Off { key }) => self.queue(&NoteOffEvent::new(
+                    at,
+                    Pckn::new(0u16, 0u16, u16::from(key), Match::All),
+                    0.5,
+                )),
+                _ => self.queue(&MidiEvent::new(at, 0, midi(event))),
+            }
+        }
         let Some(processor) = self.processor.as_mut() else {
             return;
         };
@@ -216,7 +308,6 @@ impl ClapProcessor {
             ),
         });
         let mut output_audio = self.output_ports.with_output_buffers(outs);
-        self.events_in.clear();
         self.events_out.clear();
         let result = processor.process(
             &input_audio,
@@ -296,6 +387,7 @@ impl ClapPlugin {
                 latency: OnceLock::new(),
                 gui: OnceLock::new(),
                 ports: OnceLock::new(),
+                note_ports: OnceLock::new(),
             },
             |shared| MainThread {
                 shared,
@@ -378,6 +470,25 @@ impl ClapPlugin {
         Ports { inputs, outputs }
     }
 
+    /// How it takes notes: as its first input note port says (one without
+    /// the extension is taken to take CLAP's).
+    pub fn note_dialect(&mut self) -> Notes {
+        let Some(ext) = self.shared(|s| s.note_ports.get().copied().flatten()) else {
+            return Notes::Clap;
+        };
+        let handle = self.instance.plugin_handle();
+        if ext.count(&handle, true) == 0 {
+            return Notes::None;
+        }
+        let mut buffer = NotePortInfoBuffer::new();
+        match ext.get(&handle, 0, true, &mut buffer) {
+            Some(port) if port.supported_dialects.supports(NoteDialect::Clap) => Notes::Clap,
+            Some(port) if port.supported_dialects.supports(NoteDialect::Midi) => Notes::Midi,
+            Some(_) => Notes::None,
+            None => Notes::Clap,
+        }
+    }
+
     /// Takes its processor back if it's come home: stopped and deactivated.
     pub fn reclaim(&mut self) {
         let back = self.home.lock().unwrap_or_else(|e| e.into_inner()).take();
@@ -401,6 +512,7 @@ impl ClapPlugin {
             return Ok(None);
         }
         let ports = self.ports();
+        let notes = self.note_dialect();
         let config = PluginAudioConfiguration {
             sample_rate,
             min_frames_count: 1,
@@ -428,9 +540,11 @@ impl ClapPlugin {
             input_ports: AudioPorts::with_capacity(total(&ports.inputs), ports.inputs.len()),
             output_ports: AudioPorts::with_capacity(total(&ports.outputs), ports.outputs.len()),
             ports,
-            events_in: EventBuffer::new(),
-            events_out: EventBuffer::new(),
+            events_in: EventBuffer::with_capacity(MAX_EVENTS),
+            events_out: EventBuffer::with_capacity(MAX_EVENTS),
             steady: 0,
+            notes,
+            queued: 0,
         }))
     }
 

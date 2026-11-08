@@ -3,7 +3,10 @@
 //! exit functions for each system. The gain runs: its processor scales
 //! what goes through it by its level (a half, until its state or its one
 //! parameter says otherwise), and its controller, a separate object as
-//! many plugins' are, has that parameter. The factory is only handed out once the
+//! many plugins' are, has that parameter. The tone plays: it has no audio
+//! input, an event bus for its notes, and plays a constant level while a
+//! key is down (the velocity it was pressed with, from its note's frame).
+//! The factory is only handed out once the
 //! module's entry function has been called, as the SDK's hosting rules say
 //! it must be (on Windows that function is optional).
 
@@ -97,6 +100,12 @@ impl IPluginFactoryTrait for Factory {
         } else if cid == GAIN_CONTROLLER_CID {
             ComWrapper::new(GainController {
                 level: Cell::new(0.5),
+            })
+            .to_com_ptr::<FUnknown>()
+        } else if cid == TONE_CID {
+            ComWrapper::new(ToneProcessor {
+                level: Cell::new(0.0),
+                key: Cell::new(None),
             })
             .to_com_ptr::<FUnknown>()
         } else {
@@ -305,6 +314,173 @@ impl IAudioProcessorTrait for GainProcessor {
                 }
             }
         }
+        kResultOk
+    }
+
+    unsafe fn getTailSamples(&self) -> uint32 {
+        0
+    }
+}
+
+/// The tone's processor (and its own controller: it has nothing to set).
+struct ToneProcessor {
+    level: Cell<f32>,
+    key: Cell<Option<i16>>,
+}
+
+impl Class for ToneProcessor {
+    type Interfaces = (IComponent, IAudioProcessor);
+}
+
+impl IPluginBaseTrait for ToneProcessor {
+    unsafe fn initialize(&self, _context: *mut FUnknown) -> tresult {
+        kResultOk
+    }
+
+    unsafe fn terminate(&self) -> tresult {
+        kResultOk
+    }
+}
+
+impl IComponentTrait for ToneProcessor {
+    unsafe fn getControllerClassId(&self, _class_id: *mut TUID) -> tresult {
+        kResultFalse
+    }
+
+    unsafe fn setIoMode(&self, _mode: IoMode) -> tresult {
+        kResultOk
+    }
+
+    /// One event input, one audio output.
+    unsafe fn getBusCount(&self, media: MediaType, dir: BusDirection) -> int32 {
+        let input = dir == BusDirections_::kInput as BusDirection;
+        let events = media == MediaTypes_::kEvent as MediaType;
+        (events == input) as int32
+    }
+
+    unsafe fn getBusInfo(
+        &self,
+        media: MediaType,
+        dir: BusDirection,
+        index: int32,
+        bus: *mut BusInfo,
+    ) -> tresult {
+        if index != 0 || unsafe { self.getBusCount(media, dir) } == 0 {
+            return kInvalidArgument;
+        }
+        let bus = unsafe { &mut *bus };
+        bus.mediaType = media;
+        bus.direction = dir;
+        bus.channelCount = if media == MediaTypes_::kAudio as MediaType {
+            2
+        } else {
+            16
+        };
+        bus.busType = BusTypes_::kMain as BusType;
+        bus.flags = BusInfo_::BusFlags_::kDefaultActive as uint32;
+        kResultOk
+    }
+
+    unsafe fn getRoutingInfo(&self, _in: *mut RoutingInfo, _out: *mut RoutingInfo) -> tresult {
+        kNotImplemented
+    }
+
+    unsafe fn activateBus(&self, _m: MediaType, _d: BusDirection, _i: int32, _s: TBool) -> tresult {
+        kResultOk
+    }
+
+    unsafe fn setActive(&self, _state: TBool) -> tresult {
+        kResultOk
+    }
+
+    unsafe fn setState(&self, _state: *mut IBStream) -> tresult {
+        kResultOk
+    }
+
+    unsafe fn getState(&self, _state: *mut IBStream) -> tresult {
+        kResultOk
+    }
+}
+
+impl IAudioProcessorTrait for ToneProcessor {
+    unsafe fn setBusArrangements(
+        &self,
+        _inputs: *mut SpeakerArrangement,
+        _num_ins: int32,
+        _outputs: *mut SpeakerArrangement,
+        _num_outs: int32,
+    ) -> tresult {
+        kResultTrue
+    }
+
+    unsafe fn getBusArrangement(
+        &self,
+        _dir: BusDirection,
+        _index: int32,
+        arr: *mut SpeakerArrangement,
+    ) -> tresult {
+        unsafe { *arr = SpeakerArr::kStereo };
+        kResultOk
+    }
+
+    unsafe fn canProcessSampleSize(&self, size: int32) -> tresult {
+        if size == SymbolicSampleSizes_::kSample32 as int32 {
+            kResultOk
+        } else {
+            kNotImplemented
+        }
+    }
+
+    unsafe fn getLatencySamples(&self) -> uint32 {
+        0
+    }
+
+    unsafe fn setupProcessing(&self, _setup: *mut ProcessSetup) -> tresult {
+        kResultOk
+    }
+
+    unsafe fn setProcessing(&self, _state: TBool) -> tresult {
+        kResultOk
+    }
+
+    unsafe fn process(&self, data: *mut ProcessData) -> tresult {
+        let data = unsafe { &*data };
+        if data.numOutputs < 1 {
+            return kResultOk;
+        }
+        let n = data.numSamples.max(0) as usize;
+        let output = unsafe { &*data.outputs };
+        let write = |from: usize, to: usize, level: f32| {
+            for c in 0..output.numChannels.max(0) as usize {
+                let out = unsafe { *output.__field0.channelBuffers32.add(c) };
+                for i in from..to {
+                    unsafe { *out.add(i) = level };
+                }
+            }
+        };
+        let mut from = 0;
+        if let Some(events) = unsafe { ComRef::from_raw(data.inputEvents) } {
+            for i in 0..unsafe { events.getEventCount() } {
+                let mut e: Event = unsafe { std::mem::zeroed() };
+                if unsafe { events.getEvent(i, &mut e) } != kResultOk {
+                    continue;
+                }
+                let at = (e.sampleOffset.max(0) as usize).min(n);
+                write(from, at, self.level.get());
+                from = at;
+                if e.r#type == Event_::EventTypes_::kNoteOnEvent as uint16 {
+                    let on = unsafe { e.__field0.noteOn };
+                    self.key.set(Some(on.pitch));
+                    self.level.set(on.velocity);
+                } else if e.r#type == Event_::EventTypes_::kNoteOffEvent as uint16
+                    && Some(unsafe { e.__field0.noteOff }.pitch) == self.key.get()
+                {
+                    self.key.set(None);
+                    self.level.set(0.0);
+                }
+            }
+        }
+        write(from, n, self.level.get());
         kResultOk
     }
 

@@ -403,8 +403,10 @@ In the desktop app, the **Plugins** tab lists the VST3 and CLAP plugins on
 your computer. With a track's FX rack open, click a VST3 or CLAP effect to
 add it to the chain: it plays in the native engine, **Open its window** on
 its card shows the plugin's own window, and what you set in it is saved
-with the project. NAM's own plugin plays NAM models this way. Plugin
-instruments come next ([docs/desktop.md](docs/desktop.md)).
+with the project. NAM's own plugin plays NAM models this way. With a MIDI
+track's FX rack open, click a VST3 or CLAP instrument to play it on that
+track, from its clips and the keys you play
+([docs/desktop.md](docs/desktop.md)).
 
 ### Dynamics
 

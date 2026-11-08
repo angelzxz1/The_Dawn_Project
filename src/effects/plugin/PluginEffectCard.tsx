@@ -14,11 +14,13 @@ import { spaceGrotesk } from "@/ui/pluginFonts";
 
 const FORMATS: Record<PluginRef["format"], string> = { clap: "CLAP", vst3: "VST3" };
 
-/** Whether the plugin can run now, and if not, why. */
-function usePluginState(effectId: string, plugin: PluginRef | undefined) {
+/** Whether the plugin can run now, and if not, why; and whether its window
+ * is open. `effectId` is what the engine knows it by: an effect's id, or
+ * for an instrument, its track's. */
+export function usePluginState(effectId: string, plugin: PluginRef | undefined) {
   const native = useSyncExternalStore(nativeEngine.subscribe, () => nativeEngine.current, () => nativeEngine.current);
   const error = native.plugins.errors[effectId] ?? null;
-  const why = !plugin
+  const why = !plugin || !plugin.id || !plugin.path
     ? "This plugin's details are missing."
     : !native.active
       ? "Plays in the desktop app's native engine: turn it on in Audio settings."

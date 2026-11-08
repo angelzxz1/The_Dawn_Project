@@ -12,6 +12,7 @@
 import { EFFECT_TYPES, FILE_EFFECT_TYPES, hasSidechain, paramSpecs, type EffectInstance, type EffectType } from "../effects/registry";
 import { SIDECHAIN_TAPS, type SidechainTap } from "../effects/sidechain/sidechainModel";
 import { legacyFilterTypeToMode, migrateLegacyFilterParams } from "../effects/filter/filterModel";
+import { normalizePluginRef } from "../effects/plugin";
 import { SCALE_NAMES, SCALE_ROOTS, type ScaleSetting } from "./scales";
 import { DEFAULT_KEY } from "./chords";
 import { SNAP_RESOLUTIONS, quarterNotesPerBar, type SnapResolution } from "./musicTime";
@@ -251,18 +252,9 @@ function normalizeEffect(raw: unknown): EffectInstance | null {
   const presetId = nonEmptyId(preset.id);
   if (presetId) effect.preset = { id: presetId, name: str(preset.name, "Preset").slice(0, 60) };
   if (type === "plugin") {
-    const p = obj(r.plugin);
-    const pluginId = str(p.id, "");
-    const path = str(p.path, "");
-    if (!pluginId || !path || (p.format !== "clap" && p.format !== "vst3")) return null;
-    effect.plugin = {
-      format: p.format,
-      id: pluginId,
-      name: str(p.name, pluginId).slice(0, 120),
-      vendor: str(p.vendor, "").slice(0, 120),
-      path,
-      ...(typeof p.state === "string" && /^[A-Za-z0-9+/=]*$/.test(p.state) ? { state: p.state } : {}),
-    };
+    const plugin = normalizePluginRef(r.plugin);
+    if (!plugin) return null;
+    effect.plugin = plugin;
   }
   // A key from a track that's since been deleted just stays unconnected.
   if (hasSidechain(type) && r.sidechain !== undefined) {

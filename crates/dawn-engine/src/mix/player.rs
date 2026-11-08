@@ -1,7 +1,13 @@
 //! A MIDI track's instrument as the engine plays it: the kernel (the Drum
-//! Rack, the piano, the synth), the notes its clips have sounding, and the
-//! keys held live (with the sustain pedal, pitch bend and mod wheel), which
-//! carry on from one version of the song to the next.
+//! Rack, the piano, the synth, or a plugin the app hosts), the notes its
+//! clips have sounding, and the keys held live (with the sustain pedal,
+//! pitch bend and mod wheel), which carry on from one version of the song
+//! to the next.
+//!
+//! A plugin instrument is given its notes with each block, at their frames
+//! in it (`PluginProcessor::play`). The pedal is worked out here, as for
+//! the others (a key let go while it's down is let go when it lifts), so a
+//! plugin hears only keys and the bend and mod wheel.
 //!
 //! As in the browser's engine (`audioEngine.ts`): a clip's notes start and
 //! end where they sit; stopping, jumping and looping back release them
@@ -12,6 +18,7 @@
 use std::sync::Arc;
 
 use super::clip::AudioData;
+use super::fx::{PluginNote, PluginProcessor, PluginSettings, TimedNote};
 use super::song::MAX_BLOCK;
 use crate::instruments::drums::{DrumEvent, DrumEventKind, DrumKit, Drums, PAD_COUNT};
 use crate::instruments::piano::{Piano, PianoEvent, PianoEventKind, PianoSample};
@@ -36,6 +43,9 @@ pub enum InstrumentSpec {
         /// where it starts once they're built).
         tables: [Option<Wavetable>; 3],
     },
+    /// A plugin (VST3 or CLAP): its processor, in its slot until a player
+    /// takes it.
+    Plugin(PluginSettings),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -43,6 +53,7 @@ pub enum InstrumentKind {
     Drums,
     Piano,
     Synth,
+    Plugin,
 }
 
 impl InstrumentSpec {
@@ -51,6 +62,15 @@ impl InstrumentSpec {
             InstrumentSpec::Drums { .. } => InstrumentKind::Drums,
             InstrumentSpec::Piano { .. } => InstrumentKind::Piano,
             InstrumentSpec::Synth { .. } => InstrumentKind::Synth,
+            InstrumentSpec::Plugin(_) => InstrumentKind::Plugin,
+        }
+    }
+
+    /// How late its sound comes out (frames): a plugin's own latency.
+    pub fn latency(&self) -> usize {
+        match self {
+            InstrumentSpec::Plugin(p) => p.latency,
+            _ => 0,
         }
     }
 }
@@ -69,9 +89,92 @@ enum Kernel {
     Drums(Box<Drums>),
     Piano(Box<Piano>),
     Synth(Box<Synth>),
+    Plugin(Box<PluginKernel>),
 }
 
 const KEYS: usize = 128;
+
+/// The most notes waiting for their block; more are dropped.
+const MAX_PENDING: usize = 1024;
+
+/// A plugin instrument: its processor, and the notes for it, by their
+/// frame on the engine's clock until their block comes.
+struct PluginKernel {
+    processor: Option<Box<dyn PluginProcessor>>,
+    pending: Vec<(u64, PluginNote)>,
+    block: Vec<TimedNote>,
+    /// The keys it's been told are down.
+    down: [bool; KEYS],
+}
+
+impl PluginKernel {
+    fn new(processor: Option<Box<dyn PluginProcessor>>) -> Self {
+        Self {
+            processor,
+            pending: Vec::with_capacity(MAX_PENDING),
+            block: Vec::with_capacity(MAX_PENDING),
+            down: [false; KEYS],
+        }
+    }
+
+    fn push(&mut self, at: u64, note: PluginNote) {
+        if self.pending.len() < MAX_PENDING {
+            self.pending.push((at, note));
+        }
+    }
+
+    fn on(&mut self, key: usize, velocity: f64, at: u64) {
+        self.down[key] = true;
+        self.push(
+            at,
+            PluginNote::On {
+                key: key as u8,
+                velocity: velocity.clamp(0.0, 1.0) as f32,
+            },
+        );
+    }
+
+    fn off(&mut self, key: usize, at: u64) {
+        if std::mem::take(&mut self.down[key]) {
+            self.push(at, PluginNote::Off { key: key as u8 });
+        }
+    }
+
+    /// The `n` frames from `at`, with the notes due in them (one already
+    /// late plays at the block's start).
+    fn render(&mut self, l: &mut [f32], r: &mut [f32], at: u64) {
+        let n = l.len();
+        if n == 0 {
+            return;
+        }
+        let end = at + n as u64;
+        self.block.clear();
+        for &(t, note) in &self.pending {
+            if t < end {
+                self.block.push(TimedNote {
+                    offset: t.saturating_sub(at).min(n as u64 - 1) as u32,
+                    note,
+                });
+            }
+        }
+        self.pending.retain(|(t, _)| *t >= end);
+        // In order, those at one frame as they came (an off before the on
+        // of a key played again): an insertion sort, which keeps them so
+        // and doesn't allocate.
+        for i in 1..self.block.len() {
+            let mut j = i;
+            while j > 0 && self.block[j - 1].offset > self.block[j].offset {
+                self.block.swap(j - 1, j);
+                j -= 1;
+            }
+        }
+        l.fill(0.0);
+        r.fill(0.0);
+        if let Some(p) = self.processor.as_mut() {
+            p.play(&self.block, l, r);
+        }
+    }
+}
 
 pub struct Player {
     sample_rate: f64,
@@ -95,6 +198,7 @@ impl Player {
             InstrumentSpec::Drums { .. } => Kernel::Drums(Box::new(Drums::new(sample_rate))),
             InstrumentSpec::Piano { .. } => Kernel::Piano(Box::new(Piano::new(sample_rate))),
             InstrumentSpec::Synth { .. } => Kernel::Synth(Box::new(Synth::new(sample_rate))),
+            InstrumentSpec::Plugin(p) => Kernel::Plugin(Box::new(PluginKernel::new(p.slot.take()))),
         };
         let mut player = Self {
             sample_rate,
@@ -115,6 +219,7 @@ impl Player {
             Kernel::Drums(_) => InstrumentKind::Drums,
             Kernel::Piano(_) => InstrumentKind::Piano,
             Kernel::Synth(_) => InstrumentKind::Synth,
+            Kernel::Plugin(_) => InstrumentKind::Plugin,
         }
     }
 
@@ -148,18 +253,26 @@ impl Player {
         }
     }
 
-    /// The pitch bend, -1..1 of the instrument's bend range (only the
-    /// synth bends).
+    /// The pitch bend, -1..1 of the instrument's bend range (the synth
+    /// bends, and a plugin is told).
     pub fn set_bend(&mut self, bend: f64) {
-        if let Kernel::Synth(k) = &mut self.kernel {
-            k.set_bend(bend.clamp(-1.0, 1.0));
+        let bend = bend.clamp(-1.0, 1.0);
+        match &mut self.kernel {
+            Kernel::Synth(k) => k.set_bend(bend),
+            // From the next block's start.
+            Kernel::Plugin(k) => k.push(0, PluginNote::Bend(bend as f32)),
+            _ => {}
         }
     }
 
-    /// The mod wheel, 0..1 (only the synth has a use for it).
+    /// The mod wheel, 0..1 (the synth has a use for it, and a plugin is
+    /// told).
     pub fn set_mod_wheel(&mut self, amount: f64) {
-        if let Kernel::Synth(k) = &mut self.kernel {
-            k.set_mod_wheel(amount.clamp(0.0, 1.0));
+        let amount = amount.clamp(0.0, 1.0);
+        match &mut self.kernel {
+            Kernel::Synth(k) => k.set_mod_wheel(amount),
+            Kernel::Plugin(k) => k.push(0, PluginNote::ModWheel(amount as f32)),
+            _ => {}
         }
     }
 
@@ -188,6 +301,11 @@ impl Player {
                 time,
                 kind: SynthEventKind::On { note: key, vel },
             }),
+            Kernel::Plugin(k) => {
+                if let Some(key) = Self::key(key) {
+                    k.on(key, vel, at);
+                }
+            }
         }
     }
 
@@ -204,6 +322,11 @@ impl Player {
                 time,
                 kind: SynthEventKind::Off { note: key },
             }),
+            Kernel::Plugin(k) => {
+                if let Some(key) = Self::key(key) {
+                    k.off(key, at);
+                }
+            }
         }
     }
 
@@ -221,6 +344,8 @@ impl Player {
                 time,
                 kind: SynthEventKind::AllOff,
             }),
+            // Every key it's been told is down.
+            Kernel::Plugin(k) => (0..KEYS).for_each(|key| k.off(key, at)),
         }
         self.clip_ends = [None; KEYS];
         self.sustained = [false; KEYS];
@@ -321,6 +446,7 @@ impl Player {
                 k.render(l, r, now);
             }
             Kernel::Synth(k) => k.render(l, r, now),
+            Kernel::Plugin(k) => k.render(l, r, at),
         }
         (&self.out_l[..n], &self.out_r[..n])
     }

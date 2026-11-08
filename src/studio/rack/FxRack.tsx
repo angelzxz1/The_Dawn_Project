@@ -11,7 +11,7 @@ import { sidechainSourceName, type SidechainSource } from "@/effects/sidechain/S
 import { SIDECHAIN_TAPS, SIDECHAIN_TAP_LABELS, type SidechainTap } from "@/effects/sidechain/sidechainModel";
 import type { EffectInstance, EffectType } from "@/effects/registry";
 import { EFFECT_UI } from "@/effects/ui/registry";
-import { INSTRUMENT_LABELS, INSTRUMENT_TYPES, type InstrumentSettings, type InstrumentType } from "@/instruments/registry";
+import { INSTRUMENT_LABELS, PICKER_INSTRUMENT_TYPES, type InstrumentSettings, type InstrumentType } from "@/instruments/registry";
 import { INSTRUMENT_UI } from "@/instruments/ui/registry";
 import type { BusConfig, ChannelType } from "@/project/types";
 import type { TrackColor } from "@/project/colors";
@@ -95,13 +95,16 @@ interface FxRackProps {
   onCollapsedChange?: (collapsed: boolean) => void;
 }
 
-const INSTRUMENT_OPTIONS: { type: InstrumentType | null; label: string; icon: React.ReactNode }[] = [
-  { type: null, label: "None", icon: <SlashSquare size={12} /> },
-  ...INSTRUMENT_TYPES.map((type) => {
-    const Icon = INSTRUMENT_UI[type].icon;
-    return { type, label: INSTRUMENT_LABELS[type], icon: <Icon size={12} /> };
-  }),
-];
+type InstrumentOption = { type: InstrumentType | null; label: string; icon: React.ReactNode };
+
+const instrumentOption = (type: InstrumentType): InstrumentOption => {
+  const Icon = INSTRUMENT_UI[type].icon;
+  return { type, label: INSTRUMENT_LABELS[type], icon: <Icon size={12} /> };
+};
+
+const INSTRUMENT_OPTIONS: InstrumentOption[] = [{ type: null, label: "None", icon: <SlashSquare size={12} /> }, ...PICKER_INSTRUMENT_TYPES.map(instrumentOption)];
+/** With the plugin the track has (to go back to it). */
+const WITH_PLUGIN: InstrumentOption[] = [...INSTRUMENT_OPTIONS, instrumentOption("plugin")];
 
 const SEND_OFF_DB = -60;
 const SEND_MIN_DB = -60;
@@ -350,7 +353,7 @@ export function FxRack({
               Instrument
             </div>
             <div className="mb-1.5 flex overflow-hidden rounded border border-border">
-              {INSTRUMENT_OPTIONS.map((opt) => (
+              {(instrumentSettings?.pluginInstrument ? WITH_PLUGIN : INSTRUMENT_OPTIONS).map((opt) => (
                 <button
                   key={opt.label}
                   type="button"

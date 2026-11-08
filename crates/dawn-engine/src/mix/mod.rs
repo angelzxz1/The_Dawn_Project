@@ -19,8 +19,8 @@ pub use automation::{EffectAutomation, ParamLane, Point};
 pub use clip::{AudioData, Clip, ClipTiming};
 pub use engine::{Engine, LiveInput, input_sample};
 pub use fx::{
-    EffectKind, EffectSettings, EffectSpec, KeySource, KeySpec, PluginProcessor, PluginSettings,
-    PluginSlot, Tap,
+    EffectKind, EffectSettings, EffectSpec, KeySource, KeySpec, PluginNote, PluginProcessor,
+    PluginSettings, PluginSlot, Tap, TimedNote,
 };
 pub use player::{InstrumentKind, InstrumentSpec, Note, track_key};
 pub use song::{Bus, Destination, MAX_BLOCK, Master, Prepared, Send, Song, Track, db_to_gain};

@@ -285,6 +285,9 @@ pub enum InstrumentSpecIn {
         /// like audio: one channel, the mip levels one after another).
         tables: Vec<String>,
     },
+    /// A plugin instrument (VST3 or CLAP), made by the app's host.
+    #[serde(rename_all = "camelCase")]
+    Plugin { plugin: PluginSpec },
 }
 
 /// An effect in a chain, as the studio keeps it (`EffectInstance`).
@@ -312,8 +315,8 @@ pub struct EffectSpecIn {
     pub plugin: Option<PluginSpec>,
 }
 
-/// A plugin effect: which plugin (its format, id and file), and the state
-/// it saved last (base64), to start from.
+/// A plugin effect or instrument: which plugin (its format, id and file),
+/// and the state it saved last (base64), to start from.
 #[derive(Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct PluginSpec {
@@ -325,7 +328,8 @@ pub struct PluginSpec {
 }
 
 /// Makes a plugin effect's settings (its processor in its slot) for the
-/// effect with this id; none when it can't run.
+/// effect with this id (or an instrument's, by its track's id); none when
+/// it can't run.
 pub type PluginMaker<'a> = &'a dyn Fn(&str, &PluginSpec) -> Option<PluginSettings>;
 
 /// Where a keyed effect's key comes from: a track's or bus's id, and where
@@ -574,14 +578,17 @@ pub struct LoadedAudio {
 /// (at this rate) go in `missing`; until they do, a pad plays nothing, and
 /// the piano nothing at all. A synth waiting for a new wavetable keeps the
 /// one it had (`previous`, the track's instrument in the song playing), as
-/// the browser's does; with none yet, it waits to play.
+/// the browser's does; with none yet, it waits to play. A plugin is made by
+/// `plugins`, for the track `track`; none if it can't run.
 fn instrument(
+    track: &str,
     spec: &InstrumentSpecIn,
     previous: Option<&InstrumentSpec>,
     audio: &HashMap<String, LoadedAudio>,
     sample_rate: f64,
     missing: &mut Vec<String>,
-) -> InstrumentSpec {
+    plugins: PluginMaker,
+) -> Option<InstrumentSpec> {
     let mut file = |id: &str| match audio.get(id) {
         Some(a) if a.sample_rate == sample_rate => Some(a.data.clone()),
         _ => {
@@ -589,7 +596,8 @@ fn instrument(
             None
         }
     };
-    match spec {
+    Some(match spec {
+        InstrumentSpecIn::Plugin { plugin } => InstrumentSpec::Plugin(plugins(track, plugin)?),
         InstrumentSpecIn::Drums { kit, samples } => {
             let mut pads = [Pad::default(); PAD_COUNT];
             for (pad, p) in pads.iter_mut().zip(&kit.pads) {
@@ -656,7 +664,7 @@ fn instrument(
                 }),
             }
         }
-    }
+    })
 }
 
 /// The engine's song, at `sample_rate`, following `previous` (the one
@@ -746,11 +754,11 @@ pub fn build_with(
                     }
                 })
                 .collect(),
-            instrument: t.instrument.as_ref().map(|i| {
+            instrument: t.instrument.as_ref().and_then(|i| {
                 let playing = previous
                     .and_then(|p| p.tracks.iter().find(|x| x.id == t.id))
                     .and_then(|x| x.instrument.as_ref());
-                instrument(i, playing, audio, sample_rate, &mut missing)
+                instrument(&t.id, i, playing, audio, sample_rate, &mut missing, plugins)
             }),
             notes: t
                 .notes
@@ -1230,6 +1238,48 @@ mod tests {
         assert_eq!(asked[0].0, "p");
         assert_eq!(asked[0].1.state.as_deref(), Some("AAAAPw=="));
         assert_eq!(asked[0].1.path, "C:/Plugins/Verb.clap");
+    }
+
+    #[test]
+    fn a_plugin_instrument_is_made_by_the_host_for_its_track() {
+        let json = r#"{
+            "tracks": [
+                { "id": "ch-1", "volumeDb": 0, "pan": 0, "audible": true, "output": null, "sends": [], "clips": [],
+                  "instrument": { "type": "plugin",
+                    "plugin": { "format": "vst3", "id": "ABCD", "path": "C:/Plugins/Keys.vst3", "state": "AQID" } },
+                  "notes": [{ "start": 0, "end": 0.5, "key": 60, "velocity": 0.8 }] },
+                { "id": "ch-2", "volumeDb": 0, "pan": 0, "audible": true, "output": null, "sends": [], "clips": [],
+                  "instrument": { "type": "plugin",
+                    "plugin": { "format": "clap", "id": "com.vendor.broken", "path": "C:/Plugins/Broken.clap" } } }
+            ],
+            "buses": [],
+            "master": { "volumeDb": 0, "pan": 0, "limiterDb": -1 },
+            "tempo": [{ "beat": 0, "seconds": 0, "bpm": 120 }],
+            "beatsPerBar": 4
+        }"#;
+        let spec: SongSpec = serde_json::from_str(json).unwrap();
+        let asked = std::cell::RefCell::new(vec![]);
+        let maker = |id: &str, plugin: &PluginSpec| {
+            asked.borrow_mut().push((id.to_owned(), plugin.clone()));
+            (plugin.format == "vst3").then(|| PluginSettings {
+                slot: Arc::new(dawn_engine::mix::PluginSlot::default()),
+                latency: 32,
+            })
+        };
+        let (song, _) = build_with(&spec, None, &HashMap::new(), 48000.0, &maker);
+        let keys = song.tracks[0].instrument.as_ref().expect("the plugin");
+        assert_eq!(keys.kind(), dawn_engine::mix::InstrumentKind::Plugin);
+        assert_eq!(keys.latency(), 32);
+        assert_eq!(song.tracks[0].notes.len(), 1);
+        // One that can't run plays nothing (why is in the status).
+        assert!(song.tracks[1].instrument.is_none());
+        let asked = asked.borrow();
+        assert_eq!(asked.len(), 2);
+        assert_eq!(
+            (asked[0].0.as_str(), asked[0].1.state.as_deref()),
+            ("ch-1", Some("AQID"))
+        );
+        assert_eq!(asked[1].0, "ch-2");
     }
 
     #[test]

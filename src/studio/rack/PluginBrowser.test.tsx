@@ -47,11 +47,11 @@ beforeEach(() => {
   bridge.list.mockResolvedValue(LIST);
 });
 
-async function renderTab(onAddEffect?: (p: PluginInfo) => void) {
+async function renderTab(onAddEffect?: (p: PluginInfo) => void, onAddInstrument?: (p: PluginInfo) => void) {
   await plugins.refresh();
   return render(
     <div className="flex h-[600px] w-48 flex-col">
-      <PluginBrowser onAddEffect={onAddEffect} />
+      <PluginBrowser onAddEffect={onAddEffect} onAddInstrument={onAddInstrument} />
     </div>
   );
 }
@@ -145,5 +145,16 @@ describe("the Plugins tab", () => {
     await effects.getByRole("button").nth(1).click();
     expect(add).toHaveBeenCalledWith(expect.objectContaining({ name: "Echoes", format: "clap" }));
     await expect.element(screen.getByRole("list", { name: "Instruments", exact: true }).getByRole("button")).not.toBeInTheDocument();
+  });
+
+  test("an instrument is put on the MIDI track open in the rack with a click", async () => {
+    const addEffect = vi.fn();
+    const addInstrument = vi.fn();
+    const screen = await renderTab(addEffect, addInstrument);
+    await screen.getByRole("list", { name: "Instruments", exact: true }).getByRole("button").click();
+    expect(addInstrument).toHaveBeenCalledWith(expect.objectContaining({ name: "Pads", format: "vst3" }));
+    expect(addEffect).not.toHaveBeenCalled();
+    // A note effect isn't either yet.
+    await expect.element(screen.getByRole("list", { name: "Note effects", exact: true }).getByRole("button")).not.toBeInTheDocument();
   });
 });

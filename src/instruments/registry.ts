@@ -8,11 +8,12 @@ import type { InstrumentDefinition, InstrumentSettings, InstrumentSettingsKey } 
 import { pianoInstrument } from "./piano";
 import { drumRackInstrument } from "./drum-rack";
 import { synthInstrument } from "./synth";
+import { pluginInstrument } from "./plugin";
 
 export type { InstrumentSettings };
 
 /** In the instrument picker's order. */
-const INSTRUMENTS = [pianoInstrument, drumRackInstrument, synthInstrument] as const;
+const INSTRUMENTS = [pianoInstrument, drumRackInstrument, synthInstrument, pluginInstrument] as const;
 
 /** The sound source a MIDI track plays through - "like in Ableton", an
  * instrument you pick per track rather than a single hardcoded piano. */
@@ -22,6 +23,9 @@ const ALL: InstrumentDefinition<InstrumentType>[] = [...INSTRUMENTS];
 const BY_TYPE = new Map(ALL.map((i) => [i.type, i]));
 
 export const INSTRUMENT_TYPES: InstrumentType[] = ALL.map((i) => i.type);
+
+/** Those the picker always offers (a hidden one only once a track has it). */
+export const PICKER_INSTRUMENT_TYPES: InstrumentType[] = ALL.filter((i) => !i.hidden).map((i) => i.type);
 
 export const INSTRUMENT_LABELS = Object.fromEntries(ALL.map((i) => [i.type, i.label])) as Record<InstrumentType, string>;
 

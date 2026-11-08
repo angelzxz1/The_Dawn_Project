@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   INSTRUMENT_LABELS,
   INSTRUMENT_TYPES,
+  PICKER_INSTRUMENT_TYPES,
   changedInstrumentSettings,
   readInstrumentSettings,
   startingSettings,
@@ -11,7 +12,9 @@ import { defaultDrumKit } from "./drum-rack/drumParams";
 
 describe("instrument registry", () => {
   it("every instrument has a unique key and label, in the picker's order", () => {
-    expect(INSTRUMENT_TYPES).toEqual(["piano", "drums", "synth"]);
+    expect(INSTRUMENT_TYPES).toEqual(["piano", "drums", "synth", "plugin"]);
+    // A plugin is put on a track from the Plugins tab, not the picker.
+    expect(PICKER_INSTRUMENT_TYPES).toEqual(["piano", "drums", "synth"]);
     const labels = INSTRUMENT_TYPES.map((t) => INSTRUMENT_LABELS[t]);
     expect(new Set(labels).size).toBe(labels.length);
   });
@@ -34,6 +37,14 @@ describe("instrument registry", () => {
     expect(readInstrumentSettings(null, saved)).toEqual({});
     // Missing or broken settings come back as the defaults.
     expect(readInstrumentSettings("synth", {})).toEqual({ synthParams: initSynthParams() });
+  });
+
+  it("a plugin instrument reads back its plugin, or says its details are missing", () => {
+    const keys = { format: "clap", id: "com.vendor.keys", name: "Keys", vendor: "Vendor", path: "C:/CLAP/Keys.clap", state: "AQID" };
+    expect(readInstrumentSettings("plugin", { pluginInstrument: keys })).toEqual({ pluginInstrument: keys });
+    expect(readInstrumentSettings("plugin", { pluginInstrument: { ...keys, format: "au" } }).pluginInstrument?.id).toBe("");
+    expect(readInstrumentSettings("plugin", {}).pluginInstrument?.id).toBe("");
+    expect(startingSettings({}, "plugin").pluginInstrument?.id).toBe("");
   });
 
   it("finds only the settings that changed", () => {

@@ -10,9 +10,10 @@ publish.workspace = true
 [dependencies]
 # CLAP (MIT): loading a plugin's entry and reading its factory.
 clack-host = "0.2"
-# CLAP's extensions a host uses: a plugin's state, latency, audio ports and
-# window (put in one of the app's, by its raw window handle).
-clack-extensions = { version = "0.2", features = ["clack-host", "state", "latency", "audio-ports", "gui", "raw-window-handle_06"] }
+# CLAP's extensions a host uses: a plugin's state, latency, audio ports,
+# note ports (how an instrument takes its notes) and window (put in one of
+# the app's, by its raw window handle).
+clack-extensions = { version = "0.2", features = ["clack-host", "state", "latency", "audio-ports", "note-ports", "gui", "raw-window-handle_06"] }
 # The library a VST3 module is loaded with on Windows and Linux.
 libloading = "0.9"
 # Edits made in a VST3 plugin's window, on their way to its processor.

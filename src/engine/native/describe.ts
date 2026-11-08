@@ -30,7 +30,7 @@ import type { InstrumentType } from "../../instruments/registry";
 import { EFFECT_LABELS, hasSidechain, type EffectInstance, type EffectType } from "../../effects/registry";
 
 /** The instruments the native engine plays. */
-export const NATIVE_INSTRUMENTS: readonly InstrumentType[] = ["piano", "drums", "synth"];
+export const NATIVE_INSTRUMENTS: readonly InstrumentType[] = ["piano", "drums", "synth", "plugin"];
 
 /** What the synth's sub oscillator plays (its shapes' wavetable), next to
  * the oscillators' tables (synth.ts tableKey). */
@@ -66,7 +66,10 @@ export type NativeInstrument =
   | { type: "drums"; kit: ReturnType<typeof compileDrumKit>; samples: (string | null)[] }
   | { type: "piano"; samples: { note: number; audio: string }[] }
   /** Its tables: oscillator 1's, oscillator 2's, the sub's. */
-  | { type: "synth"; settings: ReturnType<typeof compileSynth>; tables: string[] };
+  | { type: "synth"; settings: ReturnType<typeof compileSynth>; tables: string[] }
+  /** A plugin (VST3 or CLAP) the desktop app hosts, and the state it starts
+   * from. */
+  | { type: "plugin"; plugin: { format: "clap" | "vst3"; id: string; path: string; state?: string } };
 
 /** An effect in a chain, with its parameters as the project keeps them. */
 export interface NativeEffect {
@@ -182,6 +185,11 @@ function nativeInstrument(channel: ChannelConfig, ids: NativeAudioIds): NativeIn
       type: "piano",
       samples: Object.keys(PIANO_SAMPLE_URLS).map((name) => ({ note: noteNameToMidi(name) ?? 60, audio: ids.pianoSample(name) })),
     };
+  }
+  if (channel.instrument === "plugin") {
+    const p = channel.pluginInstrument;
+    if (!p?.id || !p.path) return null;
+    return { type: "plugin", plugin: { format: p.format, id: p.id, path: p.path, ...(p.state ? { state: p.state } : {}) } };
   }
   if (channel.instrument === "synth") {
     const params = channel.synthParams ?? initSynthParams();

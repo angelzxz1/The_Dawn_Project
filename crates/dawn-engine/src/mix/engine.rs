@@ -31,7 +31,7 @@ use super::fx::{self, KeySource, Tap};
 use super::keys::{self, KeyLink, Node};
 use super::latency::Delay;
 use super::metronome::{Loop, Metronome};
-use super::player::Player;
+use super::player::{InstrumentKind, Player};
 use super::song::{Applied, Destination, MAX_BLOCK, Prepared, Song, Stereo};
 use super::tempo::segment_at_seconds;
 use crate::effects::limiter::{Limiter, LimiterMeters};
@@ -188,7 +188,11 @@ impl Engine {
                 continue;
             };
             let id = &song.song.tracks[i].id;
-            if let Some(j) = old.song.tracks.iter().position(|t| &t.id == id)
+            // A plugin made a new processor for this version (another
+            // plugin, or the same at another rate): that one plays.
+            let fresh = spec.kind() == InstrumentKind::Plugin && song.players[i].is_some();
+            if !fresh
+                && let Some(j) = old.song.tracks.iter().position(|t| &t.id == id)
                 && old.players[j]
                     .as_ref()
                     .is_some_and(|p| p.kind() == spec.kind())

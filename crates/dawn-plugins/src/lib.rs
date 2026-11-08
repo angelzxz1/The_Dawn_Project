@@ -10,7 +10,8 @@
 //!
 //! `host` runs a CLAP plugin: its instance on the main thread, its audio
 //! processor on the audio thread, its state and its window; `vst3_host`
-//! runs a VST3 one the same way (docs/desktop.md).
+//! runs a VST3 one the same way (docs/desktop.md). An instrument of
+//! either format is given its notes with each block (`NoteEvent`).
 
 use std::path::PathBuf;
 
@@ -22,6 +23,24 @@ pub mod host;
 pub mod scan;
 pub mod vst3;
 pub mod vst3_host;
+
+/// What an instrument is told to play, at a frame of the block it comes
+/// with.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum NoteEvent {
+    /// A key pressed, its velocity 0-1.
+    On {
+        key: u8,
+        velocity: f32,
+    },
+    Off {
+        key: u8,
+    },
+    /// The pitch bend, -1..1.
+    Bend(f32),
+    /// The mod wheel, 0..1.
+    ModWheel(f32),
+}
 
 /// A plugin format.
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]

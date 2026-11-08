@@ -10,6 +10,7 @@
 import type { Instrument } from "./instrument";
 import type { SynthParams } from "./synth/synthParams";
 import type { DrumKitParams } from "./drum-rack/drumParams";
+import type { PluginRef } from "../effects/types";
 
 /** What a track keeps for its instruments, one field each, saved in
  * projects under these names (never rename them). A track keeps an
@@ -20,6 +21,9 @@ export interface InstrumentSettings {
   synthParams?: SynthParams;
   /** The Drum Rack's kit - present once the track has played drums. */
   drumParams?: DrumKitParams;
+  /** The plugin (VST3 or CLAP) it plays, with the state the plugin saved -
+   * present once one's been put on the track. */
+  pluginInstrument?: PluginRef;
 }
 
 export type InstrumentSettingsKey = keyof InstrumentSettings;
@@ -40,6 +44,9 @@ export interface InstrumentDefinition<T extends string = string> {
   label: string;
   /** Left out for an instrument with nothing to set (the piano). */
   settings?: InstrumentSettingsSpec;
+  /** Not in the instrument picker until the track has one (a plugin,
+   * which is put on a track from the browser's Plugins tab). */
+  hidden?: boolean;
 }
 
 export function defineInstrument<T extends string>(definition: InstrumentDefinition<T>): InstrumentDefinition<T> {

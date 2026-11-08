@@ -9,7 +9,7 @@ committed.
 ## Start here
 
 - **Where we are:** Phase 9 (plugins) of `nextSteps.md` is under way:
-  steps 1-31 are done (step 6, NAM in the engine, was dropped). The last
+  steps 1-32 are done (step 6, NAM in the engine, was dropped). The last
   few:
   - step 22, the mixer view (2026-11-02, `0078489`);
   - step 23, the mixer and piano roll in windows of their own
@@ -32,13 +32,13 @@ committed.
     yet tried with a real plugin: only the test plugin.
   - step 31, VST3 effects in the engine (2026-11-04, `222a5da`). Not
     yet tried with a real plugin either (NAM's is the first to try).
-- **Next: step 32, plugin instruments** on MIDI tracks, played from clips
-  and live (VST3 and CLAP). Wait for the user to say "go" before starting
-  a step: they ask for each one ("Lets go with step N").
+  - step 32, plugin instruments in the engine (2026-11-07, commit to
+    come). Only the test plugin's tone so far, in both formats.
+- **Next: step 33, Audio Units** (macOS). Wait for the user to say "go"
+  before starting a step: they ask for each one ("Lets go with step N").
 - **What's left after that,** in order (the full list, with sizes, is in
   `nextSteps.md`; a summary is under "The road ahead" below):
-  plugins (plugin instruments,
-  AU), shipping (export through the engine, native dialogs, signed
+  plugins (AU), shipping (export through the engine, native dialogs, signed
   installers), an accessibility pass, and last the desktop's driver,
   device and inputs picker, which waits for ASIO.
 - **Known loose ends:**
@@ -501,8 +501,8 @@ Temporary, never committed:
   effects; takes are written to disk and handed back from their downbeat
   (docs/desktop.md, "Recording").
 - **Not yet in the engine:** recording another track's audio, stereo
-  takes from an input pair, the loudness readout's levels, plugin
-  instruments (VST3 and CLAP effects play, steps 30-31). The
+  takes from an input pair, the loudness readout's levels, Audio Units
+  (VST3 and CLAP effects and instruments play, steps 30-32). The
   NAM Amp won't be (NAM's own plugin will play it).
 
 ## The native engine plan, stage by stage
@@ -725,7 +725,26 @@ ahead" above).
    gain now runs (a processor with its level as its state and parameter
    0, and a separate controller). Tests: `tests/host.rs` (state, a block,
    an edit from its window, home and out again). Then P4 plugin
-   instruments, P5 Audio Units.
+   instruments: done 2026-11-07 (step 32, commit to come). The engine:
+   `InstrumentSpec::Plugin` (a `PluginSettings`, its slot as an effect's),
+   the player's `PluginKernel` (notes by their frame on the engine's
+   clock until their block, then each at its offset in it through
+   `PluginProcessor::play`; the keys it was told are down, so stopping
+   lets go of each; the bend and mod wheel), a new processor (another
+   plugin, or another rate) playing at once in `set_song` where the
+   others keep the one playing, and its latency in the track's chain
+   (`Track::chain_latency`). The hosts: `NoteEvent` in dawn-plugins;
+   CLAP's `play` (note events or MIDI, by the first note port's
+   dialects; `HostNotePorts`), VST3's (an `IEventList` of its own on the
+   first event bus; bend and mod wheel through `IMidiMapping`). The
+   studio: `src/instruments/plugin/` (hidden from the picker until the
+   track has one), `pluginInstrument` on the track, `trackActions.
+   setPluginInstrument` / `setPluginInstrumentState`, the Plugins tab's
+   instruments clickable for the MIDI track open in the rack. The test
+   plugin's tone now plays (a key's velocity while it's down). Tests:
+   `crates/dawn-engine/tests/plugin_instruments.rs`, `tests/host.rs`, the
+   desktop's `song.rs`, `describe.test.ts`, `registry.test.ts`,
+   `FxRack.test.tsx`, `PluginBrowser.test.tsx`. Then P5 Audio Units.
 6. **Export** through the engine, native file dialogs, signed installers.
 
 ## Item log: the studio's improvements
@@ -1027,10 +1046,10 @@ the order they were done, with the fixes made along the way.
     `inputChannels.test.ts`, `TrackHeader.test.tsx`,
     `projectSchema.test.ts`, `e2e/recording.spec.ts` (input 2 of the
     fake microphone, which has two channels).
-  - Item 27 is open. Next in `nextSteps.md` is Phase 9, step 32 (plugin
-    instruments); steps 24, 25 and 29-31 (sidechains, automation,
-    recording, and CLAP and VST3 effects in the engine) are logged under
-    "The native engine plan".
+  - Item 27 is open. Next in `nextSteps.md` is Phase 9, step 33 (Audio
+    Units); steps 24, 25 and 29-32 (sidechains, automation, recording,
+    and CLAP and VST3 effects and instruments in the engine) are logged
+    under "The native engine plan".
   - Fixed 2026-10-31: on Windows, Next's static export wrote each page's
     prefetch files as folders (`__next.!KHNpdGUp/__PAGE__.txt`, from a
     backslash it doesn't turn into a dot) where its router asks for

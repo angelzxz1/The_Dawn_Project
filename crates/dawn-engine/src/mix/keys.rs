@@ -176,7 +176,7 @@ impl<'a> Timing<'a> {
             tracks: song
                 .tracks
                 .iter()
-                .map(|t| fx::latency(&t.effects, sample_rate))
+                .map(|t| t.chain_latency(sample_rate))
                 .collect(),
             buses: song
                 .buses

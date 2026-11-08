@@ -10,7 +10,8 @@
 //! A plugin (`EffectSettings::Plugin`) is run by the app's host: the host
 //! puts its audio processor in a slot as the song is made, and the effect
 //! takes it from there when it's made (off the audio thread). While the
-//! slot is empty, the effect already playing carries on.
+//! slot is empty, the effect already playing carries on. A plugin
+//! instrument (`player`) takes its processor from a slot the same way.
 
 use std::fmt;
 use std::sync::{Arc, Mutex};
@@ -39,10 +40,41 @@ use crate::effects::tuner::{TunerKernel, TunerSettings, TunerTap};
 use crate::effects::utility::{UtilityKernel, UtilitySettings};
 use crate::params::ParamSource;
 
+/// What a plugin instrument is told to play.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum PluginNote {
+    /// A key pressed, its velocity 0-1.
+    On {
+        key: u8,
+        velocity: f32,
+    },
+    Off {
+        key: u8,
+    },
+    /// The pitch bend, -1..1.
+    Bend(f32),
+    /// The mod wheel, 0..1.
+    ModWheel(f32),
+}
+
+/// A note at a frame of the block it comes with.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct TimedNote {
+    pub offset: u32,
+    pub note: PluginNote,
+}
+
 /// A plugin's audio processor, run by the app's host: it processes a
 /// stereo block (at most `MAX_BLOCK` frames) in place, on the audio thread.
 pub trait PluginProcessor: Send {
     fn process(&mut self, l: &mut [f32], r: &mut [f32]);
+
+    /// An instrument's block: the notes in it (in the order of their
+    /// frames), and `l` and `r` silent, for it to play into.
+    fn play(&mut self, notes: &[TimedNote], l: &mut [f32], r: &mut [f32]) {
+        let _ = notes;
+        self.process(l, r);
+    }
 }
 
 /// Where the host leaves a plugin's processor for the effect to take.
@@ -64,7 +96,8 @@ impl PluginSlot {
     }
 }
 
-/// A plugin effect: its slot, and how late its sound comes out (frames).
+/// A plugin effect (or instrument): its slot, and how late its sound comes
+/// out (frames).
 #[derive(Clone)]
 pub struct PluginSettings {
     pub slot: Arc<PluginSlot>,

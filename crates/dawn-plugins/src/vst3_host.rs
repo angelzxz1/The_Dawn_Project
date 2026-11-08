@@ -9,6 +9,11 @@
 //! a plug frame (its window asks to be resized), and memory streams for its
 //! state. A plugin's state is its component's and its controller's, one
 //! after the other (`save_state`).
+//!
+//! An instrument is given its notes with each block (`play`), as note-on
+//! and note-off events on its first event bus; the pitch bend and mod wheel
+//! go to the parameters its controller maps them to (IMidiMapping), as
+//! VST3 has no MIDI controller events of its own.
 
 #![allow(non_snake_case)]
 
@@ -24,12 +29,15 @@ use vst3::Steinberg::Vst::*;
 use vst3::Steinberg::*;
 use vst3::{Class, ComPtr, ComWrapper, Interface};
 
+use crate::NoteEvent;
 use crate::vst3::{Module, class_id};
 
 /// The most frames processed in one go: the engine's block.
 pub const MAX_FRAMES: usize = 2048;
 /// The most parameter edits a block carries to the processor.
 const MAX_EDITS: usize = 256;
+/// The most note events a block carries.
+const MAX_EVENTS: usize = 1024;
 
 fn tuid_of(guid: &[u8; 16]) -> TUID {
     guid.map(|b| b as std::ffi::c_char)
@@ -557,6 +565,81 @@ impl IParameterChangesTrait for Changes {
     }
 }
 
+// --- The notes a block carries (IEventList) ---
+
+struct Events(RefCell<Vec<Event>>);
+
+impl Class for Events {
+    type Interfaces = (IEventList,);
+}
+
+impl Events {
+    fn new() -> ComWrapper<Events> {
+        ComWrapper::new(Events(RefCell::new(Vec::with_capacity(MAX_EVENTS))))
+    }
+
+    /// Adds one, unless the block's full (it doesn't allocate).
+    fn push(&self, event: Event) {
+        let mut events = self.0.borrow_mut();
+        if events.len() < events.capacity() {
+            events.push(event);
+        }
+    }
+
+    fn note(offset: i32, kind: u16, key: u8, velocity: f32) -> Event {
+        // SAFETY: an event is plain data; all zeros is a valid one.
+        let mut e: Event = unsafe { std::mem::zeroed() };
+        e.busIndex = 0;
+        e.sampleOffset = offset;
+        e.flags = Event_::EventFlags_::kIsLive as uint16;
+        e.r#type = kind;
+        if kind == Event_::EventTypes_::kNoteOnEvent as uint16 {
+            e.__field0.noteOn = NoteOnEvent {
+                channel: 0,
+                pitch: i16::from(key),
+                tuning: 0.0,
+                velocity,
+                length: 0,
+                noteId: -1,
+            };
+        } else {
+            e.__field0.noteOff = NoteOffEvent {
+                channel: 0,
+                pitch: i16::from(key),
+                velocity,
+                noteId: -1,
+                tuning: 0.0,
+            };
+        }
+        e
+    }
+}
+
+impl IEventListTrait for Events {
+    unsafe fn getEventCount(&self) -> int32 {
+        self.0.borrow().len() as int32
+    }
+
+    unsafe fn getEvent(&self, index: int32, e: *mut Event) -> tresult {
+        let events = self.0.borrow();
+        match events.get(index.max(0) as usize) {
+            Some(event) if !e.is_null() => {
+                unsafe { *e = *event };
+                kResultOk
+            }
+            _ => kInvalidArgument,
+        }
+    }
+
+    unsafe fn addEvent(&self, e: *mut Event) -> tresult {
+        if e.is_null() {
+            return kInvalidArgument;
+        }
+        self.push(unsafe { *e });
+        kResultOk
+    }
+}
+
 // --- The plugin ---
 
 /// A COM pointer moved to the audio thread: the plugin's processor is
@@ -590,6 +673,12 @@ pub struct Vst3Processor {
     edits: Consumer<(ParamID, ParamValue)>,
     changes: ComWrapper<Changes>,
     changes_ptr: ComPtr<IParameterChanges>,
+    /// Its notes, if it has an event bus to take them.
+    events: Option<(ComWrapper<Events>, ComPtr<IEventList>)>,
+    /// The parameters its controller maps the pitch bend and the mod wheel
+    /// to, if any.
+    bend: Option<ParamID>,
+    mod_wheel: Option<ParamID>,
 }
 
 // SAFETY: the raw pointers point into its own buffers, and the COM objects
@@ -600,6 +689,17 @@ impl Vst3Processor {
     /// Processes a stereo block in place (its main buses: a mono one takes
     /// both sides mixed and gives its one to both).
     pub fn process(&mut self, l: &mut [f32], r: &mut [f32]) {
+        self.play(&[], l, r);
+    }
+
+    /// Whether it takes notes (it has an event bus).
+    pub fn takes_notes(&self) -> bool {
+        self.events.is_some()
+    }
+
+    /// As `process`, with the notes for the block (each at its frame, in
+    /// order): what an instrument plays.
+    pub fn play(&mut self, notes: &[(u32, NoteEvent)], l: &mut [f32], r: &mut [f32]) {
         let n = l.len().min(r.len()).min(MAX_FRAMES);
         let main_in = self.inputs.first().copied().unwrap_or(0);
         for (c, buf) in self.buffers_in.iter_mut().enumerate() {
@@ -618,6 +718,42 @@ impl Vst3Processor {
         while let Ok((id, value)) = self.edits.pop() {
             self.changes.add(id, value);
         }
+        if let Some((events, _)) = &self.events {
+            events.0.borrow_mut().clear();
+        }
+        for &(at, event) in notes {
+            let at = at.min(n.saturating_sub(1) as u32) as i32;
+            match event {
+                NoteEvent::On { key, velocity } => {
+                    if let Some((events, _)) = &self.events {
+                        let on = Event_::EventTypes_::kNoteOnEvent as uint16;
+                        events.push(Events::note(at, on, key, velocity));
+                    }
+                }
+                NoteEvent::Off { key } => {
+                    if let Some((events, _)) = &self.events {
+                        let off = Event_::EventTypes_::kNoteOffEvent as uint16;
+                        events.push(Events::note(at, off, key, 0.5));
+                    }
+                }
+                // As the block starts: its controller's parameter, 0-1.
+                NoteEvent::Bend(b) => {
+                    if let Some(id) = self.bend {
+                        self.changes
+                            .add(id, f64::from((b.clamp(-1.0, 1.0) + 1.0) * 0.5));
+                    }
+                }
+                NoteEvent::ModWheel(m) => {
+                    if let Some(id) = self.mod_wheel {
+                        self.changes.add(id, f64::from(m.clamp(0.0, 1.0)));
+                    }
+                }
+            }
+        }
+        let input_events = self
+            .events
+            .as_ref()
+            .map_or(std::ptr::null_mut(), |(_, p)| p.as_ptr());
         let mut data = ProcessData {
             processMode: ProcessModes_::kRealtime as int32,
             symbolicSampleSize: SymbolicSampleSizes_::kSample32 as int32,
@@ -628,7 +764,7 @@ impl Vst3Processor {
             outputs: self.buses_out.as_mut_ptr(),
             inputParameterChanges: self.changes_ptr.as_ptr(),
             outputParameterChanges: std::ptr::null_mut(),
-            inputEvents: std::ptr::null_mut(),
+            inputEvents: input_events,
             outputEvents: std::ptr::null_mut(),
             processContext: std::ptr::null_mut(),
         };
@@ -733,7 +869,7 @@ impl Vst3Plugin {
         }
         let processor = component
             .cast::<IAudioProcessor>()
-            .ok_or("It isn't an audio effect.")?;
+            .ok_or("It doesn't process audio.")?;
         let (controller, separate) = match component.cast::<IEditController>() {
             Some(c) => (Some(c), false),
             None => {
@@ -978,6 +1114,40 @@ impl Vst3Plugin {
         let buses_out = buses(&outputs, &mut pointers_out);
         let changes = Changes::new();
         let changes_ptr = changes.to_com_ptr::<IParameterChanges>().expect("changes");
+        // Its notes come on its first event bus, if it has one.
+        let event_buses = unsafe {
+            self.component.getBusCount(
+                MediaTypes_::kEvent as MediaType,
+                BusDirections_::kInput as BusDirection,
+            )
+        };
+        let events = (event_buses > 0).then(|| {
+            unsafe {
+                self.component.activateBus(
+                    MediaTypes_::kEvent as MediaType,
+                    BusDirections_::kInput as BusDirection,
+                    0,
+                    1,
+                )
+            };
+            let events = Events::new();
+            let ptr = events.to_com_ptr::<IEventList>().expect("an event list");
+            (events, ptr)
+        });
+        let mapping = self
+            .controller
+            .as_ref()
+            .and_then(|c| c.cast::<IMidiMapping>());
+        let mapped = |controller: u32| -> Option<ParamID> {
+            let mapping = mapping.as_ref()?;
+            let mut id: ParamID = 0;
+            (unsafe {
+                mapping.getMidiControllerAssignment(0, 0, controller as CtrlNumber, &mut id)
+            } == kResultOk)
+                .then_some(id)
+        };
+        let bend = mapped(ControllerNumbers_::kPitchBend as u32);
+        let mod_wheel = mapped(ControllerNumbers_::kCtrlModWheel as u32);
         let home = Arc::new(AtomicBool::new(false));
         self.home = Some(home.clone());
         Ok(Some(Vst3Processor {
@@ -994,6 +1164,9 @@ impl Vst3Plugin {
             edits,
             changes,
             changes_ptr,
+            events,
+            bend,
+            mod_wheel,
         }))
     }
 

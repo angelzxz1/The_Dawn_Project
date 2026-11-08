@@ -4,8 +4,13 @@ use std::ffi::CStr;
 use std::io::{Read, Write};
 use std::sync::atomic::{AtomicU32, Ordering};
 
+use clack_extensions::note_ports::{
+    NoteDialect, NoteDialects, NotePortInfo, NotePortInfoWriter, PluginNotePorts,
+    PluginNotePortsImpl,
+};
 use clack_extensions::state::{PluginState, PluginStateImpl};
 use clack_plugin::entry::prelude::*;
+use clack_plugin::events::spaces::CoreEventSpace;
 use clack_plugin::plugin::features::{AUDIO_EFFECT, INSTRUMENT, STEREO, SYNTHESIZER};
 use clack_plugin::prelude::*;
 use clack_plugin::stream::{InputStream, OutputStream};
@@ -108,38 +113,100 @@ pub struct Tone;
 impl Plugin for Tone {
     type AudioProcessor<'a> = ToneProcessor;
     type Shared<'a> = ();
-    type MainThread<'a> = ();
+    type MainThread<'a> = ToneMain;
+
+    fn declare_extensions(builder: &mut PluginExtensions<Self>, _shared: Option<&()>) {
+        builder.register::<PluginNotePorts>();
+    }
 }
 
-/// Silent, for now: it's here to be found as an instrument.
-pub struct ToneProcessor;
+pub struct ToneMain;
 
-impl<'a> PluginAudioProcessor<'a, (), ()> for ToneProcessor {
+impl<'a> PluginMainThread<'a, ()> for ToneMain {}
+
+/// One note port, taking CLAP's notes (and MIDI).
+impl PluginNotePortsImpl for ToneMain {
+    fn count(&self, is_input: bool) -> u32 {
+        is_input as u32
+    }
+
+    fn get(&self, index: u32, is_input: bool, writer: &mut NotePortInfoWriter) {
+        if is_input && index == 0 {
+            writer.set(&NotePortInfo {
+                id: ClapId::new(0),
+                name: b"Notes",
+                supported_dialects: NoteDialects::CLAP | NoteDialects::MIDI,
+                preferred_dialect: Some(NoteDialect::Clap),
+            });
+        }
+    }
+}
+
+/// Plays a constant level while a key is down: the velocity it was
+/// pressed with, from its note's frame (so a test reads what it was told,
+/// and when, from what it plays).
+pub struct ToneProcessor {
+    level: f32,
+    key: Option<u16>,
+}
+
+impl<'a> PluginAudioProcessor<'a, (), ToneMain> for ToneProcessor {
     fn activate(
         _host: HostAudioProcessorHandle<'a>,
-        _main_thread: &(),
+        _main_thread: &ToneMain,
         _shared: &'a (),
         _config: PluginAudioConfiguration,
     ) -> Result<Self, PluginError> {
-        Ok(Self)
+        Ok(Self {
+            level: 0.0,
+            key: None,
+        })
     }
 
     fn process(
         &mut self,
         _process: Process,
         mut audio: Audio,
-        _events: Events,
+        events: Events,
     ) -> Result<ProcessStatus, PluginError> {
+        let n = audio.frames_count() as usize;
+        let mut levels = vec![0.0f32; n];
+        let mut from = 0;
+        for event in events.input {
+            let at = (event.header().time() as usize).min(n);
+            levels[from..at].fill(self.level);
+            from = at;
+            match event.as_core_event() {
+                Some(CoreEventSpace::NoteOn(on)) => {
+                    self.key = on.pckn().key.into_specific();
+                    self.level = on.velocity() as f32;
+                }
+                Some(CoreEventSpace::NoteOff(off))
+                    if off.pckn().key.into_specific() == self.key =>
+                {
+                    self.key = None;
+                    self.level = 0.0;
+                }
+                _ => {}
+            }
+        }
+        levels[from..].fill(self.level);
         for mut port in &mut audio {
             if let Some(channels) = port.channels()?.into_f32() {
                 for pair in channels {
-                    if let ChannelPair::OutputOnly(out) | ChannelPair::InPlace(out) = pair {
-                        out.fill(0.0);
+                    match pair {
+                        ChannelPair::OutputOnly(out) | ChannelPair::InPlace(out) => {
+                            out.copy_from_slice(&levels[..out.len()]);
+                        }
+                        ChannelPair::InputOutput(_, out) => {
+                            out.copy_from_slice(&levels[..out.len()])
+                        }
+                        ChannelPair::InputOnly(_) => {}
                     }
                 }
             }
         }
-        Ok(ProcessStatus::Sleep)
+        Ok(ProcessStatus::Continue)
     }
 }
 
@@ -214,7 +281,7 @@ impl PluginFactoryImpl for TestFactory {
                 host_info,
                 &self.tone,
                 |_| Ok(()),
-                |_, _| Ok(()),
+                |_, _| Ok(ToneMain),
             ))
         } else {
             None

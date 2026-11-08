@@ -37,6 +37,7 @@ import { warpPieces } from "../../project/warp";
 import type { AudioClipInstance } from "../../project/types";
 import { noteIssue } from "../../services/issues";
 import { effectActions } from "../../state/effectActions";
+import { trackActions } from "../../state/trackActions";
 
 /** 32-bit FNV-1a of a string, as hex: a short id for a long key. */
 function hash(text: string): string {
@@ -335,10 +336,12 @@ class NativeEngine {
     return same ? now : { errors, windows: p.windows };
   }
 
-  /** Keeps a plugin effect's state in the project, as the plugin has it. */
+  /** Keeps a plugin's state in the project, as the plugin has it: an
+   * effect's (by its id) or an instrument's (by its track's). */
   private async keepPluginState(effectId: string): Promise<void> {
     try {
-      effectActions.setPluginState(effectId, await nativeBridge.pluginState(effectId));
+      const state = await nativeBridge.pluginState(effectId);
+      if (!trackActions.setPluginInstrumentState(effectId, state)) effectActions.setPluginState(effectId, state);
     } catch (error) {
       noteIssue("native.pluginState", error);
     }

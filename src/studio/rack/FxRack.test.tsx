@@ -64,6 +64,27 @@ describe("the instrument slot", () => {
     expect(onInstrumentChange).toHaveBeenLastCalledWith(null);
   });
 
+  test("a plugin isn't offered until the track has one", async () => {
+    const { screen } = renderRack();
+    const slot = screen.getByRole("group", { name: "Instrument" });
+    await expect.element(slot.getByRole("button", { name: INSTRUMENT_LABELS.piano })).toBeVisible();
+    await expect.element(slot.getByRole("button", { name: "Plugin" })).not.toBeInTheDocument();
+  });
+
+  test("a track's plugin is offered, and its card names it", async () => {
+    const keys = { format: "vst3" as const, id: "ABCD", name: "Keys", vendor: "Cloud Synths", path: "C:/VST3/Keys.vst3" };
+    const { screen, onInstrumentChange } = renderRack({ instrument: "plugin", instrumentSettings: { pluginInstrument: keys } });
+    const pluginSlot = screen.getByRole("group", { name: "Instrument" });
+    await expect.element(pluginSlot.getByRole("button", { name: "Plugin" })).toHaveAttribute("aria-pressed", "true");
+    await expect.element(pluginSlot.getByText("Keys")).toBeVisible();
+    await expect.element(pluginSlot.getByText("VST3")).toBeVisible();
+    // It plays in the native engine, which isn't on here.
+    await expect.element(pluginSlot.getByRole("button", { name: "Open its window" })).toBeDisabled();
+    await expect.element(pluginSlot.getByRole("status")).toHaveTextContent(/native engine/);
+    await pluginSlot.getByRole("button", { name: INSTRUMENT_LABELS.synth }).click();
+    expect(onInstrumentChange).toHaveBeenCalledWith("synth");
+  });
+
   test("with none loaded, it says the track is silent", async () => {
     const { screen } = renderRack({ instrument: null });
     await expect.element(screen.getByText(/No instrument loaded/)).toBeVisible();

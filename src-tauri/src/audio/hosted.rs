@@ -11,7 +11,8 @@
 //! came home (the engine dropped it: the effect went, or the device opened
 //! anew). An instance whose effect is gone is destroyed once its processor
 //! is home. Its window is a window of the app's with the plugin's own GUI
-//! in it.
+//! in it. A plugin instrument is kept the same way, by its track's id
+//! (tracks' ids and effects' never meet: "ch-3", "fx-12").
 
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
@@ -20,7 +21,8 @@ use std::sync::Arc;
 
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
-use dawn_engine::mix::{PluginProcessor, PluginSettings, PluginSlot};
+use dawn_engine::mix::{PluginNote, PluginProcessor, PluginSettings, PluginSlot, TimedNote};
+use dawn_plugins::NoteEvent;
 use dawn_plugins::host::{ClapPlugin, ClapProcessor, ParentWindow, PluginEntry, load_entry};
 use dawn_plugins::vst3::Module;
 use dawn_plugins::vst3_host::{Vst3Plugin, Vst3Processor, load_module};
@@ -29,21 +31,51 @@ use tauri::{AppHandle, LogicalSize, PhysicalSize, WindowEvent};
 
 use super::song::PluginSpec;
 
+/// The most notes a block gives an instrument.
+const MAX_NOTES: usize = 1024;
+
+/// The engine's notes for a block, as the plugins take them (into a
+/// buffer made beforehand: this runs on the audio thread).
+fn notes_into(notes: &[TimedNote], into: &mut Vec<(u32, NoteEvent)>) {
+    into.clear();
+    for n in notes.iter().take(MAX_NOTES) {
+        into.push((
+            n.offset,
+            match n.note {
+                PluginNote::On { key, velocity } => NoteEvent::On { key, velocity },
+                PluginNote::Off { key } => NoteEvent::Off { key },
+                PluginNote::Bend(b) => NoteEvent::Bend(b),
+                PluginNote::ModWheel(m) => NoteEvent::ModWheel(m),
+            },
+        ));
+    }
+}
+
 /// A CLAP plugin's processor, as the engine runs it.
-struct Clap(ClapProcessor);
+struct Clap(ClapProcessor, Vec<(u32, NoteEvent)>);
 
 impl PluginProcessor for Clap {
     fn process(&mut self, l: &mut [f32], r: &mut [f32]) {
         self.0.process(l, r);
     }
+
+    fn play(&mut self, notes: &[TimedNote], l: &mut [f32], r: &mut [f32]) {
+        notes_into(notes, &mut self.1);
+        self.0.play(&self.1, l, r);
+    }
 }
 
 /// A VST3 plugin's.
-struct Vst3(Vst3Processor);
+struct Vst3(Vst3Processor, Vec<(u32, NoteEvent)>);
 
 impl PluginProcessor for Vst3 {
     fn process(&mut self, l: &mut [f32], r: &mut [f32]) {
         self.0.process(l, r);
+    }
+
+    fn play(&mut self, notes: &[TimedNote], l: &mut [f32], r: &mut [f32]) {
+        notes_into(notes, &mut self.1);
+        self.0.play(&self.1, l, r);
     }
 }
 
@@ -98,12 +130,12 @@ impl Instance {
 
     fn processor(&mut self, sample_rate: f64) -> Result<Option<Box<dyn PluginProcessor>>, String> {
         Ok(match self {
-            Self::Clap(p) => p
-                .processor(sample_rate)?
-                .map(|p| Box::new(Clap(p)) as Box<dyn PluginProcessor>),
-            Self::Vst3(p) => p
-                .processor(sample_rate)?
-                .map(|p| Box::new(Vst3(p)) as Box<dyn PluginProcessor>),
+            Self::Clap(p) => p.processor(sample_rate)?.map(|p| {
+                Box::new(Clap(p, Vec::with_capacity(MAX_NOTES))) as Box<dyn PluginProcessor>
+            }),
+            Self::Vst3(p) => p.processor(sample_rate)?.map(|p| {
+                Box::new(Vst3(p, Vec::with_capacity(MAX_NOTES))) as Box<dyn PluginProcessor>
+            }),
         })
     }
 
@@ -279,9 +311,10 @@ fn close_window(h: &mut Hosted) {
     }
 }
 
-/// A plugin effect's settings for the song at `sample_rate`: its slot (with
-/// a processor if its instance has one to give) and its latency. None if
-/// it can't run; why is in the status.
+/// A plugin effect's (or instrument's, by its track's id) settings for the
+/// song at `sample_rate`: its slot (with a processor if its instance has
+/// one to give) and its latency. None if it can't run; why is in the
+/// status.
 pub fn make(effect: &str, spec: &PluginSpec, sample_rate: f64) -> Option<PluginSettings> {
     with(|host| {
         host.wanted.insert(effect.to_owned());

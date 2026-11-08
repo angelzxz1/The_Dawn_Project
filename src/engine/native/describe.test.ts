@@ -369,4 +369,16 @@ describe("what the native engine doesn't play yet", () => {
     ]);
     expect(unsupported(p).effects).toEqual([]);
   });
+
+  it("sends a plugin instrument with its plugin and saved state, and none whose details are missing", () => {
+    const p = project();
+    const keys = { format: "vst3" as const, id: "ABCD", name: "Keys", vendor: "Vendor", path: "C:/VST3/Keys.vst3", state: "AQID" };
+    p.channels = p.channels.map((c) => (c.id === "keys" ? { ...c, instrument: "plugin", pluginInstrument: keys } : c));
+    const track = describeSong(p, session, idOf).tracks[3];
+    expect(track.instrument).toEqual({ type: "plugin", plugin: { format: "vst3", id: "ABCD", path: "C:/VST3/Keys.vst3", state: "AQID" } });
+    expect(track.notes.length).toBeGreaterThan(0);
+    expect(unsupported(p).instruments).toEqual([]);
+    p.channels = p.channels.map((c) => (c.id === "keys" ? { ...c, pluginInstrument: { ...keys, id: "" } } : c));
+    expect(describeSong(p, session, idOf).tracks[3].instrument).toBeNull();
+  });
 });

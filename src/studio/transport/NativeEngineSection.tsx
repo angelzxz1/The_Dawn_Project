@@ -207,8 +207,8 @@ export function NativeEngineSection({ prefs, update }: { prefs: AudioPrefs; upda
             ))}
 
           <p className="text-[11px] leading-snug text-muted">
-            So far it plays audio clips and every instrument (the piano, the Drum Rack and the synth, from clips and the keys you
-            play) through the mix (volume, pan, mute, solo, groups, sends), the dynamics and EQ effects (Compressor, Glue
+            So far it plays audio clips and every instrument (the piano, the Drum Rack, the synth and VST3 and CLAP plugins, from
+            clips and the keys you play) through the mix (volume, pan, mute, solo, groups, sends), the dynamics and EQ effects (Compressor, Glue
             Compressor, Noise Gate, Limiter, the multiband effects, Parametric EQ, EQ Three, Utility), the Filter, the Chorus, the Delay, the Reverb, the Saturator, the Pitch Shift,
             the Furnace amp, the IR Loader and the Tuner, and VST3 and CLAP plugin effects, with sidechains, automation, delay compensation, the master limiter and the metronome.
             It records your interface&apos;s inputs too, monitored through the track&apos;s effects; recording another track&apos;s audio still

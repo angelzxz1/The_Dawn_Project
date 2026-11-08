@@ -412,8 +412,8 @@ back with the song, to be freed off the audio thread.
 
 The app finds the VST3 and CLAP plugins on the computer and lists them in
 the browser's **Plugins** tab (instruments, effects and note effects, each
-with its format). VST3 and CLAP effects play in the native engine
-(below); plugin instruments and Audio Units come next.
+with its format). VST3 and CLAP effects and instruments play in the
+native engine (below); Audio Units come next.
 
 ### Where it looks
 
@@ -508,24 +508,57 @@ window is the controller's editor view, put in the app's window by its
 handle (an HWND, an NSView). NAM's own plugin is a VST3 one: on the
 desktop, it's how NAM models play.
 
+### Playing a plugin instrument
+
+With a MIDI track's FX rack open, clicking an instrument (VST3 or CLAP) in
+the Plugins tab puts it on that track in place of the one it had (one undo
+step): the track keeps which plugin it is and the state it saved
+(`pluginInstrument`), and the picker in the rack's instrument slot offers
+**Plugin** from then on, to go back to it after trying another. Its card
+in the slot has **Open its window**, as an effect's has. It plays in the
+native engine, the track's clips and the keys played live (the computer
+keyboard, the on-screen piano, a MIDI keyboard); in the browser's engine
+it's silent.
+
+- **The engine** (`crates/dawn-engine/src/mix/player.rs`): a plugin is a
+  track's instrument like the Drum Rack or the synth (`InstrumentSpec::
+  Plugin`), its processor taken from a slot as an effect's is. The notes
+  it's given each block are those the others get (a clip's notes on their
+  frame, stopping, jumping and looping back letting go of them, a key held
+  live until it's let go), each at its frame in the block
+  (`PluginProcessor::play`); the sustain pedal is worked out before it
+  hears them (a key let go with the pedal down is let go when it lifts),
+  and it's told the pitch bend and mod wheel. Its latency counts for delay
+  compensation, as its track's chain's.
+- **CLAP**: notes go as CLAP's own note events when the plugin's first note
+  port takes them, as MIDI when it only takes MIDI; the bend and mod wheel
+  as MIDI. The host offers both dialects (its note-ports extension).
+- **VST3**: notes go as note-on and note-off events on the plugin's first
+  event bus (activated); the bend and mod wheel go to the parameters its
+  controller maps them to (IMidiMapping), as VST3 has no MIDI controller
+  events of its own. One with no audio input (most instruments) is fine.
+- **The app's side**: the instance is kept by the track's id (tracks' ids
+  and effects' never meet), and its state is kept on the track as an
+  effect's is on the effect.
+
 Not yet: parameters automated from Dawn's lanes, a plugin's sidechain
-input, and plugin presets in Dawn's preset menu (the plugin's own work in
-its window).
+input, note effects (arpeggiators), a plugin instrument's several outputs
+(only its first, as a stereo pair), and plugin presets in Dawn's preset
+menu (the plugin's own work in its window).
 
 ### Testing it
 
 `cargo test -p dawn-plugins` builds `crates/dawn-test-plugin` (a gain effect
-and a silent instrument, as both a CLAP plugin and a VST3 module, in one
-library), lays it out as this system keeps plugins, and scans it for real,
+and a tone, an instrument that plays a key's velocity as a constant level
+while it's down, as both a CLAP plugin and a VST3 module, in one library), lays it out as this system keeps plugins, and scans it for real,
 along with a bundle that's only a `moduleinfo.json` and two CLAP files that
 crash and hang on purpose. CI runs it on Windows, macOS and Linux
 (`desktop.yml`).
 
 ## Next steps
 
-1. **Plugins**: finding them, and VST3 and CLAP effects, are done
-   (above). Next, plugin instruments on MIDI tracks, played from clips and
-   live; then Audio Units on macOS.
+1. **Plugins**: finding them, and VST3 and CLAP effects and instruments,
+   are done (above). Next, Audio Units on macOS.
 2. **Export through the engine**, native file dialogs, signed installers.
 
 ## Checks

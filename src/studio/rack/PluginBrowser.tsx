@@ -25,9 +25,13 @@ const matches = (p: PluginInfo, query: string) =>
  * effects, with how the scan is going, the files that couldn't be read
  * (and why), and the folders it looks in, to which more can be added. An
  * effect is added to the chain open in the FX rack with a click
- * (`onAddEffect`, when one is open).
+ * (`onAddEffect`, when one is open), and an instrument is put on the MIDI
+ * track open there (`onAddInstrument`, when it's a MIDI track's).
  */
-export function PluginBrowser({ onAddEffect }: { onAddEffect?: (plugin: PluginInfo) => void } = {}) {
+export function PluginBrowser({
+  onAddEffect,
+  onAddInstrument,
+}: { onAddEffect?: (plugin: PluginInfo) => void; onAddInstrument?: (plugin: PluginInfo) => void } = {}) {
   const { list, error } = useSyncExternalStore(pluginStore.subscribe, () => pluginStore.current, () => pluginStore.current);
   const [query, setQuery] = useState("");
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -148,13 +152,15 @@ export function PluginBrowser({ onAddEffect }: { onAddEffect?: (plugin: PluginIn
                         <span className="shrink-0 rounded border border-border px-1 text-[9px] font-semibold tracking-wide">{FORMAT_LABELS[p.format]}</span>
                       </>
                     );
+                    const add = p.kind === "effect" ? onAddEffect : p.kind === "instrument" ? onAddInstrument : undefined;
+                    const does = p.kind === "effect" ? "add it to the chain open in the FX rack" : "play it on the MIDI track open in the FX rack";
                     return (
                       <li key={`${p.format}:${p.id}`} className="min-w-0">
-                        {p.kind === "effect" && onAddEffect ? (
+                        {add ? (
                           <button
                             type="button"
-                            onClick={() => onAddEffect(p)}
-                            title={`${about}\nClick to add it to the chain open in the FX rack.`}
+                            onClick={() => add(p)}
+                            title={`${about}\nClick to ${does}.`}
                             className="flex w-full min-w-0 items-center gap-1 rounded border border-transparent px-1.5 py-1 text-left text-[11px] text-muted hover:border-accent hover:bg-surface-raised hover:text-accent"
                           >
                             {row}

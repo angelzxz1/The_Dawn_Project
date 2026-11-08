@@ -2733,6 +2733,11 @@ export function Daw() {
                   ? (p) => effectActions.addPlugin(fxHostId, { format: p.format, id: p.id, name: p.name, vendor: p.vendor, path: p.path })
                   : undefined
               }
+              onAddInstrument={
+                fxChannel?.type === "midi"
+                  ? (p) => trackActions.setPluginInstrument(fxChannel.id, { format: p.format, id: p.id, name: p.name, vendor: p.vendor, path: p.path })
+                  : undefined
+              }
             />
           ) : undefined
         }

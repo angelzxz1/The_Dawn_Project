@@ -8,11 +8,13 @@ import { NullInstrument, type Instrument } from "./instrument";
 import { pianoAudio } from "./piano/audio";
 import { drumRackAudio } from "./drum-rack/audio";
 import { synthAudio } from "./synth/audio";
+import { pluginInstrumentAudio } from "./plugin/audio";
 
 const AUDIO: Record<InstrumentType, InstrumentAudio> = {
   piano: pianoAudio,
   drums: drumRackAudio,
   synth: synthAudio,
+  plugin: pluginInstrumentAudio,
 };
 
 export function createInstrument(type: InstrumentType | null, onSettled: () => void, settings: InstrumentSettings = {}): Instrument {

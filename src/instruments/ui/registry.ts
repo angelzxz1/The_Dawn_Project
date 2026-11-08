@@ -6,9 +6,11 @@ import type { InstrumentUi } from "./types";
 import { pianoUi } from "../piano/ui";
 import { drumRackUi } from "../drum-rack/ui";
 import { synthUi } from "../synth/ui";
+import { pluginInstrumentUi } from "../plugin/ui";
 
 export const INSTRUMENT_UI: Record<InstrumentType, InstrumentUi> = {
   piano: pianoUi,
   drums: drumRackUi,
   synth: synthUi,
+  plugin: pluginInstrumentUi,
 };

@@ -91,6 +91,13 @@ impl Track {
         automation::value_at(&self.volume_automation, t).map_or(self.volume, db_to_gain)
     }
 
+    /// How late its sound leaves its chain (frames): its instrument's
+    /// latency (a plugin's), then its effects'.
+    pub fn chain_latency(&self, sample_rate: f64) -> usize {
+        self.instrument.as_ref().map_or(0, InstrumentSpec::latency)
+            + fx::latency(&self.effects, sample_rate)
+    }
+
     /// Its pan at `t`.
     pub fn pan_at(&self, t: f64) -> f64 {
         automation::value_at(&self.pan_automation, t).map_or(self.pan, |p| p.clamp(-1.0, 1.0))
@@ -450,6 +457,14 @@ impl Song {
             .iter()
             .map(|t| {
                 let spec = t.instrument.as_ref()?;
+                // A plugin's made when the host has left it a processor
+                // (as a plugin effect is); otherwise the one playing goes on.
+                if let InstrumentSpec::Plugin(p) = spec {
+                    return p
+                        .slot
+                        .is_filled()
+                        .then(|| Box::new(Player::new(spec, sample_rate)));
+                }
                 let playing = previous
                     .and_then(|p| p.tracks.iter().find(|x| x.id == t.id))
                     .and_then(|x| x.instrument.as_ref())
@@ -483,7 +498,7 @@ impl Song {
             .tracks
             .iter()
             .map(|t| Path {
-                latency: fx::latency(&t.effects, sample_rate),
+                latency: t.chain_latency(sample_rate),
                 live: t.live,
                 dest: match t.destination {
                     Destination::Track(d) => Some(d),
