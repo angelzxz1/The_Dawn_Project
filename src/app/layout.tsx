@@ -3,9 +3,9 @@ import { geist, geistMono } from "@/fonts/geist";
 import "@/fonts/alphabets.css";
 import "./globals.css";
 import { SITE_URL } from "@/site/siteUrl";
+import { EFFECT_COUNT } from "@/effects/registry";
 
-const SUMMARY =
-  "Record guitar through real amp models, make beats, mix with 18 studio effects and export your song, in a browser tab. Free, with nothing to install and no account.";
+const SUMMARY = `Record guitar through real amp models, make beats, mix with ${EFFECT_COUNT} studio effects and export your song, in a browser tab. Free, with nothing to install and no account.`;
 
 export const metadata: Metadata = {
   // Where the site lives, for absolute social-card image links. Set

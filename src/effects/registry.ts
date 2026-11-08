@@ -73,6 +73,10 @@ export const EFFECT_GROUPS: { name: string; types: EffectType[] }[] = EFFECT_GRO
   types: ALL.filter((e) => e.group === name && !e.hidden).map((e) => e.type),
 }));
 
+/** How many effects Dawn has (those in the browser: a plugin effect isn't
+ * one of them), for the website's copy. */
+export const EFFECT_COUNT = EFFECT_GROUPS.reduce((n, g) => n + g.types.length, 0);
+
 export const EFFECT_LABELS = Object.fromEntries(ALL.map((e) => [e.type, e.label])) as Record<EffectType, string>;
 
 /** Effect types whose detector can listen to another track (a sidechain). */

@@ -2,6 +2,7 @@
 // landing page. Keep answers true to what Dawn does today.
 
 import { membershipPlatforms } from "@/services/support";
+import { EFFECT_COUNT } from "@/effects/registry";
 
 export const FAQ_CATEGORIES = ["General", "Recording & guitar", "Projects & privacy", "Browsers & devices", "Support & money"] as const;
 export type FaqCategory = (typeof FAQ_CATEGORIES)[number];
@@ -30,7 +31,7 @@ export const FAQS: Faq[] = [
   { id: "other-daw", category: "Projects & privacy", q: "Can I move a project to another DAW?", a: "Yes. Export stems (one WAV per track, all starting together) and MIDI, then import them anywhere." },
   { id: "browsers", category: "Browsers & devices", q: "Which browsers are supported?", a: "Chrome and Edge on a desktop computer work best. Firefox and Safari work with some limits, which the setup guide explains." },
   { id: "mobile", category: "Browsers & devices", q: "Does it work on phones or tablets?", a: "Not yet. Mobile browsers have tighter limits on audio and files, so Dawn focuses on desktop computers for now." },
-  { id: "vst", category: "Browsers & devices", q: "Can I use my VST plugins?", a: "Not in the browser. That's what the 18 built-in effects, the NAM Amp and the IR Loader are for. You can always export stems and finish in your main DAW." },
+  { id: "vst", category: "Browsers & devices", q: "Can I use my VST plugins?", a: `Not in the browser: that's what Dawn's ${EFFECT_COUNT} built-in effects, the NAM Amp and the IR Loader among them, are for. Dawn's desktop app, on its way, plays your VST3 and CLAP effects and instruments. You can always export stems and finish in your main DAW.` },
   { id: "chromebook", category: "Browsers & devices", q: "Does it work on a Chromebook?", a: "It should, in Chrome. Performance depends on the model; if you try it, tell us how it went in the Discord." },
   { id: "supporters", category: "Support & money", q: "What do supporters get?", a: "A monthly sound pack, early access to new features, a vote on what gets built next, and your name in the credits. See the Support page for each tier." },
   { id: "cancel", category: "Support & money", q: "Can I cancel at any time?", a: `Yes. Memberships are managed on ${membershipPlatforms().join(" or ")}, and you can cancel there whenever you like.` },

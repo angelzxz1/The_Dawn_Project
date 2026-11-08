@@ -2,7 +2,7 @@
 
 **The Dawn Project** is a digital audio workstation (DAW) that runs entirely
 in the browser. You can record and edit MIDI and audio, arrange clips on a
-timeline, play three built-in instruments, and mix with 18 studio effects.
+timeline, play three built-in instruments, and mix with 19 studio effects.
 Projects are saved to a folder on your computer. Nothing has to be installed
 and no account is needed: the sound is made on your machine with the Web
 Audio API.
@@ -27,8 +27,8 @@ Live and Reaper.
 
 ## What it can do
 
-- **Templates.** Start from Guitar Demo, Beat, Voice + Guitar or an empty
-  project, each set up and ready to play or record.
+- **Templates.** Start from Guitar Demo, Beat, Voice + Guitar, Podcast or
+  an empty project, each set up and ready to play or record.
 - **Grooves.** 60 drum patterns in 12 genres (intro, verse, chorus, fill,
   ending) to drag onto a track and play over.
 - **MIDI and audio tracks.** Add as many tracks as you like. Each holds any
@@ -66,11 +66,15 @@ Live and Reaper.
 - **Three instruments:** a sampled grand piano, a 16-pad Drum Rack (modeled
   drum-machine voices or your own samples), and Daybreak, a wavetable synth
   with a modulation matrix.
-- **18 effects**, most with their own full-size window, graphs and meters,
+- **19 effects**, most with their own full-size window, graphs and meters,
   plus presets.
 - **Sidechain.** Compressors, gates and multiband dynamics can listen to
   another track (for example, the kick ducking the bass).
 - **Send/return buses** and a **master bus**, each with their own effects.
+- **Mixer view**: a channel strip for every track, bus and the master, with
+  meters, which can go in a window of its own (on a second screen, say).
+- **Loudness meter** on the master: momentary, short-term and integrated
+  LUFS, as streaming services measure it.
 - **Group tracks** (like Ableton's groups or Reaper's folders), and
   **track-to-track routing**: Audio to and Audio from, like Ableton, with
   Pre FX, Post FX or Post Fader taps, so a track can process, monitor or
@@ -97,11 +101,11 @@ A MIDI track plays one instrument, which you choose in its FX rack.
 | Instrument | What it is |
 | --- | --- |
 | **Piano** | A sampled acoustic grand, the Salamander Grand Piano (a Yamaha C5). |
-| **Drums (Drum Rack)** | 16 pads, each a modeled drum voice (kick, snare, clap, hi-hat, cymbal, tom, rim, cowbell, shaker, clave) or a sample you drop in, with its own tune, decay, tone, drive, filter, level, pan and choke group. Eight factory kits (808, 909, Trap, Lo-Fi, Electro, Techno, Studio, Percussion), and you can save your own. See [The Drum Rack](#the-drum-rack). |
-| **Synth (Daybreak)** | A wavetable synth in the spirit of Ableton's Wavetable and Vital. It has two wavetable oscillators (17 factory tables, or import your own) with warps and up to 16-voice unison, a sub and a noise source, and two filters (11 types). Three envelopes, three LFOs and four macros drive a drag-and-drop modulation matrix. It comes with 28 factory presets, and you can save your own. See [Daybreak, the synth](#daybreak-the-synth). |
+| **Drums (Drum Rack)** | 16 pads, each a modeled drum voice (kick, snare, clap, hi-hat, cymbal, tom, rim, cowbell, shaker, clave) or a sample you drop in, with its own tune, decay, tone, drive, filter, level, pan and choke group. Ten factory kits (Dawn 808, 909 Punch, Trap, Lo-Fi, Electro, Techno, Studio, Rock Kit, Brushes, Percussion), and you can save your own. See [The Drum Rack](#the-drum-rack). |
+| **Synth (Daybreak)** | A wavetable synth in the spirit of Ableton's Wavetable and Vital. It has two wavetable oscillators (17 factory tables, or import your own) with warps and up to 16-voice unison, a sub and a noise source, and two filters (11 types). Three envelopes, three LFOs and four macros drive a drag-and-drop modulation matrix. It comes with 34 factory presets, and you can save your own. See [Daybreak, the synth](#daybreak-the-synth). |
 
-All three respond to velocity, the sustain pedal, pitch bend and the mod
-wheel.
+All three respond to velocity and the sustain pedal; the synth also
+responds to pitch bend and the mod wheel.
 
 ## Daybreak, the synth
 
@@ -282,7 +286,7 @@ modulations and macros.
 | --- | --- |
 | Bass | Dawn Sub, Reese, Acid Line, Growler, Wobble (Macro 1 speeds up the wobble), FM Pluck Bass |
 | Lead | Init, Daybreak Lead, Sync Scream, Pulse Lead, Vowel Lead, Chip Arp |
-| Pad | Sunrise Pad, Glass Pad, Choir Air, Analog Strings, Evolving Wash |
+| Pad | Sunrise Pad, Glass Pad, Choir Air, Analog Strings, Evolving Wash, Prism Bloom (Macro 1 brightens it), Pump Glow (pumps on every beat), Ember Low, Halo Voices, Neon Fifths, Blaze Wall |
 | Pluck | Crystal Pluck, Dawn Pluck, Plucked String (noise ringing a tuned comb), Kalimba |
 | Keys | Drawbar Organ (Macro 1 adds drawbars), Electric Keys, Bell Keys |
 | FX | Riser, Glitch Stab, Metal Hit, Laser Zap |

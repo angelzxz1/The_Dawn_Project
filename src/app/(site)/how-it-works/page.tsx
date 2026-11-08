@@ -185,7 +185,7 @@ const GUIDES = [
       { title: 'Turn off system "enhancements"', text: "Disable any noise reduction or audio effects on the input device in your operating system settings." },
       { title: "Monitor through the amp", text: "Turn on monitoring with the headphones button to hear your guitar through the NAM Amp." },
       { title: "Keep latency low", text: "Use wired headphones, close heavy tabs, plug the laptop in, and choose lighter amp captures on older machines." },
-      { title: "Set the recording offset", text: "If takes land early or late, record a few notes against the metronome and adjust the offset once." },
+      { title: "Set the recording offset", text: "If takes land early or late, measure the delay with a loopback cable in Preferences → Recording, or record a few notes against the metronome and adjust the offset once." },
     ],
   },
   {
@@ -204,7 +204,7 @@ const LATENCY_TIPS: [string, string][] = [
   ["Wired headphones", "Bluetooth alone can add more delay than everything else combined."],
   ["Fewer tabs", "Close heavy tabs and apps while you record."],
   ["Plugged in", "Laptops on battery often slow the audio down."],
-  ["Lighter captures", "Pick the light version of a tone on older machines."],
+  ["Lighter captures", "Pick a lighter amp capture on older machines."],
 ];
 
 const FIXES: [string, string][] = [

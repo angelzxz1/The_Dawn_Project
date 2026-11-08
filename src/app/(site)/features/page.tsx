@@ -3,12 +3,12 @@ import type { ReactNode } from "react";
 import { AlignedTake, ChainChips, DeviceCard, ExportList, FileTree, PianoRoll, Routing, StatusChips, Well } from "@/site/illustrations";
 import { EffectsGrid, type EffectInfo } from "@/site/interactive";
 import { CheckList, Container, CtaBand, JumpLinks, PageIntro, SectionHead, secondaryButton } from "@/site/ui";
-import { EFFECT_GROUPS, EFFECT_LABELS, type EffectType } from "@/effects/registry";
+import { EFFECT_COUNT, EFFECT_GROUPS, EFFECT_LABELS, type EffectType } from "@/effects/registry";
 import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "Features",
-  description: "Recording, NAM amp models and cabinet IRs, 18 effects, sidechain, buses, automation, three instruments and honest exports, all in a browser tab.",
+  description: `Recording, NAM amp models and cabinet IRs, ${EFFECT_COUNT} effects, sidechain, buses, automation, three instruments and honest exports, all in a browser tab.`,
 };
 
 /** One line on each effect; the list itself comes from the studio. */
@@ -47,12 +47,11 @@ const HOOD: [string, string][] = [
 ];
 
 const NEXT: [string, string][] = [
-  ["Loop recording with take comping", "Record several takes and keep the best parts."],
+  ["Desktop app", "Dawn installed on Windows and macOS, playing your VST3 and CLAP plugins."],
   ["Bass instrument", "A sampled bass, plus bass amp captures."],
   ["Sampler", "Load a sample, play it chromatically or slice loops."],
-  ["Mixer view", "Channel strips side by side."],
   ["Spanish interface", "Dawn en español."],
-  ["Loudness meter", "LUFS and reference-track A/B."],
+  ["Reference tracks", "A/B your mix against a song you love."],
 ];
 
 /** A feature section: the words on one side, a drawing on the other. */
@@ -92,7 +91,7 @@ export default function FeaturesPage() {
       <PageIntro
         eyebrow="Features"
         title="A real studio, in the tab you already have open."
-        lead="Recording, guitar amps, 18 effects, sidechain, buses, automation, three instruments and honest exports. Here is everything Dawn does today."
+        lead={`Recording, guitar amps, ${EFFECT_COUNT} effects, sidechain, buses, automation, three instruments and honest exports. Here is everything Dawn does today.`}
       >
         <JumpLinks
           label="On this page"
@@ -115,8 +114,9 @@ export default function FeaturesPage() {
         lead="Plug in, arm a track and press R. Dawn measures your latency and lines every take up with the grid."
         items={[
           { strong: "Count-in, loop and metronome", text: "so you can focus on playing." },
-          { strong: "Latency alignment", text: "with a manual offset for your exact setup." },
-          { strong: "Multi-channel MIDI recording", text: "with each track armed on its own." },
+          { strong: "Latency alignment", text: "measured with a loopback cable, or set by ear with an offset." },
+          { strong: "Takes and comping", text: "loop-record, then keep the best parts of each take." },
+          { strong: "Punch in and out", text: "to fix one part without touching the rest." },
           { strong: "Clean input", text: "with the browser's voice-call processing turned off." },
         ]}
         visual={
@@ -139,7 +139,7 @@ export default function FeaturesPage() {
           { strong: "NAM Amp", text: "loads any .nam capture." },
           { strong: "IR Loader", text: "loads any cabinet impulse response." },
           { strong: "Ready-made chains", text: "from gate to amp, cabinet, EQ and reverb." },
-          { strong: "Light captures", text: "for older laptops." },
+          { strong: "Dawn's own cabinets", text: "and the Furnace tube amp, built in with nothing to download." },
         ]}
         visual={
           <Well className="flex flex-col gap-4">
@@ -158,7 +158,7 @@ export default function FeaturesPage() {
           <SectionHead
             id="effects-h"
             eyebrow="Effects"
-            title="18 studio effects. No plugins to buy."
+            title={`${EFFECT_COUNT} studio effects. No plugins to buy.`}
             lead="Every effect runs inside the browser's audio engine, works on any track or bus, and every knob can be automated."
             className="max-w-[720px]"
           />
@@ -232,9 +232,9 @@ export default function FeaturesPage() {
             <FileTree
               lines={[
                 { text: "▾ Late Night Riff/", depth: 0 },
-                { text: "project.json", depth: 1 },
+                { text: "project.dawn.json", depth: 1 },
                 { text: "history.json", depth: 1 },
-                { text: "▾ audio/", depth: 1 },
+                { text: "▾ Samples/", depth: 1 },
                 { text: "guitar-take-3.wav", depth: 2 },
                 { text: "vocals-take-1.wav", depth: 2 },
                 { text: "late-night-riff.mp3", depth: 0, hot: true },

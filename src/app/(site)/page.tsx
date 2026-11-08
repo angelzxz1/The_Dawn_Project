@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { LANDING_FAQ_IDS } from "@/content/faq";
+import { EFFECT_COUNT } from "@/effects/registry";
 import { TIERS } from "@/content/tiers";
 import { ChainChips, EqCurve, FileTree } from "@/site/illustrations";
 import { FaqAccordion, OpenStudioIfInstalled, Tiers } from "@/site/interactive";
@@ -11,17 +12,17 @@ import { DEMO_VIDEO_URL, supportLink } from "@/site/siteLinks";
 export const metadata: Metadata = {
   title: { absolute: "The Dawn Project — Your studio, one tab away" },
   description:
-    "Record guitar through real amp models, make beats, mix with 18 studio effects and export your song, in a browser tab. Free, with nothing to install and no account.",
+    `Record guitar through real amp models, make beats, mix with ${EFFECT_COUNT} studio effects and export your song, in a browser tab. Free, with nothing to install and no account.`,
 };
 
 const HIGHLIGHTS: [string, string][] = [
-  ["18", "built-in studio effects, with sidechain and automation"],
+  [String(EFFECT_COUNT), "built-in studio effects, with sidechain and automation"],
   ["NAM + IRs", "real amp models and cabinets in a browser tab"],
   ["0", "installs, plugins or accounts needed"],
 ];
 
 const STEPS: [string, string][] = [
-  ["Pick a template", "Guitar demo, Beat, Voice + guitar, or an empty project. Every template makes sound within three clicks."],
+  ["Pick a template", "Guitar demo, Beat, Voice + guitar, Podcast, or an empty project. Every template makes sound within three clicks."],
   ["Record", "Count-in, metronome, loop and latency alignment, so your takes land on the beat."],
   ["Export and share", "MP3 for your band chat, WAV for quality, stems and MIDI for your main DAW."],
 ];
@@ -72,7 +73,7 @@ export default function Home() {
             Your studio, one tab away.
           </h1>
           <p className={`${leadClass} max-w-[640px] text-[clamp(17px,1.6vw,20px)]`}>
-            Record guitar through real amp models, make beats, mix with 18 studio effects and export your song. Nothing to install, no plugins to buy, no account.
+            Record guitar through real amp models, make beats, mix with {EFFECT_COUNT} studio effects and export your song. Nothing to install, no plugins to buy, no account.
           </p>
           <div className="flex flex-wrap justify-center gap-3 pt-1">
             <OpenDawn />
@@ -130,13 +131,13 @@ export default function Home() {
             <FeatureCard
               eyebrow="Guitar tones"
               title="Plug in and play through a real amp."
-              text="Neural amp models (NAM) and cabinet impulse responses run right in the tab. Start from the built-in tones or load your own .nam captures and IRs."
+              text="Neural amp models (NAM) and cabinet impulse responses run right in the tab. Start from Dawn's built-in cabinets and Furnace tube amp, or load your own .nam captures and IRs."
             >
               <ChainChips items={["Gate", "NAM Amp", "Cabinet IR", "EQ", "Reverb"]} hot={["NAM Amp", "Cabinet IR"]} />
             </FeatureCard>
             <FeatureCard
               eyebrow="Studio effects"
-              title="18 effects, no plugins to buy."
+              title={`${EFFECT_COUNT} effects, no plugins to buy.`}
               text="A 24-band EQ with mid/side, compressors, multiband dynamics and a saturator. Sidechain the kick to the bass in two clicks, and automate any knob."
             >
               <EqCurve />
@@ -149,9 +150,9 @@ export default function Home() {
               <FileTree
                 lines={[
                   { text: "▾ Late Night Riff/", depth: 0 },
-                  { text: "project.json", depth: 1 },
+                  { text: "project.dawn.json", depth: 1 },
                   { text: "history.json", depth: 1 },
-                  { text: "▾ audio/", depth: 1 },
+                  { text: "▾ Samples/", depth: 1 },
                   { text: "guitar-take-3.wav", depth: 2 },
                   { text: "vocals-take-1.wav", depth: 2 },
                 ]}
