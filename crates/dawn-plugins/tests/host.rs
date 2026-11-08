@@ -115,11 +115,7 @@ type Play<'a> = &'a mut dyn FnMut(&[(u32, NoteEvent)], &mut [f32], &mut [f32]);
 
 /// A block of `n` frames from an instrument given `notes`: its left side
 /// (the test tone plays the same on both).
-fn played(
-    play: Play,
-    notes: &[(u32, NoteEvent)],
-    n: usize,
-) -> Vec<f32> {
+fn played(play: Play, notes: &[(u32, NoteEvent)], n: usize) -> Vec<f32> {
     let (mut l, mut r) = (vec![0.0f32; n], vec![0.0f32; n]);
     play(notes, &mut l, &mut r);
     assert_eq!(l, r);
@@ -128,9 +124,7 @@ fn played(
 
 /// The test tone plays a key's velocity from its note-on's frame to its
 /// note-off's, so what it plays says what it was told, and when.
-fn plays_its_notes_on_their_frames(
-    play: Play,
-) {
+fn plays_its_notes_on_their_frames(play: Play) {
     let on = NoteEvent::On {
         key: 60,
         velocity: 0.75,

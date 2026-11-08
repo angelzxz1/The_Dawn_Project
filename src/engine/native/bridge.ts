@@ -105,6 +105,11 @@ export const nativeBridge = {
 
   /** The song to play; says which of its files haven't been sent. */
   setSong: (song: NativeSong) => invoke<{ missing: string[] }>("engine_set_song", { song }),
+  /** The song rendered offline over `from` + `length` (s) and `tail` more,
+   * at the device's rate: the left side's samples, then the right's. Fails
+   * with "missing files:" and the files' ids (a line each) when some
+   * haven't been sent (mod.rs MISSING). */
+  bounce: (song: NativeSong, from: number, length: number, tail: number) => invoke<ArrayBuffer>("engine_bounce", { song, from, length, tail }),
 
   play: (from: number, countInBeats = 0) => invoke<void>("engine_play", { from, countInBeats }),
   stop: () => invoke<void>("engine_stop"),

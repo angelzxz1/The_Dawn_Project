@@ -38,6 +38,8 @@ import type { AudioClipInstance } from "../../project/types";
 import { noteIssue } from "../../services/issues";
 import { effectActions } from "../../state/effectActions";
 import { trackActions } from "../../state/trackActions";
+import { routeMap, upstreamOf } from "../routing";
+import type { RenderedAudio, RenderOptions } from "../../export/bounce";
 
 /** 32-bit FNV-1a of a string, as hex: a short id for a long key. */
 function hash(text: string): string {
@@ -246,24 +248,66 @@ class NativeEngine {
       const { missing } = await nativeBridge.setSong(song);
       if (missing.length === 0) return;
       // Sends what's missing, then the song again.
-      const clips = Object.values(doc.clipsByChannel)
-        .flat()
-        .filter((c): c is AudioClipInstance => c.kind === "audio");
-      const oscs = doc.channels
-        .filter((c) => c.type === "midi" && c.instrument === "synth")
-        .flatMap((c) => {
-          const params = c.synthParams ?? initSynthParams();
-          return [params.osc1, params.osc2];
-        });
-      const uploads = missing.map((id) => {
-        const load = this.loader(id, clips, oscs);
-        return load ? this.upload(id, load) : Promise.resolve();
-      });
-      await Promise.all(uploads);
+      await this.sendFiles(doc, missing);
       this.queueSong();
     } catch (error) {
       noteIssue("native.song", error);
     }
+  }
+
+  /** Sends the files `missing` names, for `doc`'s song. */
+  private async sendFiles(doc: ReturnType<typeof projectStore.get>, missing: string[]): Promise<void> {
+    const clips = Object.values(doc.clipsByChannel)
+      .flat()
+      .filter((c): c is AudioClipInstance => c.kind === "audio");
+    const oscs = doc.channels
+      .filter((c) => c.type === "midi" && c.instrument === "synth")
+      .flatMap((c) => {
+        const params = c.synthParams ?? initSynthParams();
+        return [params.osc1, params.osc2];
+      });
+    await Promise.all(
+      missing.map((id) => {
+        const load = this.loader(id, clips, oscs);
+        return load ? this.upload(id, load) : Promise.resolve();
+      })
+    );
+  }
+
+  /** The project rendered offline by the engine, for an export, as the
+   * browser's renderProject renders it (bounce.ts): the song or a range of
+   * it with its tail, a stem (one track and those routed into it heard,
+   * the master's chain left out unless asked for), at the device's rate.
+   * Nothing's played live in it. */
+  async render(options: RenderOptions & { contentEnd: number }): Promise<RenderedAudio> {
+    /** How the engine's error starts when files are missing (mod.rs MISSING). */
+    const BOUNCE_MISSING = "missing files:";
+    if (!this.state.active) throw new Error("The native engine isn't on.");
+    const doc = projectStore.get();
+    const masterChain = options.masterChain ?? true;
+    const song = describeSong(doc, { ...this.session, live: [], ...(masterChain ? {} : { limiterDb: 120 }) }, this.ids);
+    if (options.only) {
+      const stem = new Set([options.only, ...upstreamOf(options.only, routeMap(doc.channels))]);
+      song.tracks = song.tracks.map((t) => ({ ...t, audible: t.audible && stem.has(t.id) }));
+    }
+    if (!masterChain) song.masterEffects = [];
+    const from = Math.max(0, options.start ?? 0);
+    const length = Math.max(0, (options.end ?? options.contentEnd) - from);
+    // At least a second in all, as the browser's.
+    const tail = Math.max(0, options.tailSeconds ?? 2, 1 - length);
+    const bounce = () => nativeBridge.bounce(song, from, length, tail);
+    let bytes: ArrayBuffer;
+    try {
+      bytes = await bounce();
+    } catch (error) {
+      const text = String(error);
+      if (!text.startsWith(BOUNCE_MISSING)) throw error;
+      await this.sendFiles(doc, text.slice(BOUNCE_MISSING.length).split("\n").filter(Boolean));
+      bytes = await bounce();
+    }
+    const samples = new Float32Array(bytes);
+    const half = samples.length / 2;
+    return { channels: [samples.slice(0, half), samples.slice(half)], sampleRate: this.state.sampleRate };
   }
 
   /** Sends what an id names, once. */

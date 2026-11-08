@@ -55,6 +55,7 @@ const bridge = vi.hoisted(() => ({
   sustain: vi.fn<(track: string, down: boolean) => Promise<void>>(async () => {}),
   bend: vi.fn<(track: string, value: number) => Promise<void>>(async () => {}),
   modWheel: vi.fn<(track: string, value: number) => Promise<void>>(async () => {}),
+  bounce: vi.fn<(song: unknown, from: number, length: number, tail: number) => Promise<ArrayBuffer>>(async () => new Float32Array([0.1, 0.2, 0.3, 0.4]).buffer),
 }));
 vi.mock("./bridge", () => ({ nativeBridge: bridge }));
 
@@ -324,6 +325,40 @@ describe("the native engine from the studio", () => {
     }
     expect(bridge.record).toHaveBeenLastCalledWith(1, true);
     expect(bridge.finishTake).toHaveBeenLastCalledWith(null);
+  });
+
+  test("an export is rendered by the engine: a stem without the master's chain, the files it lacks sent first", async () => {
+    const url = wavUrl();
+    const p = project(url);
+    p.channels = [...p.channels, { ...p.channels[0], id: "a2", name: "Gtr" }];
+    p.masterEffects = [{ id: "m1", type: "utility", params: {} }];
+    projectStore.replace(p);
+    await nativeEngine.turnOn({ device: null, sampleRate: 48000, bufferSize: null, inputDevice: null });
+    bridge.bounce.mockRejectedValueOnce(`missing files:
+48000:${url}`);
+    bridge.loadAudio.mockClear();
+    const audio = await nativeEngine.render({ only: "a1", masterChain: false, start: 0.5, end: 3, tailSeconds: 1, contentEnd: 10 });
+    // Asked twice: the file it lacked was sent between.
+    expect(bridge.bounce).toHaveBeenCalledTimes(2);
+    expect(bridge.loadAudio.mock.calls.map((c) => c[0])).toContain(`48000:${url}`);
+    const [song, from, length, tail] = bridge.bounce.mock.calls[1] as [
+      { tracks: { id: string; audible: boolean; live: boolean }[]; masterEffects: unknown[]; master: { limiterDb: number } },
+      number,
+      number,
+      number,
+    ];
+    expect([from, length, tail]).toEqual([0.5, 2.5, 1]);
+    expect(song.tracks.map((t) => [t.id, t.audible, t.live])).toEqual([["a1", true, false], ["a2", false, false]]);
+    expect(song.masterEffects).toEqual([]);
+    expect(song.master.limiterDb).toBe(120);
+    expect(audio.sampleRate).toBe(48000);
+    expect(audio.channels.map((c) => [...c].map((v) => Math.round(v * 10) / 10))).toEqual([[0.1, 0.2], [0.3, 0.4]]);
+    // The whole mix keeps the master's chain.
+    await nativeEngine.render({ contentEnd: 10 });
+    const [mix, , mixLength, mixTail] = bridge.bounce.mock.calls[2] as [{ masterEffects: unknown[]; master: { limiterDb: number } }, number, number, number];
+    expect(mix.masterEffects).toHaveLength(1);
+    expect(mix.master.limiterDb).not.toBe(120);
+    expect([mixLength, mixTail]).toEqual([10, 2]);
   });
 
   test("a plugin whose state changed has it kept in the project; its window and errors are known", async () => {

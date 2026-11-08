@@ -4,7 +4,7 @@
 // exactly as in playback.
 
 import { zipSync } from "fflate";
-import { audibleChannels, renderProject, type BounceParams, type RenderedAudio } from "./bounce";
+import { audibleChannels, renderProject, type BounceParams, type RenderedAudio, type RenderOptions } from "./bounce";
 import { routeMap, upstreamOf } from "../engine/routing";
 import { encodeWav } from "./wav";
 import { encodeMp3 } from "./mp3";
@@ -51,9 +51,18 @@ export function stemTracks(params: BounceParams): { id: string; name: string }[]
 export async function exportProject(
   params: BounceParams,
   settings: ExportSettings,
-  options: { songName: string; loop?: { start: number; end: number }; onStatus: (s: ExportStatus) => void; cancelled?: () => boolean }
+  options: {
+    songName: string;
+    loop?: { start: number; end: number };
+    onStatus: (s: ExportStatus) => void;
+    cancelled?: () => boolean;
+    /** What renders it: the browser's offline graph unless given (the
+     * desktop app's native engine, when it's on). */
+    renderer?: (options: RenderOptions) => Promise<RenderedAudio>;
+  }
 ): Promise<ExportResult> {
   const { songName, onStatus, cancelled = () => false } = options;
+  const renderWith = options.renderer ?? ((o: RenderOptions) => renderProject(params, o));
   const range = settings.range === "loop" && options.loop ? options.loop : undefined;
   const render = { start: range?.start, end: range?.end, tailSeconds: settings.tail };
   const ext = settings.format;
@@ -64,7 +73,7 @@ export async function exportProject(
 
   if (settings.what === "mix") {
     onStatus({ label: "Rendering the mix…", fraction: 0.05 });
-    const audio = await renderProject(params, render);
+    const audio = await renderWith(render);
     check();
     if (settings.normalize) normalizePeak(audio.channels);
     onStatus({ label: settings.format === "mp3" ? "Encoding the MP3…" : "Writing the WAV…", fraction: 0.6 });
@@ -81,7 +90,7 @@ export async function exportProject(
     const base = i / tracks.length;
     const step = 1 / tracks.length;
     onStatus({ label: `Rendering ${tracks[i].name} (${i + 1} of ${tracks.length})…`, fraction: base });
-    const audio = await renderProject(params, { ...render, only: tracks[i].id, masterChain: settings.stemMasterFx });
+    const audio = await renderWith({ ...render, only: tracks[i].id, masterChain: settings.stemMasterFx });
     check();
     const blob = await encode(audio, settings, `${title} - ${tracks[i].name}`, (f) =>
       onStatus({ label: `Encoding ${tracks[i].name} (${i + 1} of ${tracks.length})…`, fraction: base + step * (0.6 + 0.4 * f) })

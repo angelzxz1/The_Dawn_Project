@@ -7,6 +7,9 @@ import { downloadBlob, ExportCancelled, exportProject, stemTracks, type ExportRe
 import { loadExportSettings, MP3_BITRATES, saveExportSettings, safeFileName, TAIL_CHOICES, type ExportSettings } from "@/export/exportFormats";
 import { reportError } from "@/services/telemetry";
 import { useShortcuts } from "@/ui/shortcuts";
+import { nativeEngine } from "@/engine/native/nativeEngine";
+import { unsupported } from "@/engine/native/describe";
+import { projectStore } from "@/state/projectStore";
 
 function Segmented<T extends string | number>({
   value,
@@ -91,6 +94,10 @@ export function ExportDialog({
   const cancelRef = useRef(false);
   const busy = status !== null;
   const tracks = stemTracks(buildParams());
+  // Rendered by the desktop app's native engine when it's on; what it
+  // doesn't play is left out, as it is from what's heard.
+  const native = nativeEngine.current.active;
+  const leftOut = native ? unsupported(projectStore.get()).effects : [];
   const update = (patch: Partial<ExportSettings>) => setS((prev) => ({ ...prev, ...patch }));
 
   // Escape cancels an export under way, else closes.
@@ -112,11 +119,15 @@ export function ExportDialog({
     setStatus({ label: "Starting…", fraction: 0 });
     saveExportSettings(s);
     try {
-      const result = await exportProject(buildParams(), s, {
+      const params = buildParams();
+      const result = await exportProject(params, s, {
         songName: safeFileName(name),
         loop: loop ?? undefined,
         onStatus: setStatus,
         cancelled: () => cancelRef.current,
+        // In the desktop app with its native engine on, the file is what
+        // the engine plays (its plugins included).
+        renderer: native ? (o) => nativeEngine.render({ ...o, contentEnd: params.contentEndSeconds }) : undefined,
       });
       downloadBlob(result.blob, result.fileName);
       onExported(result, s);
@@ -241,6 +252,13 @@ export function ExportDialog({
           Taking the parts to another DAW? MIDI tracks and clips export as .mid from the track header or the clip&rsquo;s
           right-click menu.
         </p>
+
+        {native && (
+          <p className="text-[11px] leading-snug text-muted">
+            Rendered by the native engine, as you hear it, plugins included.
+            {leftOut.length > 0 && ` Left out, as it doesn't play them: ${leftOut.join(", ")}.`}
+          </p>
+        )}
 
         {error && <p className="rounded-md border border-record/40 bg-record/10 px-3 py-2 text-[12px] text-record">{error}</p>}
 

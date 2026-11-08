@@ -5,6 +5,7 @@
 //! interface (the desktop app, `src-tauri`) or a file.
 
 pub mod automation;
+pub mod bounce;
 pub mod clip;
 pub mod engine;
 pub mod fx;
@@ -16,6 +17,7 @@ pub mod song;
 pub mod tempo;
 
 pub use automation::{EffectAutomation, ParamLane, Point};
+pub use bounce::{BounceRange, bounce};
 pub use clip::{AudioData, Clip, ClipTiming};
 pub use engine::{Engine, LiveInput, input_sample};
 pub use fx::{

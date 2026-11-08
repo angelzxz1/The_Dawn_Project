@@ -493,6 +493,17 @@ pub fn open_windows() -> Vec<String> {
     })
 }
 
+/// An export's own instances (its plugins, made by `make` under ids of its
+/// own), once it's done with them: they go, their processors home.
+pub fn forget(ids: &[String]) {
+    with(|host| {
+        for id in ids {
+            host.wanted.remove(id);
+        }
+        host.retain();
+    });
+}
+
 /// The device closed: every instance goes (their processors are home).
 pub fn forget_all() {
     with(|host| {

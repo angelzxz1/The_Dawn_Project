@@ -7,6 +7,8 @@
 //! (`engine_status`) to draw them. With the interface's input open, it says
 //! which tracks hear it live (`engine_monitor`), and records takes onto
 //! disk (`engine_record`, then `engine_finish_take` hands it the take).
+//! An export renders a song offline (`engine_bounce`), as the engine plays
+//! it.
 
 pub mod devices;
 pub mod hosted;
@@ -18,7 +20,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use dawn_engine::mix::metronome::CLICK_SOUNDS;
-use dawn_engine::mix::{AudioData, LiveInput, Song, track_key};
+use dawn_engine::mix::{AudioData, BounceRange, LiveInput, Song, bounce, track_key};
 use serde::{Deserialize, Serialize};
 use tauri::ipc::{InvokeBody, Request, Response};
 use tauri::{AppHandle, Manager, State};
@@ -347,6 +349,73 @@ pub fn engine_set_song(state: State<'_, AudioState>, song: SongSpec) -> Result<S
     inner.song = Some(built);
     hosted::end_song();
     Ok(SongSent { missing })
+}
+
+/// What `engine_bounce` says when files the song needs haven't been sent:
+/// this, then their ids, a line each. The studio sends them and asks again.
+const MISSING: &str = "missing files:";
+
+/// Renders `song` offline over `from` + `length` (s), with `tail` more for
+/// effects ringing out, at the device's rate, as the engine plays it (its
+/// files are those sent for the song playing). The body is the left side's
+/// samples then the right's (f32, little-endian). Its plugins are
+/// instances of their own, made for it (from their saved state) and gone
+/// after.
+#[tauri::command]
+pub async fn engine_bounce(
+    app: AppHandle,
+    song: SongSpec,
+    from: f64,
+    length: f64,
+    tail: f64,
+) -> Result<Response, String> {
+    // Made on the main thread, where the plugins live.
+    let (tx, rx) = std::sync::mpsc::channel();
+    let main = app.clone();
+    app.run_on_main_thread(move || {
+        let state = main.state::<AudioState>();
+        let inner = state.lock();
+        let made = inner
+            .running
+            .as_ref()
+            .map(|r| r.sample_rate)
+            .ok_or_else(|| "No audio device is open.".to_owned())
+            .map(|rate| {
+                let ids = std::cell::RefCell::new(Vec::new());
+                let (built, missing) =
+                    song::build_with(&song, None, &inner.audio, rate, &|id, spec| {
+                        let id = format!("export:{id}");
+                        ids.borrow_mut().push(id.clone());
+                        hosted::make(&id, spec, rate)
+                    });
+                (built, missing, rate, ids.into_inner())
+            });
+        let _ = tx.send(made);
+    })
+    .map_err(|e| format!("{e}"))?;
+    let (built, missing, rate, plugins) = tauri::async_runtime::spawn_blocking(move || rx.recv())
+        .await
+        .map_err(|e| format!("{e}"))?
+        .map_err(|e| format!("{e}"))??;
+    let forget = move |app: &AppHandle| {
+        let _ = app.run_on_main_thread(move || hosted::forget(&plugins));
+    };
+    if !missing.is_empty() {
+        forget(&app);
+        return Err(format!("{MISSING}\n{}", missing.join("\n")));
+    }
+    let range = BounceRange { from, length, tail };
+    let rendered =
+        tauri::async_runtime::spawn_blocking(move || bounce(built, rate, range, &mut |_| true))
+            .await
+            .map_err(|e| format!("{e}"));
+    forget(&app);
+    let [l, r] = rendered?.ok_or("The export was stopped.")?;
+    let mut bytes = Vec::with_capacity((l.len() + r.len()) * 4);
+    for s in l.iter().chain(r.iter()) {
+        bytes.extend_from_slice(&s.to_le_bytes());
+    }
+    Ok(Response::new(bytes))
 }
 
 /// A key pressed live (`velocity` 0-1) or let go (none) on a track.

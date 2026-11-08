@@ -555,11 +555,44 @@ along with a bundle that's only a `moduleinfo.json` and two CLAP files that
 crash and hang on purpose. CI runs it on Windows, macOS and Linux
 (`desktop.yml`).
 
+## Exporting through the engine
+
+With the native engine on, **File → Export** is rendered by the engine
+itself, offline and faster than real time, so the file is what you hear:
+plugin effects and instruments included, and the NAM Amp left out as it is
+from what plays (the dialog says so).
+
+- **The engine** (`crates/dawn-engine/src/mix/bounce.rs`, `bounce`): an
+  engine of its own plays the song from the range's start for its length,
+  then stops (what's still playing is let go, as stopping does) and renders
+  the tail for effects ringing out. The mix comes out late by the song's
+  latency (its delay compensation, the master's effects, the limiter's
+  lookahead), so that much more is rendered and trimmed off the front: the
+  file starts on its first beat, as the browser's export does.
+- **The app's side** (`engine_bounce` in `src-tauri/src/audio/mod.rs`):
+  the song is built on the main thread with the files sent for the song
+  playing (one not sent yet is asked for, and the studio sends it and asks
+  again), its plugins as instances of their own (made from their saved
+  state under `export:` ids, so the ones playing carry on), and rendered on
+  a thread of its own at the device's rate. The instances go after.
+- **The studio** (`nativeEngine.render`, used by `exportProject` when the
+  engine's on): the song as it's described for playing, with nothing
+  played live; a stem has only its track (and those routed into it) heard,
+  and without the master's chain, its effects are left out and the
+  limiter's ceiling raised out of the way (it still delays, so the stems
+  line up with the mix). The rest of the export (WAV or MP3, normalizing,
+  the ZIP of stems) is the browser's, as before.
+
+Not yet: an export at another rate than the device's, and a track taking
+another track's audio ("Audio From") in it.
+
 ## Next steps
 
 1. **Plugins**: finding them, and VST3 and CLAP effects and instruments,
-   are done (above). Next, Audio Units on macOS.
-2. **Export through the engine**, native file dialogs, signed installers.
+   are done (above). Audio Units on macOS wait for a Mac to build and try
+   them on.
+2. **Shipping**: exporting through the engine is done (above); next,
+   native file dialogs and signed installers.
 
 ## Checks
 
