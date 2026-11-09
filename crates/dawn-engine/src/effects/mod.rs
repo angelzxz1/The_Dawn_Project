@@ -6,6 +6,7 @@ pub mod biquad_node;
 pub mod chorus;
 pub mod compressor;
 pub mod convolver;
+pub mod crusher;
 pub mod delay;
 pub mod delay_node;
 pub mod eq_three;
@@ -30,6 +31,7 @@ pub mod wave_shaper;
 pub const PORTED: &[&str] = &[
     "chorus",
     "compressor",
+    "crusher",
     "delay",
     "distortion",
     "eq3",

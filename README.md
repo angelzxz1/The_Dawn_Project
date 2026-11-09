@@ -66,7 +66,7 @@ Live and Reaper.
 - **Three instruments:** a sampled grand piano, a 16-pad Drum Rack (modeled
   drum-machine voices or your own samples), and Daybreak, a wavetable synth
   with a modulation matrix.
-- **19 effects**, most with their own full-size window, graphs and meters,
+- **20 effects**, most with their own full-size window, graphs and meters,
   plus presets.
 - **Sidechain.** Compressors, gates and multiband dynamics can listen to
   another track (for example, the kick ducking the bass).
@@ -418,6 +418,7 @@ track, from its clips and the keys you play
 | --- | --- |
 | **Compressor** | A standard compressor with threshold, ratio, attack, release, knee, auto or manual makeup gain, dry/wet and output. It shows a transfer curve and a gain-reduction meter. **Sidechain.** |
 | **Glue Compressor** | A bus compressor modeled on a classic analog console design. It has stepped ratios (2, 4, 10), stepped attack and release with an **Auto** release, a Range control, soft clip, optional 2x oversampling, and an analog-style needle meter with a clip LED. **Sidechain** with its own dry/wet. |
+| **Crusher** | Dawn's own character compressor, after the classic 90s "distortion compressor". Input drives into a fixed threshold and Output sets the level (0-10 knobs, with Attack and Release); ratios **1:1** (color only), 2, 3, 4, 6, 10, 20:1 and **Nuke**, the knee hardening as they rise, and an opto-style release at 2:1. **British Mode** squashes the loudest hits below the softer ones. **Dist 2** adds tube-like even harmonics, **Dist 3** tape-like odd ones. The detector has an **HP** filter (less pumping from the low end) and **Band** emphasis (a de-esser). Mix for parallel compression, and a gain-reduction LED meter. Runs at 2x the sample rate (15 samples of latency). |
 | **Multiband Compressor** | Up to 6 bands with Linkwitz-Riley crossovers. Each band can compress, expand or compress upward, and has its own threshold, ratio, attack, release, range and makeup gain. **Sidechain.** |
 | **Multiband Dynamics** | Modeled on Ableton's Multiband Dynamics. It has up to 3 bands, each with an *above* and a *below* threshold, so one band can compress, expand, limit, gate and compress or expand upward at once. You edit it by dragging on its display. It also has RMS or peak detection, soft knee, and global Time and Amount controls. **Sidechain.** |
 | **Limiter** | A lookahead brickwall limiter with gain, ceiling, release and soft clip. |
@@ -1213,6 +1214,11 @@ and Ctrl/Cmd+O work everywhere but in the tour.
   (`wavetableModel.ts`) as band-limited copies with fewer and fewer
   harmonics; each note plays the richest one that won't alias. Modulation is
   worked out every 32 samples and smoothed in between.
+- **The Crusher** (`crusherModel.ts`) runs its gain, distortion and Mix
+  at 2x the sample rate (a 31-tap filter each way, 15 samples of
+  latency), so Dist 2 and Dist 3 don't alias. Its detector hears every
+  sample with no peak hold, so a fast release follows the waveform and
+  distorts the low end the way the hardware does.
 - **NAM Amp** runs Neural Amp Modeler's C++ core compiled to WebAssembly
   (`public/nam`), in a worklet.
 - **The Furnace amp** (`ampKernel.ts`) runs at 4x the sample rate (64-tap

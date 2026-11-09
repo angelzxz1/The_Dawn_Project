@@ -276,6 +276,7 @@ Los efectos:
 |---|---|
 | `compressor/` | Compresor (con sidechain). |
 | `glue/` | Glue Compressor (compresor de bus estilo consola). |
+| `crusher/` | Crusher (compresor con carácter y distorsión: ratios de 1:1 a Nuke, British Mode, Dist 2 y Dist 3). |
 | `gate/` | Noise Gate. |
 | `limiter/` | Limitador *brick-wall* con *lookahead*. |
 | `multiband/` | Compresor multibanda. |

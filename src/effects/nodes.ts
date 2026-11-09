@@ -7,6 +7,7 @@ import { type EffectType, defaultParams } from "./registry";
 import type { EffectAudio } from "./types";
 import { compressorAudio } from "./compressor/audio";
 import { glueAudio } from "./glue/audio";
+import { crusherAudio } from "./crusher/audio";
 import { multibandAudio } from "./multiband/audio";
 import { multibandDynamicsAudio } from "./multiband-dynamics/audio";
 import { limiterAudio } from "./limiter/audio";
@@ -35,6 +36,7 @@ export { IrLoaderChain } from "./ir-loader/irLoaderChain";
 const AUDIO: Record<EffectType, EffectAudio> = {
   compressor: compressorAudio,
   glue: glueAudio,
+  crusher: crusherAudio,
   multiband: multibandAudio,
   mbDynamics: multibandDynamicsAudio,
   limiter: limiterAudio,

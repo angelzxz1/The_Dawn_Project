@@ -10,6 +10,7 @@ import { mbBandCount } from "./multiband/multibandModel";
 import { EFFECT_GROUP_NAMES, type EffectDefinition, type EffectFileRef, type EffectGroup, type ParamSpec, type PluginRef } from "./types";
 import { compressorEffect } from "./compressor";
 import { glueEffect } from "./glue";
+import { crusherEffect } from "./crusher";
 import { multibandEffect } from "./multiband";
 import { multibandDynamicsEffect } from "./multiband-dynamics";
 import { limiterEffect } from "./limiter";
@@ -35,6 +36,7 @@ export type { EffectFileRef, EffectGroup, ParamSpec, PluginRef };
 const EFFECTS = [
   compressorEffect,
   glueEffect,
+  crusherEffect,
   multibandEffect,
   multibandDynamicsEffect,
   limiterEffect,

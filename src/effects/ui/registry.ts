@@ -4,6 +4,7 @@ import type { EffectType } from "../registry";
 import type { EffectUi } from "./types";
 import { compressorUi } from "../compressor/ui";
 import { glueUi } from "../glue/ui";
+import { crusherUi } from "../crusher/ui";
 import { multibandUi } from "../multiband/ui";
 import { multibandDynamicsUi } from "../multiband-dynamics/ui";
 import { limiterUi } from "../limiter/ui";
@@ -26,6 +27,7 @@ import { pluginUi } from "../plugin/ui";
 export const EFFECT_UI: Record<EffectType, EffectUi> = {
   compressor: compressorUi,
   glue: glueUi,
+  crusher: crusherUi,
   multiband: multibandUi,
   mbDynamics: multibandDynamicsUi,
   limiter: limiterUi,

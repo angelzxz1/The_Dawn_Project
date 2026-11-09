@@ -92,8 +92,9 @@ impl Default for GlueSettings {
     }
 }
 
-/// Low-pass for 2x oversampling: windowed sinc at the base rate's Nyquist.
-fn fir() -> &'static [f64; TAPS] {
+/// Low-pass for 2x oversampling: windowed sinc at the base rate's Nyquist
+/// (the Crusher's too).
+pub(crate) fn fir() -> &'static [f64; TAPS] {
     static FIR: OnceLock<[f64; TAPS]> = OnceLock::new();
     FIR.get_or_init(|| {
         let mut h = [0.0; TAPS];
@@ -144,27 +145,28 @@ fn knee(d: f64, w: f64) -> f64 {
     0.0
 }
 
+/// A run of the oversampling filter (`fir`).
 #[derive(Clone)]
-struct Fir {
+pub(crate) struct Fir {
     buf: [f64; TAPS * 2],
     pos: usize,
 }
 
 impl Fir {
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             buf: [0.0; TAPS * 2],
             pos: 0,
         }
     }
 
-    fn push(&mut self, x: f64) {
+    pub(crate) fn push(&mut self, x: f64) {
         self.pos = (self.pos + 1) % TAPS;
         self.buf[self.pos] = x;
         self.buf[self.pos + TAPS] = x;
     }
 
-    fn out(&self, h: &[f64; TAPS]) -> f64 {
+    pub(crate) fn out(&self, h: &[f64; TAPS]) -> f64 {
         let p = self.pos + 1;
         let mut y = 0.0;
         for (i, c) in h.iter().enumerate() {

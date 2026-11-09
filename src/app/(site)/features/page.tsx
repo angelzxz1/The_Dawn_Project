@@ -15,6 +15,7 @@ export const metadata: Metadata = {
 const EFFECT_NOTES: Record<EffectType, string> = {
   compressor: "Threshold, ratio, knee and makeup, with a live transfer curve.",
   glue: "Gentle bus compression that holds a mix together.",
+  crusher: "A character compressor: 1:1 to Nuke, British Mode, and tube or tape distortion.",
   multiband: "Compress lows, mids and highs separately.",
   mbDynamics: "Shape the dynamics of each band on its own.",
   limiter: "Set a ceiling and keep peaks under it.",

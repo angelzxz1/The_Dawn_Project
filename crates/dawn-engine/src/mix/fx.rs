@@ -22,6 +22,7 @@ use super::song::MAX_BLOCK;
 use crate::effects::amp::{self, AmpEffect, AmpSettings};
 use crate::effects::chorus::{ChorusKernel, ChorusSettings};
 use crate::effects::compressor::{CompressorKernel, CompressorSettings};
+use crate::effects::crusher::{CrusherKernel, CrusherSettings};
 use crate::effects::delay::{DelayKernel, DelaySettings};
 use crate::effects::eq_three::{EqThreeKernel, EqThreeSettings};
 use crate::effects::filter::{FilterKernel, FilterSettings};
@@ -124,6 +125,7 @@ pub enum EffectSettings {
     Amp(Box<AmpSettings>),
     Chorus(Box<ChorusSettings>),
     Compressor(CompressorSettings),
+    Crusher(CrusherSettings),
     Delay(DelaySettings),
     EqThree(EqThreeSettings),
     Filter(FilterSettings),
@@ -147,6 +149,7 @@ pub enum EffectKind {
     Amp,
     Chorus,
     Compressor,
+    Crusher,
     Delay,
     EqThree,
     Filter,
@@ -174,6 +177,7 @@ impl EffectSettings {
         Some(match kind {
             "chorus" => Self::Chorus(Box::new(ChorusSettings::from_params(params))),
             "compressor" => Self::Compressor(CompressorSettings::from_params(params, false)),
+            "crusher" => Self::Crusher(CrusherSettings::from_params(params)),
             "delay" => Self::Delay(DelaySettings::from_params(params)),
             "distortion" => Self::Saturator(Box::new(SaturatorSettings::from_params(params))),
             "eq3" => Self::EqThree(EqThreeSettings::from_params(params)),
@@ -201,6 +205,7 @@ impl EffectSettings {
     pub fn latency(&self, sample_rate: f64) -> usize {
         match self {
             Self::Amp(_) => amp::LATENCY,
+            Self::Crusher(_) => crate::effects::crusher::LATENCY,
             Self::Glue(s) if s.oversample => OS_LATENCY,
             Self::Limiter(_) => lookahead_frames(sample_rate),
             Self::PitchShift(s) => s.latency(sample_rate),
@@ -312,6 +317,7 @@ impl EffectSettings {
             Self::Amp(_) => EffectKind::Amp,
             Self::Chorus(_) => EffectKind::Chorus,
             Self::Compressor(_) => EffectKind::Compressor,
+            Self::Crusher(_) => EffectKind::Crusher,
             Self::Delay(_) => EffectKind::Delay,
             Self::EqThree(_) => EffectKind::EqThree,
             Self::Filter(_) => EffectKind::Filter,
@@ -401,6 +407,7 @@ enum Kernel {
     Amp(Box<AmpEffect>),
     Chorus(Box<ChorusKernel>),
     Compressor(Box<CompressorKernel>),
+    Crusher(Box<CrusherKernel>),
     Delay(Box<DelayKernel>),
     EqThree(Box<EqThreeKernel>),
     Filter(Box<FilterKernel>),
@@ -436,6 +443,9 @@ impl Effect {
             }
             EffectSettings::Compressor(s) => {
                 Kernel::Compressor(Box::new(CompressorKernel::new(sample_rate, s)))
+            }
+            EffectSettings::Crusher(s) => {
+                Kernel::Crusher(Box::new(CrusherKernel::new(sample_rate, s)))
             }
             EffectSettings::Delay(s) => Kernel::Delay(Box::new(DelayKernel::new(sample_rate, s))),
             EffectSettings::EqThree(s) => {
@@ -486,6 +496,7 @@ impl Effect {
             Kernel::Amp(_) => EffectKind::Amp,
             Kernel::Chorus(_) => EffectKind::Chorus,
             Kernel::Compressor(_) => EffectKind::Compressor,
+            Kernel::Crusher(_) => EffectKind::Crusher,
             Kernel::Delay(_) => EffectKind::Delay,
             Kernel::EqThree(_) => EffectKind::EqThree,
             Kernel::Filter(_) => EffectKind::Filter,
@@ -512,6 +523,7 @@ impl Effect {
             (Kernel::Amp(k), EffectSettings::Amp(s)) => k.set(s),
             (Kernel::Chorus(k), EffectSettings::Chorus(s)) => k.set(s),
             (Kernel::Compressor(k), EffectSettings::Compressor(s)) => k.set(s),
+            (Kernel::Crusher(k), EffectSettings::Crusher(s)) => k.set(s),
             (Kernel::Delay(k), EffectSettings::Delay(s)) => k.set(s),
             (Kernel::EqThree(k), EffectSettings::EqThree(s)) => k.set(s),
             (Kernel::Filter(k), EffectSettings::Filter(s)) => k.set(s),
@@ -546,6 +558,7 @@ impl Effect {
                 key.map(|k| k.0),
                 key.map(|k| k.1),
             ),
+            Kernel::Crusher(k) => k.process_in_place(&mut l[..n], &mut r[..n]),
             Kernel::Delay(k) => k.process_in_place(&mut l[..n], &mut r[..n]),
             Kernel::EqThree(k) => k.process_in_place(&mut l[..n], &mut r[..n]),
             Kernel::Filter(k) => k.process_in_place(&mut l[..n], &mut r[..n]),

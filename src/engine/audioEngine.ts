@@ -14,6 +14,7 @@ import { SynthInstrument, setSynthTempo, type SynthLiveState } from "../instrume
 import { type EffectType, defaultParams } from "../effects/registry";
 import { CompressorChain, type CompressorMeterReading } from "../effects/compressor/compressor";
 import { GlueChain, type GlueMeterReading } from "../effects/glue/glue";
+import { CrusherChain, type CrusherMeterReading } from "../effects/crusher/crusher";
 import { MbDynamicsChain, type MbdMeters } from "../effects/multiband-dynamics/mbDynamics";
 import { LookaheadLimiter, type LimiterLevels } from "../effects/limiter/lookaheadLimiter";
 import { measureNativeLatencies } from "./nativeLatency";
@@ -1309,6 +1310,12 @@ class AudioEngine {
   getGlueMeters(hostId: string, effectId: string): GlueMeterReading | null {
     const effect = this.effectsHost(hostId)?.host.effects.find((e) => e.id === effectId);
     return effect?.node instanceof GlueChain ? effect.node.meters : null;
+  }
+
+  /** One Crusher's gain reduction and input and output levels. */
+  getCrusherMeters(hostId: string, effectId: string): CrusherMeterReading | null {
+    const effect = this.effectsHost(hostId)?.host.effects.find((e) => e.id === effectId);
+    return effect?.node instanceof CrusherChain ? effect.node.meters : null;
   }
 
   /** Live peak input (after the plugin's gain), output, and gain reduction

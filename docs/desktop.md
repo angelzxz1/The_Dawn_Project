@@ -170,6 +170,7 @@ and MIDI devices through the engine, files through native dialogs.
   `src/effects/` that computes the same thing step for step: the same `f64`
   state and `f32` buffers as the JavaScript's numbers and Float32Arrays, the
   arithmetic in the same order. So far the Compressor, the Glue Compressor,
+  the Crusher,
   the Noise Gate, the Limiter, the Multiband Compressor, Multiband Dynamics,
   the Parametric EQ, the Pitch Shift, the Furnace amp and the Utility. The
   Filter, the EQ Three, the Chorus, the Delay, the Reverb, the Saturator

@@ -147,6 +147,18 @@ export const FACTORY_PRESETS: EffectPreset[] = [
     ["Parallel Crush", { threshold: -30, ratio: 2, attack: 0, release: 0, makeup: 10, dryWet: 0.4, softClip: 1 }],
     ["Sidechain Pump", { threshold: -30, ratio: 2, attack: 0, release: 2 }],
   ]),
+  // Knobs 0-10 (see crusherModel.ts): Input 5 and Output 5 keep the level;
+  // ratio 0-7 = 1:1, 2, 3, 4, 6, 10, 20:1, Nuke; dist 0-2 = Clean, Dist 2,
+  // Dist 3.
+  ...factory("crusher", [
+    ["Room Mic Smash", { input: 7.5, attack: 3, release: 2.5, output: 3.5, british: 1 }],
+    ["Vocal Forward", { input: 5.8, attack: 4, release: 6, output: 4.6, ratio: 1, dist: 1 }],
+    ["Bass Thickener", { input: 6.2, attack: 6, release: 4, output: 4.5, ratio: 4, dist: 2 }],
+    ["Kick Punch", { input: 6, attack: 7, release: 2, output: 4.8, ratio: 3 }],
+    ["Drum Bus Nuke (Parallel)", { input: 7.5, attack: 1, release: 1.5, output: 4, ratio: 7, mix: 0.35 }],
+    ["De-Esser", { input: 5.5, attack: 1, release: 1.5, output: 5, ratio: 4, detHp: 1, detBand: 1 }],
+    ["Tape Warmth (1:1)", { input: 6.5, output: 3.6, ratio: 0, dist: 2 }],
+  ]),
   // Per band l/m/h: Above ratio > 1 compresses down, < 1 expands up;
   // Below ratio > 1 expands down, < 1 compresses up.
   ...factory("mbDynamics", [

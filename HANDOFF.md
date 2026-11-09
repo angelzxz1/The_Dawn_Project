@@ -38,8 +38,17 @@ committed.
   - step 33, Audio Units, put off (2026-11-08): this machine is Windows,
     so AU code couldn't be built or tried; the user chose to leave it for
     when a Mac is at hand.
-  - step 34, export through the engine (2026-11-08, commit to come).
-- **Next: step 35, native file dialogs.** Wait for the user to say "go"
+  - step 34, export through the engine (2026-11-08, `6e7c555`).
+  - Not a listed step: the Crusher, a character compressor after the
+    classic 90s distortion compressor (2026-11-08, commit to come; asked
+    for by the user, who named it). `src/effects/crusher/`, ported in
+    `crates/dawn-engine/src/effects/crusher.rs` (`tests/crusher_parity.rs`
+    matches the JavaScript exactly). No sidechain (yet).
+- **Asked for next by the user:** more amps in the Furnace (an Amp
+  selector: Clean American, Chime, British Crunch, British Lead and the
+  current head, each with its tone circuit, power tubes and a matching
+  cabinet, tuned from published circuit values). After it, step 35.
+- **Next listed: step 35, native file dialogs.** Wait for the user to say "go"
   before starting a step: they ask for each one ("Lets go with step N").
 - **What's left after that,** in order (the full list, with sizes, is in
   `nextSteps.md`; a summary is under "The road ahead" below):
@@ -345,6 +354,7 @@ To add an effect, follow `docs/desktop.md` → "Porting the next kernel":
 
 - Limiter: its lookahead, 240 frames at 48 kHz.
 - Glue Compressor with oversampling: 15.
+- Crusher: 15 (always oversampled).
 - Pitch Shift: window·sr/2 + 2.
 - Furnace: 16.
 
@@ -490,7 +500,7 @@ Temporary, never committed:
   - every instrument (piano, Drum Rack, synth), from clips and live keys;
   - the mix: volume, pan, mute, solo, groups, sends (post- or pre-fader,
     `Send.pre`), buses;
-  - every effect but the NAM Amp: `PORTED` = chorus, compressor, delay,
+  - every effect but the NAM Amp: `PORTED` = chorus, compressor, crusher, delay,
     distortion (the Saturator), eq3, filter, gate, glue, irLoader,
     limiter, mbDynamics, multiband, paramEq, pitchShift, reverb, tubeAmp,
     tuner, utility;
@@ -750,8 +760,8 @@ ahead" above).
    desktop's `song.rs`, `describe.test.ts`, `registry.test.ts`,
    `FxRack.test.tsx`, `PluginBrowser.test.tsx`. Then P5 Audio Units
    (put off: it needs a Mac to build on).
-6. **Export** through the engine: done 2026-11-08 (step 34, commit to
-   come). `dawn_engine::mix::bounce` (an engine of its own, played from
+6. **Export** through the engine: done 2026-11-08 (step 34, `6e7c555`).
+   `dawn_engine::mix::bounce` (an engine of its own, played from
    the range's start, stopped at its end, the tail rendered, the song's
    latency trimmed off the front), `engine_bounce` (built on the main
    thread with the files sent and `export:` plugin instances, rendered on

@@ -13,6 +13,7 @@ import { packTones } from "@/project/packStore";
 export const PREVIEW_SOURCE: Record<EffectType, "drums" | "pluck" | null> = {
   compressor: "drums",
   glue: "drums",
+  crusher: "drums",
   multiband: "drums",
   mbDynamics: "drums",
   limiter: "drums",

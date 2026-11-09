@@ -181,6 +181,13 @@ fn the_amps_oversampling_counts_too() {
 }
 
 #[test]
+fn the_crushers_oversampling_counts_too() {
+    let crusher = EffectSpec::new("c", EffectSettings::from_params("crusher", &[]).unwrap());
+    let s = song(vec![track("a", vec![], vec![crusher])]);
+    assert_eq!(s.prepare(None, SR).latency(), 15 + LOOKAHEAD);
+}
+
+#[test]
 fn the_clicks_wait_as_long_as_the_mix() {
     let first_click = |s: &Song| {
         let mut e = engine(s);
