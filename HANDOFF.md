@@ -40,7 +40,7 @@ committed.
     when a Mac is at hand.
   - step 34, export through the engine (2026-11-08, `6e7c555`).
   - Not a listed step: the Crusher, a character compressor after the
-    classic 90s distortion compressor (2026-11-08, commit to come; asked
+    classic 90s distortion compressor (2026-11-08, `4bfd503`; asked
     for by the user, who named it). `src/effects/crusher/`, ported in
     `crates/dawn-engine/src/effects/crusher.rs` (`tests/crusher_parity.rs`
     matches the JavaScript exactly). No sidechain (yet).

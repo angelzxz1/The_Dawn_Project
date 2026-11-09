@@ -32,7 +32,8 @@ const ledOn = (i: number) => (i < 4 ? "#7FD46B" : i < 7 ? "#E6C04E" : "#FF5A5A")
 const LED_OFF = "#2A2B33";
 
 /** The gain-reduction LEDs, lit directly each frame with meter-like
- * ballistics. */
+ * ballistics. `width` sets the proportions; it fills its container's
+ * width. */
 export function CrusherLeds({ hostId, effectId, width = 320, height = 14 }: { hostId?: string; effectId: string; width?: number; height?: number }) {
   const leds = useRef<(SVGRectElement | null)[]>([]);
   useEffect(() => {
@@ -53,7 +54,7 @@ export function CrusherLeds({ hostId, effectId, width = 320, height = 14 }: { ho
   const labels = height >= 14;
   const total = labels ? height + 14 : height;
   return (
-    <svg width={width} height={total} viewBox={`0 0 ${width} ${total}`} role="img" aria-label="Gain reduction" style={{ display: "block" }}>
+    <svg viewBox={`0 0 ${width} ${total}`} preserveAspectRatio="none" role="img" aria-label="Gain reduction" style={{ display: "block", width: "100%", height: total }}>
       {CRUSHER_LED_STEPS.map((step, i) => (
         <g key={step}>
           <rect
@@ -163,7 +164,7 @@ export function CrusherWindow({
         </div>
         <div className="flex flex-col gap-1.5">
           <span className={section}>Gain reduction (dB)</span>
-          <CrusherLeds hostId={bypass ? undefined : hostId} effectId={effectId} width={816} height={16} />
+          <CrusherLeds hostId={bypass ? undefined : hostId} effectId={effectId} width={776} height={16} />
         </div>
       </div>
 

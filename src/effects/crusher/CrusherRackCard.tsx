@@ -33,7 +33,7 @@ export function CrusherRackCard({
   return (
     <div className={`${spaceGrotesk.className} flex h-full flex-col gap-2`}>
       <RackCardHeader title="Crusher" status={crusherStatus(params)} bypass={bypass} onBypassToggle={onBypassToggle} onRemove={onRemove} onExpand={onExpand} />
-      <button type="button" onClick={onExpand} title="Open the Crusher" className="block">
+      <button type="button" onClick={onExpand} title="Open the Crusher" className="block w-full">
         <CrusherLeds hostId={bypass ? undefined : hostId} effectId={effectId} width={256} height={8} />
       </button>
       <div className="grid grid-cols-4 gap-x-1">

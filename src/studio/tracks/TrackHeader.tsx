@@ -603,7 +603,7 @@ export const TrackHeader = memo(function TrackHeader({
           ) : inputName ? (
             <span
               title={`Input: ${inputName}. Change it in the track's FX rack (Audio from).`}
-              className="flex h-5 max-w-[76px] items-center truncate rounded border border-accent/40 px-1.5 text-[10px] text-accent"
+              className="flex h-5 min-w-0 max-w-[76px] items-center truncate rounded border border-accent/40 px-1.5 text-[10px] text-accent"
             >
               ← {inputName.split(" · ")[0]}
             </span>
@@ -613,7 +613,7 @@ export const TrackHeader = memo(function TrackHeader({
               aria-label="Input"
               value=""
               disabled
-              className="h-5 max-w-[76px] rounded border border-border bg-surface px-1 text-[10px] text-muted"
+              className="h-5 min-w-[52px] max-w-[76px] rounded border border-border bg-surface px-1 text-[10px] text-muted"
             >
               <option value="">{inputDevices?.[0]?.label ?? "No input"}</option>
             </select>
@@ -624,7 +624,7 @@ export const TrackHeader = memo(function TrackHeader({
               value={inputDevice}
               onChange={(e) => onInputDeviceChange(e.target.value || null)}
               onFocus={() => onRequestInputDevices()}
-              className="h-5 max-w-[76px] rounded border border-border bg-surface px-1 text-[10px] text-muted"
+              className="h-5 min-w-[52px] max-w-[76px] rounded border border-border bg-surface px-1 text-[10px] text-muted"
             >
               <option value="">Default</option>
               {deviceMissing && <option value={inputDevice}>Not connected</option>}
@@ -659,19 +659,19 @@ export const TrackHeader = memo(function TrackHeader({
             type="button"
             title={`FX${effectsCount > 0 ? ` (${effectsCount}${bypassedCount > 0 ? `, ${bypassedCount} bypassed` : ""})` : ""} — instrument & effects`}
             onClick={() => onOpenFx()}
-            className={`relative flex h-5 items-center gap-1 rounded border border-border px-1.5 text-[10px] font-medium hover:bg-surface-raised ${
+            className={`relative flex h-5 shrink-0 items-center gap-1 rounded border border-border px-1.5 text-[10px] font-medium hover:bg-surface-raised ${
               effectsCount > 0 ? "text-accent" : "text-muted"
             }`}
           >
             <Sliders size={11} />
             FX
             {effectsCount > 0 && (
-              <span className="flex h-3 w-3 items-center justify-center rounded-full bg-accent text-[7px] font-bold text-on-accent">
+              <span className="absolute -right-1 -top-1.5 flex h-3 w-3 items-center justify-center rounded-full bg-accent text-[7px] font-bold text-on-accent">
                 {effectsCount}
               </span>
             )}
             {bypassedCount > 0 && (
-              <span aria-hidden className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-warn" />
+              <span aria-hidden className="absolute -left-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-warn" />
             )}
           </button>
         </div>
