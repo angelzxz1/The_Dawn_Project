@@ -1,10 +1,12 @@
-//! The Furnace amp's DSP: a high-gain tube amp modeled stage by stage - the
-//! input coupling, up to four triode stages (cathode-bypass shelf, gain, an
+//! The Furnace amp's DSP: a tube amp modeled stage by stage - the input
+//! coupling, up to four triode stages (cathode-bypass shelf, gain, an
 //! asymmetric soft clip whose bias shifts as the grid conducts, coupling
-//! high-pass, the plate's Miller low-pass), the cathode follower, the
-//! passive bass/mid/treble network, then the power amp (presence and depth,
-//! phase inverter and output stage clipping, the supply sagging under load,
-//! the output transformer's band). Everything from the first stage on runs
+//! high-pass, the plate's Miller low-pass), the cathode follower and the
+//! passive bass/mid/treble network after the stage the amp has it after,
+//! then the power amp (presence and depth, phase inverter and output stage
+//! clipping, push-pull or class A, the supply sagging under load, the
+//! output transformer's band). Five amps (`amp`): Clean American, Chime,
+//! British Crunch, British Lead and the High Gain head. Everything from the first stage on runs
 //! at 4x the rate, so the distortion doesn't alias.
 //!
 //! Port of `src/effects/furnace/ampKernel.ts` (`AmpKernel`) and the knobs'
@@ -58,6 +60,8 @@ pub struct AmpSettings {
     /// cathode-bypass shelf (Hz, gain kept below), coupling high-pass and
     /// Miller low-pass (Hz).
     pub stages: usize,
+    /// How many stages come before the tone stack (1 to `stages`).
+    pub stack_at: usize,
     pub stage_gains: [f64; MAX_STAGES],
     pub shelf_hz: [f64; MAX_STAGES],
     pub shelf_keep: [f64; MAX_STAGES],
@@ -70,6 +74,8 @@ pub struct AmpSettings {
     pub stack: Stack,
     pub stack_gain: f64,
     pub power_drive: f64,
+    /// The output stage's bias offset: 0 push-pull, more for class A.
+    pub power_bias: f64,
     pub presence_hz: f64,
     pub presence_db: f64,
     pub depth_hz: f64,
@@ -100,6 +106,7 @@ const MODERN: AmpSettings = AmpSettings {
     master: 0.0,
     output: 0.0,
     stages: 4,
+    stack_at: 4,
     stage_gains: [20.3, 8.31, 31.6, 7.29],
     shelf_hz: [473.0, 473.0, 473.0, 473.0],
     shelf_keep: [0.793, 0.793, 0.793, 0.793],
@@ -120,6 +127,7 @@ const MODERN: AmpSettings = AmpSettings {
     },
     stack_gain: 1.78,
     power_drive: 2.69,
+    power_bias: 0.0,
     presence_hz: 4691.0,
     presence_db: 9.0,
     depth_hz: 88.0,
@@ -173,6 +181,7 @@ fn voicing(mode: usize) -> (AmpSettings, f64) {
             (
                 AmpSettings {
                     stages: 3,
+                    stack_at: 3,
                     stage_gains: [g[0], g[1] * 0.5, g[2], 0.0],
                     coupling_hz: [c[0], c[1] * 0.4, c[2], 0.0],
                     miller_hz: [f[0] * 1.2, f[1] * 1.2, f[2] * 1.2, 0.0],
@@ -192,14 +201,158 @@ fn voicing(mode: usize) -> (AmpSettings, f64) {
     }
 }
 
+/// A classic amp (`CLASSICS`): its voicing, output trim and supply sag.
+struct Classic {
+    v: AmpSettings,
+    trim: f64,
+    sag: f64,
+}
+
+/// A classic amp's tone stack parts.
+const fn stack(c1: f64, c2: f64, c3: f64, r1: f64, r2: f64, r3: f64, r4: f64) -> Stack {
+    Stack {
+        c1,
+        c2,
+        c3,
+        r1,
+        r2,
+        r3,
+        r4,
+    }
+}
+
+/// The classic amps, in the selector's order (`CLASSICS` in ampModel.ts,
+/// where each is described): Clean American, Chime, British Crunch,
+/// British Lead.
+const CLASSICS: [Classic; 4] = [
+    Classic {
+        v: AmpSettings {
+            stages: 2,
+            stack_at: 1,
+            stage_gains: [4.0, 24.0, 0.0, 0.0],
+            shelf_hz: [12.0, 12.0, 0.0, 0.0],
+            shelf_keep: [0.55, 0.55, 0.0, 0.0],
+            coupling_hz: [16.0, 22.0, 0.0, 0.0],
+            miller_hz: [22000.0, 16000.0, 0.0, 0.0],
+            input_hz: 18.0,
+            asymmetry: 1.8,
+            bias: 0.15,
+            bright: 7.0,
+            stack: stack(
+                250e-12, 100e-9, 47e-9, 250000.0, 250000.0, 10000.0, 100000.0,
+            ),
+            stack_gain: 4.0,
+            power_drive: 1.2,
+            power_bias: 0.0,
+            presence_hz: 3800.0,
+            presence_db: 6.0,
+            depth_hz: 100.0,
+            depth_db: 2.0,
+            low_hz: 35.0,
+            high_hz: 15000.0,
+            ..MODERN
+        },
+        trim: 6.0,
+        sag: 0.6,
+    },
+    Classic {
+        v: AmpSettings {
+            stages: 2,
+            stack_at: 2,
+            stage_gains: [8.0, 10.0, 0.0, 0.0],
+            shelf_hz: [40.0, 60.0, 0.0, 0.0],
+            shelf_keep: [0.6, 0.6, 0.0, 0.0],
+            coupling_hz: [25.0, 30.0, 0.0, 0.0],
+            miller_hz: [20000.0, 16000.0, 0.0, 0.0],
+            input_hz: 30.0,
+            asymmetry: 1.6,
+            bias: 0.25,
+            bright: 3.0,
+            stack: stack(
+                150e-12, 22e-9, 47e-9, 1000000.0, 1000000.0, 10000.0, 100000.0,
+            ),
+            stack_gain: 3.0,
+            power_drive: 4.0,
+            power_bias: 0.6,
+            presence_hz: 1800.0,
+            presence_db: -14.0,
+            depth_hz: 100.0,
+            depth_db: 0.0,
+            low_hz: 70.0,
+            high_hz: 12000.0,
+            ..MODERN
+        },
+        trim: 11.9,
+        sag: 1.3,
+    },
+    Classic {
+        v: AmpSettings {
+            stages: 3,
+            stack_at: 3,
+            stage_gains: [8.0, 3.0, 25.0, 0.0],
+            shelf_hz: [85.0, 1.0, 290.0, 0.0],
+            shelf_keep: [0.45, 1.0, 0.5, 0.0],
+            coupling_hz: [20.0, 160.0, 30.0, 0.0],
+            miller_hz: [18000.0, 14000.0, 12000.0, 0.0],
+            input_hz: 60.0,
+            asymmetry: 2.2,
+            bias: 0.3,
+            bright: 5.0,
+            stack: stack(470e-12, 22e-9, 22e-9, 220000.0, 1000000.0, 25000.0, 33000.0),
+            stack_gain: 2.0,
+            power_drive: 2.0,
+            power_bias: 0.0,
+            presence_hz: 3500.0,
+            presence_db: 7.0,
+            depth_hz: 100.0,
+            depth_db: 3.0,
+            low_hz: 45.0,
+            high_hz: 14000.0,
+            ..MODERN
+        },
+        trim: -1.6,
+        sag: 0.8,
+    },
+    Classic {
+        v: AmpSettings {
+            stages: 4,
+            stack_at: 4,
+            stage_gains: [10.0, 3.0, 25.0, 12.0],
+            shelf_hz: [180.0, 1.0, 290.0, 290.0],
+            shelf_keep: [0.45, 1.0, 0.5, 0.6],
+            coupling_hz: [30.0, 220.0, 60.0, 40.0],
+            miller_hz: [18000.0, 14000.0, 12000.0, 10000.0],
+            input_hz: 160.0,
+            asymmetry: 2.3,
+            bias: 0.33,
+            bright: 4.0,
+            stack: stack(470e-12, 22e-9, 22e-9, 220000.0, 1000000.0, 25000.0, 47000.0),
+            stack_gain: 2.0,
+            power_drive: 2.0,
+            power_bias: 0.0,
+            presence_hz: 3500.0,
+            presence_db: 7.0,
+            depth_hz: 100.0,
+            depth_db: 4.0,
+            low_hz: 45.0,
+            high_hz: 13000.0,
+            ..MODERN
+        },
+        trim: -2.4,
+        sag: 0.8,
+    },
+];
+
+/// The High Gain head's place in the selector (and the default: it was the
+/// only amp).
+const HIGH_GAIN: f64 = 4.0;
+
 impl AmpSettings {
     /// The settings for the effect's parameters (`ampSettingsFromParams`):
-    /// the knobs 0-10, `mode` 0-2 (Raw, Vintage, Modern), `rectifier` (0
-    /// tube, 1 diode), `output` dB.
+    /// the knobs 0-10, `amp` 0-4 (Clean American, Chime, British Crunch,
+    /// British Lead, High Gain), and on the head `mode` 0-2 (Raw, Vintage,
+    /// Modern) and `rectifier` (0 tube, 1 diode); `output` dB.
     pub fn from_params<P: ParamSource + ?Sized>(p: &P) -> Self {
-        let mode = js_round(p.param_or("mode", 2.0)).clamp(0.0, 2.0) as usize;
-        let (v, trim) = voicing(mode);
-        let tube = p.param_or("rectifier", 1.0) < 0.5;
         let knob = |key: &str| {
             let fallback = DEFAULT_KNOBS
                 .iter()
@@ -207,18 +360,32 @@ impl AmpSettings {
                 .map_or(0.0, |(_, v)| *v);
             (p.param_or(key, fallback) / 10.0).clamp(0.0, 1.0)
         };
-        Self {
+        let knobs = |v: AmpSettings| Self {
             gain: knob("gain"),
             bass: knob("bass"),
             mid: knob("mid"),
             treble: knob("treble"),
             presence: knob("presence"),
             master: knob("master"),
+            ..v
+        };
+        let amp = js_round(p.param_or("amp", HIGH_GAIN)).clamp(0.0, HIGH_GAIN) as usize;
+        if let Some(c) = CLASSICS.get(amp) {
+            return Self {
+                output: p.param_or("output", 0.0) + c.trim,
+                sag: c.sag,
+                ..knobs(c.v)
+            };
+        }
+        let mode = js_round(p.param_or("mode", 2.0)).clamp(0.0, 2.0) as usize;
+        let (v, trim) = voicing(mode);
+        let tube = p.param_or("rectifier", 1.0) < 0.5;
+        Self {
             output: p.param_or("output", 0.0) + trim + if tube { TUBE_TRIM } else { 0.0 },
             sag: if tube { SAG_TUBE } else { SAG_DIODE },
             power_drive: v.power_drive * if tube { TUBE_DRIVE } else { 1.0 },
             input_hz: v.input_hz * if tube { TUBE_INPUT } else { 1.0 },
-            ..v
+            ..knobs(v)
         }
     }
 }
@@ -594,6 +761,8 @@ pub struct AmpKernel {
     down_pos: usize,
     in_hp: OnePole,
     stages: [Stage; MAX_STAGES],
+    /// How many stages come before the tone stack.
+    stack_at: usize,
     bright: Biquad,
     stack_b: [f64; 4],
     stack_a: [f64; 4],
@@ -628,6 +797,7 @@ impl AmpKernel {
             down_pos: 0,
             in_hp: OnePole::default(),
             stages,
+            stack_at: 1,
             bright: Biquad::default(),
             stack_b: [0.0; 4],
             stack_a: [1.0, 0.0, 0.0, 0.0],
@@ -656,6 +826,7 @@ impl AmpKernel {
         self.s = *s;
         let fs = self.fs;
         self.in_hp.lowpass(s.input_hz, fs);
+        self.stack_at = s.stack_at.clamp(1, s.stages.min(MAX_STAGES));
         for i in 0..s.stages.min(MAX_STAGES) {
             let st = &mut self.stages[i];
             st.gain = s.stage_gains[i];
@@ -696,6 +867,18 @@ impl AmpKernel {
         self.shift_rate = 1.0 - (-1.0 / (0.03 * fs)).exp();
     }
 
+    /// The cathode follower (a soft limit on large swings) into the tone
+    /// stack (third order).
+    fn tone_stack(&mut self, mut x: f64) -> f64 {
+        x /= 1.0 + 0.15 * x.abs();
+        let (tb, ta, z) = (self.stack_b, self.stack_a, &mut self.stack_z);
+        let y = tb[0] * x + z[0];
+        z[0] = tb[1] * x - ta[1] * y + z[1];
+        z[1] = tb[2] * x - ta[2] * y + z[2];
+        z[2] = tb[3] * x - ta[3] * y;
+        y * self.s.stack_gain
+    }
+
     /// One sample at the oversampled rate.
     fn tick(&mut self, mut x: f64) -> f64 {
         let s = self.s;
@@ -717,22 +900,16 @@ impl AmpKernel {
             if i == 0 {
                 x = self.bright.run(x * self.gain_pot);
             }
+            if i + 1 == self.stack_at {
+                x = self.tone_stack(x);
+            }
         }
-        // Cathode follower into the stack: a soft limit on large swings.
-        x /= 1.0 + 0.15 * x.abs();
-        // Tone stack (third order).
-        let (tb, ta, z) = (self.stack_b, self.stack_a, &mut self.stack_z);
-        let y = tb[0] * x + z[0];
-        z[0] = tb[1] * x - ta[1] * y + z[1];
-        z[1] = tb[2] * x - ta[2] * y + z[2];
-        z[2] = tb[3] * x - ta[3] * y;
-        x = y * s.stack_gain;
         // Power amp.
         let pre = self.presence.run(x * self.master_gain);
         x = self.depth.run(pre);
         let head = 1.0 - 0.3 * s.sag * self.env;
         x = (x * 0.8).tanh() / 0.8; // phase inverter
-        x = head * (x / head).tanh(); // output stage
+        x = head * ((x / head + s.power_bias).tanh() - s.power_bias.tanh()); // output stage
         let p = x * x;
         let rate = if p > self.env {
             self.sag_atk

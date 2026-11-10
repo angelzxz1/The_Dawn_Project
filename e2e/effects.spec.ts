@@ -83,3 +83,23 @@ test("a sidechain source that would make a loop is marked, until the routing cha
   await output.selectOption({ index: 0 });
   await expect(source).not.toHaveText(/loop/);
 });
+
+test("the Furnace's Amp selector changes the amp, its switches and its knobs", async ({ page, studio }) => {
+  await studio.open("Empty Project");
+  await studio.select("Audio 1");
+  await studio.addEffect("Furnace");
+  await studio.openLastEffect();
+  const amp = page.getByRole("radiogroup", { name: "Amp" });
+  await expect(amp.getByRole("radio", { name: "High Gain" })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByRole("radiogroup", { name: "Channel mode" })).toBeVisible();
+
+  await amp.getByRole("radio", { name: "Chime" }).click();
+  await expect(amp.getByRole("radio", { name: "Chime" })).toHaveAttribute("aria-checked", "true");
+  // The channel and rectifier switches are the head's; Presence is Cut.
+  await expect(page.getByRole("radiogroup", { name: "Channel mode" })).toHaveCount(0);
+  await expect(page.getByRole("slider", { name: /^Cut,/ }).first()).toBeVisible();
+  await expect(page.getByText("2x12 Alnico Chime")).toBeVisible();
+  // The rack card says which amp it is.
+  await page.getByTitle("Close (Esc)", { exact: true }).click();
+  await expect(page.getByText("Chime", { exact: true })).toBeVisible();
+});

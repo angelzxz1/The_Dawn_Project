@@ -17,9 +17,9 @@ const lib = new Function(`${AMP_SOURCE}; return { AmpKernel, stackResponse, fitS
 const STACK: Stack = { c1: 250e-12, c2: 20e-9, c3: 20e-9, r1: 250e3, r2: 1e6, r3: 25e3, r4: 56e3 };
 const SETTINGS: AmpSettings = {
   gain: 0.6, bass: 0.5, mid: 0.5, treble: 0.5, presence: 0.5, master: 0.5, output: 0,
-  stageGains: [20, 20, 8, 5], shelfHz: [300, 300, 300, 300], shelfKeep: [0.5, 0.5, 0.5, 0.5],
+  stageGains: [20, 20, 8, 5], stackAt: 4, shelfHz: [300, 300, 300, 300], shelfKeep: [0.5, 0.5, 0.5, 0.5],
   couplingHz: [20, 100, 30, 30], millerHz: [12000, 10000, 9000, 8000], inputHz: 80,
-  asymmetry: 2, bias: 0.4, bright: 4, stack: STACK, stackGain: 3, powerDrive: 5,
+  asymmetry: 2, bias: 0.4, bright: 4, stack: STACK, stackGain: 3, powerDrive: 5, powerBias: 0,
   presenceHz: 3500, presenceDb: 8, depthHz: 90, depthDb: 3, sag: 0.5, lowHz: 40, highHz: 12000,
 };
 

@@ -145,6 +145,27 @@ export const FACTORY_CABS: FactoryCab[] = [
     design: { lowHz: 80, lowQ: 1.2, peaks: [{ hz: 130, db: 2.5, q: 1 }, { hz: 700, db: 1.5, q: 0.9 }, { hz: 1800, db: 3, q: 1.1 }], highHz: 3800, highOrder: 6, ripple: 2, seed: 4 },
   },
   {
+    id: "factory-ir:2x12-open",
+    name: "2x12 Open Clean",
+    description: "Wide and scooped, with a glassy top and loose, open lows: the Furnace's Clean American.",
+    use: "guitar",
+    design: { lowHz: 80, lowQ: 0.85, peaks: [{ hz: 110, db: 2, q: 1 }, { hz: 500, db: -2.5, q: 0.8 }, { hz: 2800, db: 3.5, q: 1.1 }, { hz: 4800, db: 2, q: 2 }], highHz: 6200, highOrder: 4, ripple: 1.5, seed: 7 },
+  },
+  {
+    id: "factory-ir:2x12-alnico",
+    name: "2x12 Alnico Chime",
+    description: "Open back, a bright, ringing upper mid and a soft low end: the Furnace's Chime.",
+    use: "guitar",
+    design: { lowHz: 90, lowQ: 0.9, peaks: [{ hz: 130, db: 1, q: 1 }, { hz: 1200, db: 1.5, q: 1 }, { hz: 3200, db: 4.5, q: 1.4 }, { hz: 5000, db: 1.5, q: 2.5 }], highHz: 6000, highOrder: 5, ripple: 2.5, seed: 8 },
+  },
+  {
+    id: "factory-ir:4x12-crunch",
+    name: "4x12 British Crunch",
+    description: "Closed back, a thick low mid and a warm, rounded 2 kHz bite: the Furnace's British amps.",
+    use: "guitar",
+    design: { lowHz: 78, lowQ: 1.3, peaks: [{ hz: 115, db: 3.5, q: 1.2 }, { hz: 600, db: 1.5, q: 0.9 }, { hz: 2100, db: 4, q: 1.3 }, { hz: 3600, db: -3, q: 2.5 }], highHz: 4800, highOrder: 6, ripple: 2.5, seed: 9 },
+  },
+  {
     id: "factory-ir:1x15-bass",
     name: "1x15 Bass Cab",
     description: "Deep and round, for warm fingerstyle and dub lows.",

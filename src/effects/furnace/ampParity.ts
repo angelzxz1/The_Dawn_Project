@@ -34,6 +34,11 @@ export const AMP_PARITY_CASES: AmpParityCase[] = [
   { name: "tone-extremes", params: { bass: 0, mid: 10, treble: 10, presence: 0, master: 10 } },
   { name: "scooped", params: { bass: 10, mid: 0, treble: 2, presence: 10, gain: 10 } },
   { name: "knobs-moved", params: { gain: 4 }, change: { at: 60 * PARITY_BLOCK, params: { gain: 9, bass: 3, mid: 8, master: 7, mode: 1 } } },
+  { name: "clean-american", params: { amp: 0, gain: 6, master: 6, output: 4 } },
+  { name: "chime", params: { amp: 1, gain: 7, treble: 7, presence: 3 } },
+  { name: "british-crunch", params: { amp: 2, gain: 8, mid: 7 } },
+  { name: "british-lead", params: { amp: 3, gain: 9, bass: 4, presence: 8 } },
+  { name: "amp-switched", params: { amp: 0, gain: 8 }, change: { at: 50 * PARITY_BLOCK, params: { amp: 1 } } },
 ];
 
 const changeParams = (c: AmpParityCase) => (c.change ? { ...c.params, ...c.change.params } : null);

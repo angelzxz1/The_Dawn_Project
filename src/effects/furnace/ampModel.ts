@@ -1,7 +1,27 @@
 // The Furnace amp's knobs and voicings: what the plugin's params mean to
-// the kernel (ampKernel.ts). The knobs read 0-10 like an amp's; the
-// channel modes and the rectifier switch pick a voicing - the stage gains,
-// filters and tone-stack parts behind the knobs.
+// the kernel (ampKernel.ts). The knobs read 0-10 like an amp's; the Amp
+// selector, and on the High Gain head the channel modes and the rectifier
+// switch, pick a voicing - the stage gains, filters and tone-stack parts
+// behind the knobs.
+//
+// Five amps, after the classic designs:
+//   Clean American - a blackface-style combo: one stage, the tone stack,
+//     then the second stage; 6L6s with plenty of headroom, a bright cap on
+//     the volume.
+//   Chime - a top-boost-style class A combo: two stages and a cathode
+//     follower into the stack, EL84s biased class A (even harmonics, early
+//     breakup), no negative feedback, so Presence is the Cut control.
+//   British Crunch - a plexi/800-style head: three stages, the cold second
+//     one, a cathode follower into the stack, EL34s.
+//   British Lead - the same with a fourth stage cascaded in, a tighter
+//     input and more mids: the hot-rodded lead sound.
+//   High Gain - the reference head (Raw, Vintage and Modern channels, the
+//     rectifier switch).
+// Clean American's and the British amps' tone stacks use the published part
+// values of the circuits they're after (Chime's: see its voicing); their
+// gains, filters and power stages are tuned
+// to those amps' character by ear and by test (breakup, harmonics, level),
+// not fitted to measurements like the head.
 //
 // Modern is the reference voicing: its constants were fitted against
 // measurements of a high-gain rectifier head's rhythm channel (gain and
@@ -17,6 +37,16 @@ export const AMP_MODES = ["raw", "vintage", "modern"] as const;
 export type AmpMode = (typeof AMP_MODES)[number];
 export const AMP_MODE_LABELS: Record<AmpMode, string> = { raw: "Raw", vintage: "Vintage", modern: "Modern" };
 
+export const AMP_MODELS = ["clean", "chime", "crunch", "lead", "highGain"] as const;
+export type AmpModel = (typeof AMP_MODELS)[number];
+export const AMP_MODEL_LABELS: Record<AmpModel, string> = {
+  clean: "Clean American",
+  chime: "Chime",
+  crunch: "British Crunch",
+  lead: "British Lead",
+  highGain: "High Gain",
+};
+
 export const AMP_RECTIFIERS = ["tube", "diode"] as const;
 export type AmpRectifier = (typeof AMP_RECTIFIERS)[number];
 export const AMP_RECTIFIER_LABELS: Record<AmpRectifier, string> = { tube: "Tube", diode: "Diode" };
@@ -28,6 +58,29 @@ export function ampMode(v: number | undefined): AmpMode {
   return AMP_MODES[Math.min(AMP_MODES.length - 1, Math.max(0, Math.round(v ?? 2)))];
 }
 
+/** The Amp selector; missing (a project from before it) is the High Gain
+ * head, which was the only amp. */
+export function ampModel(v: number | undefined): AmpModel {
+  return AMP_MODELS[Math.min(AMP_MODELS.length - 1, Math.max(0, Math.round(v ?? AMP_MODELS.length - 1)))];
+}
+
+/** The factory cabinet (cabIrs.ts) that goes with each amp. */
+export function ampMatchingCab(model: AmpModel): string {
+  return {
+    clean: "factory-ir:2x12-open",
+    chime: "factory-ir:2x12-alnico",
+    crunch: "factory-ir:4x12-crunch",
+    lead: "factory-ir:4x12-crunch",
+    highGain: "factory-ir:4x12-closed",
+  }[model];
+}
+
+/** What the Presence knob is on this amp: Chime has no feedback loop, so
+ * it's the Cut control (turning it up darkens). */
+export function ampPresenceLabel(model: AmpModel): string {
+  return model === "chime" ? "Cut" : "Presence";
+}
+
 export function ampRectifier(v: number | undefined): AmpRectifier {
   return (v ?? 1) >= 0.5 ? "diode" : "tube";
 }
@@ -37,6 +90,7 @@ type Voicing = Omit<AmpSettings, "gain" | "bass" | "mid" | "treble" | "presence"
 /** Fitted against the reference capture (see the header). */
 const MODERN: Voicing = {
   stageGains: [20.3, 8.31, 31.6, 7.29],
+  stackAt: 4,
   shelfHz: [473, 473, 473, 473],
   shelfKeep: [0.793, 0.793, 0.793, 0.793],
   couplingHz: [20, 349, 40, 30],
@@ -48,6 +102,7 @@ const MODERN: Voicing = {
   stack: { c1: 0.839e-9, c2: 20e-9, c3: 22.1e-9, r1: 250000, r2: 1000000, r3: 25000, r4: 53282 },
   stackGain: 1.78,
   powerDrive: 2.69,
+  powerBias: 0,
   presenceHz: 4691,
   presenceDb: 9,
   depthHz: 88,
@@ -85,6 +140,7 @@ function voicing(mode: AmpMode): { v: Voicing; trim: number } {
     v: {
       ...m,
       stageGains: m.stageGains.slice(0, 3).map((g, i) => (i === 1 ? g * 0.5 : g)),
+      stackAt: 3,
       shelfHz: m.shelfHz.slice(0, 3),
       shelfKeep: m.shelfKeep.slice(0, 3),
       couplingHz: [m.couplingHz[0], m.couplingHz[1] * 0.4, m.couplingHz[2]],
@@ -99,6 +155,133 @@ function voicing(mode: AmpMode): { v: Voicing; trim: number } {
   };
 }
 
+/** A classic amp's voicing, its output trim (to the reference level) and
+ * its supply sag. */
+interface Classic {
+  v: Voicing;
+  trim: number;
+  sag: number;
+}
+
+const CLASSICS: Record<Exclude<AmpModel, "highGain">, Classic> = {
+  // One stage, the stack (250 pF, 100 nF, 47 nF; 250k treble and bass,
+  // 10k mid, 100k slope), the volume and a second stage; a long-tail phase
+  // inverter into 6L6s with lots of headroom, a solid-state rectifier.
+  clean: {
+    v: {
+      stageGains: [4, 24],
+      stackAt: 1,
+      shelfHz: [12, 12],
+      shelfKeep: [0.55, 0.55],
+      couplingHz: [16, 22],
+      millerHz: [22000, 16000],
+      inputHz: 18,
+      asymmetry: 1.8,
+      bias: 0.15,
+      bright: 7,
+      stack: { c1: 250e-12, c2: 100e-9, c3: 47e-9, r1: 250000, r2: 250000, r3: 10000, r4: 100000 },
+      stackGain: 4,
+      powerDrive: 1.2,
+      powerBias: 0,
+      presenceHz: 3800,
+      presenceDb: 6,
+      depthHz: 100,
+      depthDb: 2,
+      lowHz: 35,
+      highHz: 15000,
+    },
+    trim: 6,
+    sag: 0.6,
+  },
+  // Two stages and a cathode follower into the stack; no feedback loop,
+  // EL84s in class A, a tube rectifier. (The real top boost is a different
+  // network from the one the kernel solves: these values give the same
+  // network its sound - the forward upper mids and the scooped low mids.)
+  chime: {
+    v: {
+      stageGains: [8, 10],
+      stackAt: 2,
+      shelfHz: [40, 60],
+      shelfKeep: [0.6, 0.6],
+      couplingHz: [25, 30],
+      millerHz: [20000, 16000],
+      inputHz: 30,
+      asymmetry: 1.6,
+      bias: 0.25,
+      bright: 3,
+      stack: { c1: 150e-12, c2: 22e-9, c3: 47e-9, r1: 1000000, r2: 1000000, r3: 10000, r4: 100000 },
+      stackGain: 3,
+      powerDrive: 4,
+      powerBias: 0.6,
+      presenceHz: 1800,
+      presenceDb: -14,
+      depthHz: 100,
+      depthDb: 0,
+      lowHz: 70,
+      highHz: 12000,
+    },
+    trim: 11.9,
+    sag: 1.3,
+  },
+  // Three stages (the second one cold, unbypassed) and a cathode follower
+  // into the stack (470 pF, 22 nF, 22 nF; 220k treble, 1M bass, 25k mid,
+  // 33k slope); EL34s, a diode rectifier.
+  crunch: {
+    v: {
+      stageGains: [8, 3, 25],
+      stackAt: 3,
+      shelfHz: [85, 1, 290],
+      shelfKeep: [0.45, 1, 0.5],
+      couplingHz: [20, 160, 30],
+      millerHz: [18000, 14000, 12000],
+      inputHz: 60,
+      asymmetry: 2.2,
+      bias: 0.3,
+      bright: 5,
+      stack: { c1: 470e-12, c2: 22e-9, c3: 22e-9, r1: 220000, r2: 1000000, r3: 25000, r4: 33000 },
+      stackGain: 2,
+      powerDrive: 2,
+      powerBias: 0,
+      presenceHz: 3500,
+      presenceDb: 7,
+      depthHz: 100,
+      depthDb: 3,
+      lowHz: 45,
+      highHz: 14000,
+    },
+    trim: -1.6,
+    sag: 0.8,
+  },
+  // The crunch head with a fourth stage cascaded in, a tighter input and a
+  // stack with a bigger slope resistor (more mids).
+  lead: {
+    v: {
+      stageGains: [10, 3, 25, 12],
+      stackAt: 4,
+      shelfHz: [180, 1, 290, 290],
+      shelfKeep: [0.45, 1, 0.5, 0.6],
+      couplingHz: [30, 220, 60, 40],
+      millerHz: [18000, 14000, 12000, 10000],
+      inputHz: 160,
+      asymmetry: 2.3,
+      bias: 0.33,
+      bright: 4,
+      stack: { c1: 470e-12, c2: 22e-9, c3: 22e-9, r1: 220000, r2: 1000000, r3: 25000, r4: 47000 },
+      stackGain: 2,
+      powerDrive: 2,
+      powerBias: 0,
+      presenceHz: 3500,
+      presenceDb: 7,
+      depthHz: 100,
+      depthDb: 4,
+      lowHz: 45,
+      highHz: 13000,
+    },
+    trim: -2.4,
+    sag: 0.8,
+  },
+};
+
 /** Supply sag per rectifier: the tube rectifier sags and blooms, the
  * diodes stay stiff and tight. */
 /** The tube rectifier's softer supply also drives the power amp harder
@@ -111,16 +294,24 @@ const knob = (v: number | undefined, fallback: number) => Math.min(1, Math.max(0
 
 /** The kernel settings for a Furnace's params. */
 export function ampSettingsFromParams(params: Record<string, number>): AmpSettings {
-  const { v, trim } = voicing(ampMode(params.mode));
-  const tube = ampRectifier(params.rectifier) === "tube";
-  return {
-    ...v,
+  const knobs = {
     gain: knob(params.gain, AMP_DEFAULTS.gain),
     bass: knob(params.bass, AMP_DEFAULTS.bass),
     mid: knob(params.mid, AMP_DEFAULTS.mid),
     treble: knob(params.treble, AMP_DEFAULTS.treble),
     presence: knob(params.presence, AMP_DEFAULTS.presence),
     master: knob(params.master, AMP_DEFAULTS.master),
+  };
+  const model = ampModel(params.amp);
+  if (model !== "highGain") {
+    const c = CLASSICS[model];
+    return { ...c.v, ...knobs, output: (params.output ?? 0) + c.trim, sag: c.sag };
+  }
+  const { v, trim } = voicing(ampMode(params.mode));
+  const tube = ampRectifier(params.rectifier) === "tube";
+  return {
+    ...v,
+    ...knobs,
     output: (params.output ?? 0) + trim + (tube ? TUBE.trim : 0),
     sag: SAG[ampRectifier(params.rectifier)],
     powerDrive: v.powerDrive * (tube ? TUBE.drive : 1),

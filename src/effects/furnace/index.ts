@@ -3,10 +3,10 @@
 
 import { defineEffect } from "../types";
 import { dbSigned, tenths } from "../format";
-import { AMP_DEFAULTS, AMP_MODES, AMP_MODE_LABELS, AMP_RECTIFIER_LABELS, ampMode, ampRectifier } from "./ampModel";
+import { AMP_DEFAULTS, AMP_MODELS, AMP_MODEL_LABELS, AMP_MODES, AMP_MODE_LABELS, AMP_RECTIFIER_LABELS, ampMode, ampModel, ampRectifier } from "./ampModel";
 
-// The Furnace amp (see ampModel.ts): 0-10 knobs, three channel modes
-// and the rectifier switch.
+// The Furnace amp (see ampModel.ts): 0-10 knobs, the Amp selector, and on
+// the High Gain head three channel modes and the rectifier switch.
 export const furnaceEffect = defineEffect({
   type: "tubeAmp",
   label: "Furnace",
@@ -21,5 +21,6 @@ export const furnaceEffect = defineEffect({
     { key: "output", label: "Output", min: -24, max: 24, default: 0, format: dbSigned },
     { key: "mode", label: "Mode", min: 0, max: AMP_MODES.length - 1, default: AMP_MODES.length - 1, format: (v) => AMP_MODE_LABELS[ampMode(v)], automatable: false },
     { key: "rectifier", label: "Rectifier", min: 0, max: 1, default: 1, format: (v) => AMP_RECTIFIER_LABELS[ampRectifier(v)], automatable: false },
+    { key: "amp", label: "Amp", min: 0, max: AMP_MODELS.length - 1, default: AMP_MODELS.length - 1, format: (v) => AMP_MODEL_LABELS[ampModel(v)], automatable: false },
   ],
 });

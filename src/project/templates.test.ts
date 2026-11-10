@@ -67,7 +67,8 @@ describe("project templates", () => {
     expect(end).toBeCloseTo((20 * 4 * 60) / 110, 6);
     const guitar = p.channels.find((c) => c.name === "Guitar")!;
     expect(guitar.armed).toBe(true);
-    expect(p.channelEffects[guitar.id].find((fx) => fx.type === "irLoader")?.file?.id).toBe("factory-ir:2x12-combo");
+    expect(p.channelEffects[guitar.id].find((fx) => fx.type === "irLoader")?.file?.id).toBe("factory-ir:4x12-crunch");
+    expect(p.channelEffects[guitar.id].find((fx) => fx.type === "tubeAmp")?.params.amp).toBe(2); // British Crunch
     expect(p.channelEffects[guitar.id].some((fx) => fx.type === "reverb")).toBe(false); // the bus does that
   });
 });

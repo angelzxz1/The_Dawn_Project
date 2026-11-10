@@ -5,7 +5,21 @@ import { PluginKnob, type KnobMode } from "@/ui/PluginKnob";
 import { PluginWindow } from "@/effects/ui/PluginChrome";
 import { Segmented } from "@/effects/ui/PluginSegmented";
 import { paramSpecs, type ParamSpec } from "@/effects/registry";
-import { AMP_MODES, AMP_MODE_LABELS, AMP_RECTIFIERS, AMP_RECTIFIER_LABELS, ampMode, ampRectifier, ampToneCurve } from "./ampModel";
+import {
+  AMP_MODELS,
+  AMP_MODEL_LABELS,
+  AMP_MODES,
+  AMP_MODE_LABELS,
+  AMP_RECTIFIERS,
+  AMP_RECTIFIER_LABELS,
+  ampMatchingCab,
+  ampMode,
+  ampModel,
+  ampPresenceLabel,
+  ampRectifier,
+  ampToneCurve,
+} from "./ampModel";
+import { factoryCab } from "../ir-loader/cabIrs";
 import { fraunces } from "@/ui/pluginFonts";
 
 export function furnaceSpec(key: string): ParamSpec {
@@ -14,6 +28,19 @@ export function furnaceSpec(key: string): ParamSpec {
 
 export function furnaceValue(params: Record<string, number>, key: string): number {
   return params[key] ?? furnaceSpec(key).default;
+}
+
+/** A knob's label: Presence is Cut on the Chime. */
+export function furnaceLabel(params: Record<string, number>, key: string): string {
+  return key === "presence" ? ampPresenceLabel(ampModel(params.amp)) : furnaceSpec(key).label;
+}
+
+/** What the rack card's header says: the amp, or on the High Gain head
+ * its channel and rectifier. */
+export function furnaceStatus(params: Record<string, number>): string {
+  const model = ampModel(params.amp);
+  if (model !== "highGain") return AMP_MODEL_LABELS[model];
+  return `${AMP_MODE_LABELS[ampMode(params.mode)]} · ${AMP_RECTIFIER_LABELS[ampRectifier(params.rectifier)]}`;
 }
 
 const KNOBS: { key: string; mode: KnobMode }[] = [
@@ -26,6 +53,15 @@ const KNOBS: { key: string; mode: KnobMode }[] = [
   { key: "output", mode: "bipolar" },
 ];
 
+/** A line about each amp, under the curve. */
+const AMP_NOTES: Record<ReturnType<typeof ampModel>, string> = {
+  clean: "Clean American stays clean to about 5 on Gain and breaks up from 7; Gain is its volume, so it gets louder as it goes, and the bright cap lifts the top at low settings.",
+  chime: "Chime breaks up early and sweetly, with even harmonics from its class A power amp. Cut darkens it: turn it up to tame the top.",
+  crunch: "British Crunch goes from edge-of-breakup at 3 to a thick rhythm crunch at 7 and up; Middle does a lot.",
+  lead: "British Lead is the crunch head with a fourth stage: saturated from about 3, for leads and tight rhythm.",
+  highGain: "High Gain is the modern head: Raw, Vintage and Modern channels and the rectifier switch.",
+};
+
 const F_MIN = 40;
 const F_MAX = 12000;
 const CURVE_POINTS = 96;
@@ -37,15 +73,16 @@ const RANGE_DB = 18;
 /** The tone controls' combined curve (the stack after the distortion, plus
  * presence and depth), centered on its own average level. */
 export function FurnaceCurve({ params, width, height, labels = false }: { params: Record<string, number>; width: number; height: number; labels?: boolean }) {
-  const { bass, mid, treble, presence, mode } = {
+  const { bass, mid, treble, presence, mode, amp } = {
     bass: furnaceValue(params, "bass"),
     mid: furnaceValue(params, "mid"),
     treble: furnaceValue(params, "treble"),
     presence: furnaceValue(params, "presence"),
     mode: furnaceValue(params, "mode"),
+    amp: furnaceValue(params, "amp"),
   };
   const path = useMemo(() => {
-    const db = ampToneCurve({ bass, mid, treble, presence, mode }, CURVE_FREQS);
+    const db = ampToneCurve({ bass, mid, treble, presence, mode, amp }, CURVE_FREQS);
     const center = (Math.max(...db) + Math.min(...db)) / 2;
     return db
       .map((d, i) => {
@@ -54,7 +91,7 @@ export function FurnaceCurve({ params, width, height, labels = false }: { params
         return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${Math.min(height, Math.max(0, y)).toFixed(1)}`;
       })
       .join(" ");
-  }, [bass, mid, treble, presence, mode, width, height]);
+  }, [bass, mid, treble, presence, mode, amp, width, height]);
   const xOf = (f: number) => (Math.log(f / F_MIN) / Math.log(F_MAX / F_MIN)) * width;
   return (
     <svg width={width} height={height} className="block rounded-lg" style={{ background: "#141519" }} aria-label="Tone curve">
@@ -75,8 +112,9 @@ export function FurnaceCurve({ params, width, height, labels = false }: { params
   );
 }
 
-/** The Furnace's full window: a faceplate with the channel and rectifier
- * switches, the seven knobs, and the tone curve. */
+/** The Furnace's full window: a faceplate with the Amp selector (and on
+ * the High Gain head the channel and rectifier switches), the seven knobs,
+ * the tone curve, and which cabinet goes with the amp. */
 export function FurnaceWindow({
   channelName,
   params,
@@ -99,13 +137,15 @@ export function FurnaceWindow({
     onParamDragStart?.();
     onParamChange(key, v);
   };
+  const model = ampModel(value("amp"));
+  const cab = factoryCab(ampMatchingCab(model));
   return (
     <PluginWindow title="Furnace" channelName={channelName} bypass={bypass} onBypassToggle={onBypassToggle} onClose={onClose} width={860}>
       <div
         className="flex flex-col gap-4 rounded-xl px-5 pb-5 pt-4"
         style={{ background: "linear-gradient(180deg, #24242A 0%, #18181D 100%)", border: "1px solid #34353D", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)" }}
       >
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex min-h-[34px] items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <span
               aria-label={bypass ? "Standby" : "On"}
@@ -116,28 +156,36 @@ export function FurnaceWindow({
               Furnace
             </span>
           </div>
-          <div className="flex items-center gap-3">
-            <Segmented
-              label="Channel mode"
-              options={AMP_MODES.map((m, i) => ({ value: i, label: AMP_MODE_LABELS[m] }))}
-              value={AMP_MODES.indexOf(ampMode(value("mode")))}
-              onSelect={(v) => pick("mode", v)}
-            />
-            <Segmented
-              label="Rectifier"
-              options={AMP_RECTIFIERS.map((r, i) => ({ value: i, label: AMP_RECTIFIER_LABELS[r] }))}
-              value={AMP_RECTIFIERS.indexOf(ampRectifier(value("rectifier")))}
-              onSelect={(v) => pick("rectifier", v)}
-            />
-          </div>
+          {model === "highGain" && (
+            <div className="flex items-center gap-3">
+              <Segmented
+                label="Channel mode"
+                options={AMP_MODES.map((m, i) => ({ value: i, label: AMP_MODE_LABELS[m] }))}
+                value={AMP_MODES.indexOf(ampMode(value("mode")))}
+                onSelect={(v) => pick("mode", v)}
+              />
+              <Segmented
+                label="Rectifier"
+                options={AMP_RECTIFIERS.map((r, i) => ({ value: i, label: AMP_RECTIFIER_LABELS[r] }))}
+                value={AMP_RECTIFIERS.indexOf(ampRectifier(value("rectifier")))}
+                onSelect={(v) => pick("rectifier", v)}
+              />
+            </div>
+          )}
         </div>
+        <Segmented
+          label="Amp"
+          options={AMP_MODELS.map((m, i) => ({ value: i, label: AMP_MODEL_LABELS[m] }))}
+          value={AMP_MODELS.indexOf(model)}
+          onSelect={(v) => pick("amp", v)}
+        />
         <div className="flex justify-between">
           {KNOBS.map(({ key, mode }) => {
             const spec = furnaceSpec(key);
             return (
               <PluginKnob
                 key={key}
-                label={spec.label}
+                label={furnaceLabel(params, key)}
                 value={value(key)}
                 min={spec.min}
                 max={spec.max}
@@ -157,6 +205,9 @@ export function FurnaceWindow({
         <span className="text-[10px] font-semibold uppercase tracking-wider text-muted">Tone controls</span>
         <FurnaceCurve params={params} width={816} height={120} labels />
       </div>
+      <p className="text-[12px] leading-snug text-muted">
+        {AMP_NOTES[model]} The Furnace is the amp alone: put an IR Loader after it with a cabinet{cab ? <> (this amp&apos;s is the <span className="text-foreground">{cab.name}</span>)</> : null}, or add one of the guitar chains, which come with theirs.
+      </p>
     </PluginWindow>
   );
 }

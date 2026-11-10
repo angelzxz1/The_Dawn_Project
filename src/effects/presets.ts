@@ -273,8 +273,18 @@ export const FACTORY_PRESETS: EffectPreset[] = [
     ["Dark Cab", { lowCut: 70, highCut: 4500 }],
     ["Ambient Blend", { wet: 0.3 }],
   ]),
-  // Mode 0-2 = Raw, Vintage, Modern; rectifier 0 = Tube, 1 = Diode.
+  // Amp 0-4 = Clean American, Chime, British Crunch, British Lead, High Gain
+  // (the default); on High Gain, mode 0-2 = Raw, Vintage, Modern and
+  // rectifier 0 = Tube, 1 = Diode. Output brings each near the head's level.
   ...factory("tubeAmp", [
+    ["Clean American Sparkle", { amp: 0, gain: 4, bass: 4.5, mid: 5, treble: 6.5, presence: 5, master: 5, output: 14 }],
+    ["Clean American Edge", { amp: 0, gain: 7, bass: 5, mid: 6, treble: 6, presence: 5, master: 6 }],
+    ["Chime Jangle", { amp: 1, gain: 5, bass: 4, mid: 5, treble: 7, presence: 3, master: 5, output: 8 }],
+    ["Chime Drive", { amp: 1, gain: 8, bass: 5, mid: 6, treble: 6, presence: 5, master: 6, output: -4 }],
+    ["British Crunch Edge", { amp: 2, gain: 4, bass: 5, mid: 6, treble: 6, presence: 5, master: 5, output: 6 }],
+    ["British Crunch Rhythm", { amp: 2, gain: 7.5, bass: 5, mid: 7, treble: 6, presence: 5, master: 6, output: -3 }],
+    ["British Lead Tight Rhythm", { amp: 3, gain: 6, bass: 4, mid: 6, treble: 6, presence: 5, master: 5, output: 2 }],
+    ["British Lead Solo", { amp: 3, gain: 8.5, bass: 5, mid: 7.5, treble: 5.5, presence: 6, master: 6, output: -2 }],
     ["Modern Rhythm", {}],
     ["Modern Lead", { gain: 8.5, mid: 5.5, presence: 6, output: 1 }],
     ["Tube Rectifier Bloom", { rectifier: 0, gain: 7.5 }],

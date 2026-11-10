@@ -446,9 +446,9 @@ track, from its clips and the keys you play
 
 | Effect | What it does |
 | --- | --- |
-| **Furnace** | Dawn's own high-gain tube amp, modeled stage by stage: four triode stages, a real bass/middle/treble tone stack after the distortion, presence and master into a push-pull power amp, with 0-10 knobs (gain, bass, middle, treble, presence, master) and output. **Raw**, **Vintage** and **Modern** channel modes, and a **Tube** or **Diode** rectifier (tube sags and blooms, diode stays tight). Modern's voicing was fitted against measurements of a real rectifier head; pair it with a 4x12 cabinet in the IR Loader. |
+| **Furnace** | Dawn's own tube amp, modeled stage by stage: triode stages, a real bass/middle/treble tone stack, presence and master into the power amp, with 0-10 knobs (gain, bass, middle, treble, presence, master) and output. The **Amp** selector picks one of five: **Clean American** (a blackface-style combo: clean to about 5, breaking up from 7), **Chime** (a top-boost-style class A combo: early, sweet breakup with even harmonics; Presence is its **Cut** control), **British Crunch** (a plexi-style head), **British Lead** (the same with a fourth stage, for leads) and **High Gain** (the modern head, with **Raw**, **Vintage** and **Modern** channel modes and a **Tube** or **Diode** rectifier). High Gain's Modern voicing was fitted against measurements of a real rectifier head; the classic amps use their circuits' published tone stack values and were tuned by ear and by test. Each amp has a cabinet to go with it in the IR Loader (its window names it), and a chain that puts the two together. |
 | **NAM Amp** | Loads [Neural Amp Modeler](https://www.neuralampmodeler.com/) `.nam` amp captures, with input, a bass/middle/treble tone stack, output and normalize. |
-| **IR Loader** | Loads an impulse response (a speaker cabinet, a room) from an audio file, or one of Dawn's six built-in cabinets (four guitar, two bass), with low and high cut, dry/wet and normalize. It draws the IR's frequency response. |
+| **IR Loader** | Loads an impulse response (a speaker cabinet, a room) from an audio file, or one of Dawn's nine built-in cabinets (seven guitar, two bass), with low and high cut, dry/wet and normalize. It draws the IR's frequency response. |
 | **Utility** | Gain, stereo width, balance, mono, bass mono, per-channel phase invert, channel select (stereo, left, right or swapped), a DC filter and mute. |
 | **Tuner** | A chromatic tuner with an adjustable reference pitch (A4 = 410 to 480 Hz), sharps or flats, and an option to mute the track while tuning. |
 
@@ -994,14 +994,16 @@ Double-click a MIDI clip to open it.
   room impulse response) and the **NAM Amp** takes a `.nam` model. The file
   is saved inside the project's `Samples` folder. **Browse cabinets** in the
   IR Loader's window picks one of Dawn's own cabinets (1x12 Open Back, 2x12
-  Combo, 4x12 Closed Back, 4x12 Vintage Dark, 1x15 and 8x10 bass cabs), each
-  with a short description; they're generated in the app, so there's nothing
-  to download.
+  Combo, 4x12 Closed Back, 4x12 Vintage Dark, and one for each of the
+  Furnace's classic amps: 2x12 Open Clean, 2x12 Alnico Chime, 4x12 British
+  Crunch; plus 1x15 and 8x10 bass cabs), each with a short description;
+  they're generated in the app, so there's nothing to download.
 - **Chains** (at the top of the Effects browser) add a whole ready-made chain
   to the selected track in one click: **Clean Guitar**, **Crunch Guitar**,
-  **High-Gain Guitar**, **Bass**, **Acoustic Guitar** and **Vocal**. The
-  High-Gain chain uses the Furnace amp and the clean and crunch chains the
-  Saturator; swap in a **NAM Amp** with your favorite capture any time.
+  **Chime Guitar**, **Lead Guitar**, **High-Gain Guitar**, **Bass**,
+  **Acoustic Guitar** and **Vocal**. The guitar chains each use one of the
+  Furnace's amps with the cabinet that goes with it; swap in a **NAM Amp**
+  with your favorite capture any time.
 
 ### Sidechain
 
@@ -1225,7 +1227,11 @@ and Ctrl/Cmd+O work everywhere but in the tour.
   polyphase filters each way, 16 samples of latency) so its distortion
   doesn't alias. Each triode stage has a cathode-bypass shelf, an asymmetric
   soft clip whose bias shifts when driven hard, and coupling and Miller
-  filters. The tone stack isn't a stock EQ: the circuit is solved (nodal
+  filters. Each amp (`ampModel.ts`) sets how many stages there are, which
+  one the tone stack comes after (after the first on Clean American, so
+  the second stage distorts what the controls shaped; after the last on
+  the high-gain amps), the stack's parts, and the power amp: push-pull, or
+  class A on the Chime, which clips one side first. The tone stack isn't a stock EQ: the circuit is solved (nodal
   analysis) whenever a knob moves, its exact third-order response fitted and
   turned into a digital filter. The default voicing's constants were fitted
   by optimization against measurements of a NAM capture of a real amp (gain

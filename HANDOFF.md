@@ -44,10 +44,16 @@ committed.
     for by the user, who named it). `src/effects/crusher/`, ported in
     `crates/dawn-engine/src/effects/crusher.rs` (`tests/crusher_parity.rs`
     matches the JavaScript exactly). No sidechain (yet).
-- **Asked for next by the user:** more amps in the Furnace (an Amp
-  selector: Clean American, Chime, British Crunch, British Lead and the
-  current head, each with its tone circuit, power tubes and a matching
-  cabinet, tuned from published circuit values). After it, step 35.
+  - Not a listed step: the Furnace's Amp selector (2026-11-09, commit to
+    come; asked for by the user). Clean American, Chime, British Crunch,
+    British Lead and High Gain (the head that was the only amp, still the
+    default, so older projects sound the same). The kernel gained
+    `stackAt` (which stage the tone stack follows) and `powerBias` (class
+    A); the head renders exactly as before. Three new factory cabinets go
+    with the classic amps (`ampMatchingCab`), and the Clean and Crunch
+    chains now use the Furnace, with new Chime and Lead chains. Ported in
+    `amp.rs` (`CLASSICS`); `tests/amp_parity.rs` has a case per amp and
+    one that switches amps mid-render.
 - **Next listed: step 35, native file dialogs.** Wait for the user to say "go"
   before starting a step: they ask for each one ("Lets go with step N").
 - **What's left after that,** in order (the full list, with sizes, is in

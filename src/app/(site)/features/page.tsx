@@ -28,7 +28,7 @@ const EFFECT_NOTES: Record<EffectType, string> = {
   distortion: "From warmth to grit, with oversampling.",
   reverb: "Rooms, halls and plates, from short to huge.",
   delay: "Tempo-synced repeats with feedback.",
-  tubeAmp: "A modeled high-gain tube amp, tuned against a real head.",
+  tubeAmp: "A modeled tube amp with five amps: Clean American, Chime, British Crunch, British Lead and a high-gain head.",
   namAmp: "Real amp captures via Neural Amp Modeler.",
   irLoader: "Cabinet impulse responses for any amp.",
   utility: "Gain, pan and other everyday fixes.",

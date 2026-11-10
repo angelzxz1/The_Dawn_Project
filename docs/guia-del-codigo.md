@@ -288,7 +288,7 @@ Los efectos:
 | `pitch-shift/` | Cambio de tono. |
 | `utility/` | Ganancia, panorama, anchura, fase, medidores. |
 | `tuner/` | Afinador. |
-| `furnace/` | Amplificador de válvulas modelado etapa por etapa. |
+| `furnace/` | Amplificador de válvulas modelado etapa por etapa, con cinco amplificadores (Clean American, Chime, British Crunch, British Lead y High Gain). |
 | `nam-amp/` | Amplificador NAM (redes neuronales, motor WebAssembly en `public/nam/`). |
 | `ir-loader/` | Cargador de IRs (bafles); `cabIrs.ts` genera los bafles propios de Dawn. |
 | `plugin/` | Un plugin VST3/CLAP del ordenador como efecto. En el navegador el sonido pasa tal cual; suena en el motor nativo. |

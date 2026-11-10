@@ -2,8 +2,7 @@
 
 import { PluginKnob } from "@/ui/PluginKnob";
 import { RackCardHeader } from "@/effects/ui/PluginChrome";
-import { FurnaceCurve, furnaceSpec, furnaceValue } from "./FurnaceWindow";
-import { AMP_MODE_LABELS, AMP_RECTIFIER_LABELS, ampMode, ampRectifier } from "./ampModel";
+import { FurnaceCurve, furnaceLabel, furnaceSpec, furnaceStatus, furnaceValue } from "./FurnaceWindow";
 import { spaceGrotesk } from "@/ui/pluginFonts";
 
 const CARD_KNOBS = ["gain", "bass", "mid", "treble"];
@@ -27,7 +26,7 @@ export function FurnaceRackCard({
   onParamChange: (key: string, value: number) => void;
   onParamDragStart?: () => void;
 }) {
-  const status = `${AMP_MODE_LABELS[ampMode(params.mode)]} · ${AMP_RECTIFIER_LABELS[ampRectifier(params.rectifier)]}`;
+  const status = furnaceStatus(params);
   return (
     <div className={`${spaceGrotesk.className} flex h-full flex-col gap-2`}>
       <RackCardHeader title="Furnace" status={status} bypass={bypass} onBypassToggle={onBypassToggle} onRemove={onRemove} onExpand={onExpand} />
@@ -41,7 +40,7 @@ export function FurnaceRackCard({
             return (
               <PluginKnob
                 key={key}
-                label={spec.label}
+                label={furnaceLabel(params, key)}
                 value={furnaceValue(params, key)}
                 min={spec.min}
                 max={spec.max}

@@ -8,11 +8,14 @@
 //      asymmetric soft clip whose bias shifts as the grid conducts (the
 //      stage "grabs" when hit hard), a coupling high-pass and the plate's
 //      Miller low-pass; the Gain knob sits after the first stage
-//   -> cathode follower -> the passive bass/mid/treble network (after the
-//      distortion, so the controls carve the distorted tone)
+//   -> cathode follower -> the passive bass/mid/treble network: after the
+//      last stage in a high-gain head, so the controls carve the distorted
+//      tone; after the first or second in older designs, so they shape
+//      what the later stages distort
 //   -> master -> power amp: presence and depth (the feedback loop's
-//      shaping), phase inverter and push-pull output stage clipping, the
-//      power supply sagging under load, the output transformer's band
+//      shaping), phase inverter and output stage clipping (push-pull, or
+//      class A's lopsided clip), the power supply sagging under load, the
+//      output transformer's band
 //   -> output level.
 // Everything from the first stage to the output transformer runs at 4x
 // the sample rate, so the distortion's harmonics don't fold back down as
@@ -46,6 +49,8 @@ export interface AmpSettings {
    * has less gain, and how much less (0-1 of the gain kept). */
   shelfHz: number[];
   shelfKeep: number[];
+  /** How many stages come before the tone stack (1 to all of them). */
+  stackAt: number;
   /** Coupling high-pass after each stage (Hz). */
   couplingHz: number[];
   /** Plate (Miller) low-pass after each stage (Hz). */
@@ -65,6 +70,9 @@ export interface AmpSettings {
   stackGain: number;
   /** Power amp: drive into the output stage (linear, at full master). */
   powerDrive: number;
+  /** The output stage's bias offset: 0 for push-pull (it clips evenly),
+   * more for class A (it clips one side first: even harmonics). */
+  powerBias: number;
   /** Presence: high shelf (Hz, max dB); depth: low peak (Hz, dB). */
   presenceHz: number;
   presenceDb: number;
@@ -271,6 +279,7 @@ class AmpKernel {
     const fs = this.fs;
     this.inHp.lowpass(s.inputHz, fs);
     this.nStages = s.stageGains.length;
+    this.stackAt = Math.min(this.nStages, Math.max(1, s.stackAt));
     for (let i = 0; i < this.nStages; i++) {
       const st = this.stages[i];
       st.gain = s.stageGains[i];
@@ -303,6 +312,18 @@ class AmpKernel {
     this.shiftRate = 1 - Math.exp(-1 / (0.03 * fs));
   }
 
+  // The cathode follower (a soft limit on large swings) into the tone
+  // stack (third order, direct form I).
+  toneStack(x) {
+    x = x / (1 + 0.15 * Math.abs(x));
+    const tb = this.stack.b, ta = this.stack.a, z = this.stack.z;
+    const y = tb[0] * x + z[0];
+    z[0] = tb[1] * x - ta[1] * y + z[1];
+    z[1] = tb[2] * x - ta[2] * y + z[2];
+    z[2] = tb[3] * x - ta[3] * y;
+    return y * this.s.stackGain;
+  }
+
   // One sample at the oversampled rate.
   tick(x) {
     const s = this.s;
@@ -320,21 +341,13 @@ class AmpKernel {
       st.shift += this.shiftRate * (s.bias * Math.max(0, u - 0.6) - st.shift);
       x = st.lp.lp(st.hp.hp(-y));
       if (i === 0) x = this.bright.run(x * this.gainPot);
+      if (i === this.stackAt - 1) x = this.toneStack(x);
     }
-    // Cathode follower into the stack: a soft limit on large swings.
-    x = x / (1 + 0.15 * Math.abs(x));
-    // Tone stack (third order, direct form I).
-    const tb = this.stack.b, ta = this.stack.a, z = this.stack.z;
-    const y = tb[0] * x + z[0];
-    z[0] = tb[1] * x - ta[1] * y + z[1];
-    z[1] = tb[2] * x - ta[2] * y + z[2];
-    z[2] = tb[3] * x - ta[3] * y;
-    x = y * s.stackGain;
     // Power amp.
     x = this.depth.run(this.presence.run(x * this.masterGain));
     const head = 1 - 0.3 * s.sag * this.env;
     x = Math.tanh(x * 0.8) / 0.8;                       // phase inverter
-    x = head * Math.tanh(x / head);                      // output stage
+    x = head * (Math.tanh(x / head + s.powerBias) - Math.tanh(s.powerBias)); // output stage
     const p = x * x;
     this.env += (p > this.env ? this.sagAtk : this.sagRel) * (p - this.env);
     x = this.otHigh.run(this.otLow.run(x));

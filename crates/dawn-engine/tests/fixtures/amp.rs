@@ -44,4 +44,29 @@ const CASES: &[Case] = &[
         params: &[("gain", 4.0)],
         change: Some((7680, &[("gain", 9.0), ("bass", 3.0), ("mid", 8.0), ("master", 7.0), ("mode", 1.0)])),
     },
+    Case {
+        name: "clean-american",
+        params: &[("amp", 0.0), ("gain", 6.0), ("master", 6.0), ("output", 4.0)],
+        change: None,
+    },
+    Case {
+        name: "chime",
+        params: &[("amp", 1.0), ("gain", 7.0), ("treble", 7.0), ("presence", 3.0)],
+        change: None,
+    },
+    Case {
+        name: "british-crunch",
+        params: &[("amp", 2.0), ("gain", 8.0), ("mid", 7.0)],
+        change: None,
+    },
+    Case {
+        name: "british-lead",
+        params: &[("amp", 3.0), ("gain", 9.0), ("bass", 4.0), ("presence", 8.0)],
+        change: None,
+    },
+    Case {
+        name: "amp-switched",
+        params: &[("amp", 0.0), ("gain", 8.0)],
+        change: Some((6400, &[("amp", 1.0), ("gain", 8.0)])),
+    },
 ];
