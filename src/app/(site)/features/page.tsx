@@ -24,7 +24,7 @@ const EFFECT_NOTES: Record<EffectType, string> = {
   eq3: "Fast low, mid and high tone shaping.",
   filter: "Low-pass, high-pass, band-pass and more, with resonance.",
   chorus: "Thicken and widen with modulated delay.",
-  pitchShift: "Move a sound up or down by semitones.",
+  pitchShift: "A drop pedal in tune: shift by semitones, chords and all, in a natural Studio mode or a low-latency Live one.",
   distortion: "From warmth to grit, with oversampling.",
   reverb: "Rooms, halls and plates, from short to huge.",
   delay: "Tempo-synced repeats with feedback.",

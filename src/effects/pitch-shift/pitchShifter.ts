@@ -1,107 +1,78 @@
 import * as Tone from "tone";
 import { loadWorklet } from "../../engine/workletLoader";
-import { PITCH_SHIFTER_NAME, PITCH_SHIFTER_SOURCE } from "./pitchShiftKernel";
+import { PITCH_SHIFT_SOURCE, pitchLatency, pitchSettingsFromParams } from "./pitchShiftKernel";
 
-// The Pitch Shift's audio node: the shifter (pitchShiftKernel.ts) as an
-// AudioWorklet, beside a dry path waiting as long, blended equal-power.
+// The Pitch Shift's audio node: pitchShiftKernel.ts's kernel (the shifter,
+// the dry path waiting as long, and the Dry/Wet blend) in an AudioWorklet.
+// Silent until its module has loaded (a few ms, once per audio context).
 
-export interface PitchShiftSettings {
-  /** Semitones. */
-  pitch: number;
-  /** Cents, added to `pitch`. */
-  fine: number;
-  /** Seconds. */
-  window: number;
-  feedback: number;
-  /** 0..1 dry/wet, equal-power (as Tone.PitchShift's crossfade was). */
-  wet: number;
+const PROCESSOR_NAME = "dawn-pitch-shift-v2";
+
+const PROCESSOR_CODE = `
+${PITCH_SHIFT_SOURCE}
+class DawnPitchShift extends AudioWorkletProcessor {
+  constructor(options) {
+    super();
+    this.kernel = new PitchKernel(sampleRate);
+    this.kernel.set(options.processorOptions);
+    this.alive = true;
+    this.port.onmessage = (e) => {
+      if (e.data === "dispose") this.alive = false;
+      else this.kernel.set(e.data);
+    };
+  }
+  process(inputs, outputs) {
+    const input = inputs[0] || [];
+    const out = outputs[0];
+    this.kernel.process(input[0] || null, input[1] || null, out[0], out[1] || null, out[0].length);
+    return this.alive;
+  }
 }
+registerProcessor("${PROCESSOR_NAME}", DawnPitchShift);
+`;
 
-/** The shifted (wet) path is silent until its worklet module has loaded (a
- * few ms, once per audio context); the dry path passes straight through. */
 export class PitchShifter extends Tone.ToneAudioNode {
   readonly name = "PitchShifter";
   readonly input = new Tone.Gain();
   readonly output = new Tone.Gain();
-  private readonly dryGain = new Tone.Gain();
-  private readonly wetGain = new Tone.Gain();
-  /** The dry signal waits as long as the shifted one takes, so a Dry/Wet
-   * blend is a harmony in time rather than a slapback. */
-  private readonly dryDelay = new Tone.Delay(0, 0.5);
   private worklet: AudioWorkletNode | null = null;
-  private settings: PitchShiftSettings;
+  private params: Record<string, number>;
+  private pending = false;
   private isDisposed = false;
 
-  constructor(settings: PitchShiftSettings) {
+  constructor(params: Record<string, number>) {
     super();
-    this.settings = { ...settings };
-    this.dryDelay.delayTime.value = this.latency;
-    this.input.chain(this.dryDelay, this.dryGain);
-    this.dryGain.connect(this.output);
-    this.wetGain.connect(this.output);
-    this.setWet(settings.wet);
-    loadWorklet(this.context, PITCH_SHIFTER_NAME, PITCH_SHIFTER_SOURCE).then(() => {
+    this.params = { ...params };
+    loadWorklet(this.context, PROCESSOR_NAME, PROCESSOR_CODE).then(() => {
       if (this.isDisposed) return;
-      const node = this.context.createAudioWorkletNode(PITCH_SHIFTER_NAME, {
+      const node = this.context.createAudioWorkletNode(PROCESSOR_NAME, {
         numberOfInputs: 1,
         numberOfOutputs: 1,
         outputChannelCount: [2],
         channelCount: 2,
         channelCountMode: "explicit",
         channelInterpretation: "speakers",
-        parameterData: {
-          ratio: this.ratio(),
-          window: this.settings.window,
-          feedback: this.settings.feedback,
-        },
+        processorOptions: pitchSettingsFromParams(this.params),
       });
       this.worklet = node;
       this.input.connect(node);
-      Tone.connect(node, this.wetGain);
+      Tone.connect(node, this.output);
     });
   }
 
-  private setParam(name: string, value: number): void {
-    const param = this.worklet?.parameters.get(name);
-    if (param) param.value = value;
+  setParam(key: string, value: number): void {
+    this.params[key] = value;
+    if (this.pending || !this.worklet) return;
+    this.pending = true;
+    queueMicrotask(() => {
+      this.pending = false;
+      this.worklet?.port.postMessage(pitchSettingsFromParams(this.params));
+    });
   }
 
-  private ratio(): number {
-    return Math.pow(2, (this.settings.pitch + this.settings.fine / 100) / 12);
-  }
-
-  setPitch(semitones: number): void {
-    this.settings.pitch = semitones;
-    this.setParam("ratio", this.ratio());
-  }
-
-  setFine(cents: number): void {
-    this.settings.fine = cents;
-    this.setParam("ratio", this.ratio());
-  }
-
-  setWindow(seconds: number): void {
-    this.settings.window = seconds;
-    this.setParam("window", seconds);
-    this.dryDelay.delayTime.value = this.latency;
-  }
-
-  /** Seconds the shifted signal lags the input: the read taps sit half a
-   * window (plus the interpolator's 2 samples) behind on average. */
+  /** Seconds the shifted signal (and the dry one, to match) lags. */
   get latency(): number {
-    const sr = this.context.sampleRate;
-    return (this.settings.window * sr) / 2 / sr + 2 / sr;
-  }
-
-  setFeedback(amount: number): void {
-    this.settings.feedback = amount;
-    this.setParam("feedback", amount);
-  }
-
-  setWet(mix: number): void {
-    this.settings.wet = mix;
-    this.dryGain.gain.value = Math.cos((mix * Math.PI) / 2);
-    this.wetGain.gain.value = Math.sin((mix * Math.PI) / 2);
+    return pitchLatency(pitchSettingsFromParams(this.params), this.context.sampleRate) / this.context.sampleRate;
   }
 
   dispose(): this {
@@ -111,9 +82,6 @@ export class PitchShifter extends Tone.ToneAudioNode {
       this.worklet.port.postMessage("dispose");
       this.worklet.disconnect();
     }
-    this.dryDelay.dispose();
-    this.dryGain.dispose();
-    this.wetGain.dispose();
     this.input.dispose();
     this.output.dispose();
     return this;

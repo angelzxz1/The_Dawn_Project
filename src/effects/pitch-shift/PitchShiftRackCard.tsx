@@ -4,6 +4,7 @@ import { Maximize2, Power, X } from "lucide-react";
 import { PluginKnob } from "@/ui/PluginKnob";
 import { PluginIcon } from "@/effects/ui/PluginIcon";
 import { PITCH_KNOBS, pitchParam, pitchSpec, snapPitchParam } from "./PitchShiftWindow";
+import { pitchMode } from "./pitchShiftKernel";
 import { shiftReadout } from "./pitchInterval";
 import { fraunces, spaceGrotesk } from "@/ui/pluginFonts";
 
@@ -84,6 +85,7 @@ export function PitchShiftRackCard({
               onChange={(v) => onParamChange(key, snapPitchParam(key, v))}
               onDragStart={onParamDragStart}
               formatValue={spec.format}
+              disabled={key === "window" && pitchMode(params.mode) === "studio"}
             />
           );
         })}

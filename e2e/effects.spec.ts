@@ -123,3 +123,18 @@ test("the Tremor's Voice switch shows each voice's own controls", async ({ page,
   await page.getByTitle("Close (Esc)", { exact: true }).click();
   await expect(page.getByText("Split", { exact: true })).toBeVisible();
 });
+
+test("the Pitch Shift's quick shifts set the interval, and Live turns the Window on", async ({ page, studio }) => {
+  await studio.open("Empty Project");
+  await studio.select("Audio 1");
+  await studio.addEffect("Pitch Shift");
+  await studio.openLastEffect();
+  await page.getByRole("group", { name: "Quick shifts" }).getByRole("button", { name: "−2" }).click();
+  await expect(page.getByText("A guitar in E standard plays in D standard (whole step down)")).toBeVisible();
+  await expect(page.getByRole("slider", { name: /^Pitch, -2 st/ }).first()).toBeVisible();
+  const mode = page.getByRole("radiogroup", { name: "Mode" });
+  await expect(mode.getByRole("radio", { name: "Studio" })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByRole("slider", { name: /^Window,/ }).last()).toHaveAttribute("aria-disabled", "true");
+  await mode.getByRole("radio", { name: "Live" }).click();
+  await expect(page.getByRole("slider", { name: /^Window,/ }).last()).not.toHaveAttribute("aria-disabled", "true");
+});

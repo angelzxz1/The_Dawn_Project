@@ -1,87 +1,77 @@
 // The Pitch Shift's parity fixture for its Rust port
 // (crates/dawn-engine/src/effects/pitch_shift.rs): the cases, rendered with
-// the worklet's own processor (pitchShiftKernel.ts) the way the worklet
-// runs it - a render quantum at a time, its k-rate parameters as the
-// AudioParams hold them (float32, within their ranges) - as a generated Rust
+// the worklet's own kernel (pitchShiftKernel.ts) the way the worklet runs
+// it (pitchShifter.ts) - a render quantum at a time - as a generated Rust
 // file and the rendered samples. pitchShiftParity.test.ts checks the stored
 // fixture still matches; the Rust side's tests/pitch_shift_parity.rs
 // compares the port against it. See src/test/kernelParity.ts.
-//
-// The dry path and the Dry/Wet blend are Web Audio nodes (pitchShifter.ts),
-// so they aren't here: the Rust side tests those on their own.
 
-import { PITCH_SHIFTER_SOURCE } from "./pitchShiftKernel";
+import { PITCH_SHIFT_SOURCE, pitchSettingsFromParams, type PitchKernelSettings } from "./pitchShiftKernel";
 import { FixtureData, PARITY_BLOCK, PARITY_FRAMES, PARITY_SAMPLE_RATE, PARITY_STRIDE, fnv1a, paritySignal, rustF64, rustHex, type ParitySignal } from "../../test/kernelParity";
 
-interface Processor {
-  process(inputs: Float32Array[][], outputs: Float32Array[][], parameters: Record<string, Float32Array>): boolean;
+interface Kernel {
+  set(s: PitchKernelSettings): void;
+  process(inL: Float32Array | null, inR: Float32Array | null, outL: Float32Array, outR: Float32Array | null, n: number): void;
 }
 
-/** The AudioWorkletProcessor the processor extends, as far as it uses it. */
-class WorkletStub {
-  port = { onmessage: null as unknown, postMessage() {} };
-}
-
-const Shifter = new Function("AudioWorkletProcessor", "registerProcessor", "sampleRate", `${PITCH_SHIFTER_SOURCE}; return DawnPitchShifter;`)(
-  WorkletStub,
-  () => {},
-  PARITY_SAMPLE_RATE
-) as new () => Processor;
+const Pitch = new Function(`${PITCH_SHIFT_SOURCE}; return PitchKernel;`)() as new (sr: number) => Kernel;
 
 export interface PitchShiftParityCase {
   name: string;
-  /** As the effect keeps them. */
-  params: { pitch: number; fine: number; window: number; feedback: number };
-  /** New parameters from this frame on - a block start. */
-  change?: { at: number; params: { pitch: number; fine: number; window: number; feedback: number } };
+  params: Record<string, number>;
+  input: "mono" | "stereo";
+  /** New parameters (over the case's) from this frame on - a block start. */
+  change?: { at: number; params: Record<string, number> };
 }
 
-const p = (pitch: number, fine = 0, window = 0.1, feedback = 0) => ({ pitch, fine, window, feedback });
+const base = { input: "stereo" } as const;
+const studio = (params: Record<string, number>) => ({ mode: 1, ...params });
+const live = (params: Record<string, number>) => ({ mode: 0, ...params });
 
 export const PITCH_SHIFT_PARITY_CASES: PitchShiftParityCase[] = [
-  { name: "unison", params: p(0) },
-  { name: "fifth-up", params: p(7) },
-  { name: "octave-down", params: p(-12) },
-  { name: "detuned-short-window", params: p(0, 37, 0.03) },
-  { name: "feedback", params: p(12, 0, 0.08, 0.6) },
-  { name: "two-octaves-up-long-window", params: p(24, 0, 0.25) },
-  { name: "lowest", params: p(-24, -100, 0.02, 0.9) },
-  { name: "changed", params: p(5, 0, 0.1), change: { at: 60 * PARITY_BLOCK, params: p(-7, 20, 0.05, 0.3) } },
+  { ...base, name: "studio-unison", params: studio({}) },
+  { ...base, name: "studio-drop-2", params: studio({ pitch: -2 }) },
+  { ...base, name: "studio-octave-down", params: studio({ pitch: -12 }) },
+  { ...base, name: "studio-fifth-blend", params: studio({ pitch: 7, wet: 0.5 }) },
+  { ...base, name: "studio-detune-feedback", params: studio({ fine: 37, feedback: 0.6 }) },
+  { ...base, name: "studio-mono-in", params: studio({ pitch: 12 }), input: "mono" },
+  { ...base, name: "live-unison", params: live({}) },
+  { ...base, name: "live-drop-2", params: live({ pitch: -2 }) },
+  { ...base, name: "live-octave-down", params: live({ pitch: -12, window: 0.1 }) },
+  { ...base, name: "live-octave-up", params: live({ pitch: 12 }) },
+  { ...base, name: "live-two-up-feedback", params: live({ pitch: 24, feedback: 0.5, window: 0.25, wet: 0.7 }) },
+  { ...base, name: "live-lowest-short", params: live({ pitch: -24, fine: -100, window: 0.02 }) },
+  { ...base, name: "switched", params: live({ pitch: 5 }), change: { at: 60 * PARITY_BLOCK, params: { mode: 1, pitch: -7, fine: 20, wet: 0.8 } } },
 ];
 
-/** The ratio the node sets (pitchShifter.ts). */
-const ratio = (c: { pitch: number; fine: number }) => Math.pow(2, (c.pitch + c.fine / 100) / 12);
-
-/** An AudioParam's value: within its range, as a float32. */
-const param = (value: number, min: number, max: number) => Float32Array.of(Math.min(max, Math.max(min, value)));
+const caseParams = (c: PitchShiftParityCase) => c.params;
+const changeParams = (c: PitchShiftParityCase) => (c.change ? { ...c.params, ...c.change.params } : null);
 
 function renderCase(c: PitchShiftParityCase, sig: ParitySignal) {
-  const k = new Shifter();
+  const k = new Pitch(PARITY_SAMPLE_RATE);
+  k.set(pitchSettingsFromParams(caseParams(c)));
+  const changed = changeParams(c);
   const outL = new Float32Array(PARITY_FRAMES);
   const outR = new Float32Array(PARITY_FRAMES);
-  let at = c.params;
   for (let start = 0; start < PARITY_FRAMES; start += PARITY_BLOCK) {
-    if (c.change && start === c.change.at) at = c.change.params;
+    if (c.change && changed && start === c.change.at) k.set(pitchSettingsFromParams(changed));
     const n = Math.min(PARITY_BLOCK, PARITY_FRAMES - start);
     const part = (a: Float32Array) => a.subarray(start, start + n);
-    k.process([[part(sig.inL), part(sig.inR)]], [[part(outL), part(outR)]], {
-      ratio: param(ratio(at), 0.1, 8),
-      window: param(at.window, 0.005, 0.5),
-      feedback: param(at.feedback, 0, 0.95),
-    });
+    k.process(part(sig.inL), c.input === "stereo" ? part(sig.inR) : null, part(outL), part(outR), n);
   }
   return { outL, outR };
 }
 
-const rustParams = (q: PitchShiftParityCase["params"]) =>
-  `&[("pitch", ${rustF64(q.pitch)}), ("fine", ${rustF64(q.fine)}), ("window", ${rustF64(q.window)}), ("feedback", ${rustF64(q.feedback)})]`;
+const rustParams = (p: Record<string, number>) => `&[${Object.entries(p).map(([k, v]) => `("${k}", ${rustF64(v)})`).join(", ")}]`;
 
 function rustCase(c: PitchShiftParityCase): string {
+  const changed = changeParams(c);
   return [
     "    Case {",
     `        name: "${c.name}",`,
-    `        params: ${rustParams(c.params)},`,
-    `        change: ${c.change ? `Some((${c.change.at}, ${rustParams(c.change.params)}))` : "None"},`,
+    `        params: ${rustParams(caseParams(c))},`,
+    `        stereo: ${c.input === "stereo"},`,
+    `        change: ${c.change && changed ? `Some((${c.change.at}, ${rustParams(changed)}))` : "None"},`,
     "    },",
   ].join("\n");
 }
@@ -97,7 +87,7 @@ export function renderPitchShiftParity(): { rust: string; data: FixtureData } {
   }
   const rust = [
     "// @generated by src/effects/pitch-shift/pitchShiftParity.test.ts from the",
-    "// worklet's processor (pitchShiftKernel.ts). Don't edit it: to remake it,",
+    "// worklet's kernel (pitchShiftKernel.ts). Don't edit it: to remake it,",
     "// run UPDATE_ENGINE_FIXTURES=1 npx vitest run --project unit pitchShiftParity",
     "",
     `const SAMPLE_RATE: f64 = ${rustF64(PARITY_SAMPLE_RATE)};`,

@@ -164,13 +164,19 @@ fn oversampling_counts_too() {
 }
 
 #[test]
-fn a_pitch_shifter_counts_half_its_window() {
-    let shift = EffectSpec::new(
-        "p",
-        EffectSettings::from_params("pitchShift", &[("pitch", 7.0), ("window", 0.05)]).unwrap(),
-    );
-    let s = song(vec![track("a", vec![], vec![shift])]);
-    assert_eq!(s.prepare(None, SR).latency(), 1200 + 2 + LOOKAHEAD);
+fn a_pitch_shifter_counts_its_frame_or_its_attack_point() {
+    let latency = |mode: f64| {
+        let shift = EffectSpec::new(
+            "p",
+            EffectSettings::from_params("pitchShift", &[("pitch", 7.0), ("mode", mode)]).unwrap(),
+        );
+        song(vec![track("a", vec![], vec![shift])])
+            .prepare(None, SR)
+            .latency()
+    };
+    // Studio: a frame; Live: 3 ms behind the input, and room to interpolate.
+    assert_eq!(latency(1.0), 4096 + LOOKAHEAD);
+    assert_eq!(latency(0.0), 144 + 4 + LOOKAHEAD);
 }
 
 #[test]

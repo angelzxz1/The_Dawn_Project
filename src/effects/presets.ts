@@ -260,7 +260,13 @@ export const FACTORY_PRESETS: EffectPreset[] = [
     ["Wavefolder", { distortion: 0.6, shape: 2, tone: 9000, output: -6 }],
     ["Parallel Grit", { distortion: 0.7, shape: 0, tone: 7000, wet: 0.35 }],
   ]),
+  // Mode 0 = Live (for playing through it), 1 = Studio (the default).
   ...factory("pitchShift", [
+    ["Half Step Down", { pitch: -1 }],
+    ["Whole Step Down", { pitch: -2 }],
+    ["Drop to B", { pitch: -5 }],
+    ["Live Drop Pedal", { pitch: -2, mode: 0 }],
+    ["Live Octave Down", { pitch: -12, mode: 0 }],
     ["Octave Up", { pitch: 12 }],
     ["Octave Down", { pitch: -12 }],
     ["Fifth Harmony", { pitch: 7, wet: 0.5 }],

@@ -437,7 +437,7 @@ track, from its clips and the keys you play
 | Effect | What it does |
 | --- | --- |
 | **Chorus** | Rate, delay, depth, feedback and stereo spread, with a sine or triangle LFO. |
-| **Pitch Shift** | Transposes by semitones and cents, with window and feedback controls. |
+| **Pitch Shift** | Transposes by semitones and cents, in tune to a fraction of a cent, like a drop pedal: quick buttons for the usual shifts (−1 for E♭, −2 for D, −5 for B, octaves) and the tuning a guitar in E standard ends up in. Two modes: **Studio** (the default) shifts every note of a chord on its own for the most natural sound, delaying it by about 85 ms, which Dawn lines up on playback; **Live** is for playing through it, attacks coming out about 3 ms after you play them, with Window for how smooth the sustain is. Feedback and Dry/Wet. |
 | **Saturator** | Drive through six curves: analog clip, soft sine, medium, hard, digital clip and fold. It also has bias, tone, a pre/post "color" EQ, soft clip and up to 4x oversampling. |
 | **Reverb** | Hall, Room and Plate modes, with pre-delay, decay, damping, early reflections, low and high cut, and stereo width. |
 | **Delay** | A stereo delay with left and right times, which can be synced to the tempo or linked. It has feedback, a filter on the repeats, ping-pong and freeze. |
@@ -1235,11 +1235,21 @@ and Ctrl/Cmd+O work everywhere but in the tour.
   the high-gain amps), the stack's parts, and the power amp: push-pull, or
   class A on the Chime, which clips one side first. The tone stack isn't a
   stock EQ: the circuit is solved (nodal analysis) whenever a knob moves,
-  its exact third-order response fitted and turned into a digital filter. The default voicing's constants were fitted
-  by optimization against measurements of a NAM capture of a real amp (gain
-  and harmonics per frequency and level, the clipping curve, and the
-  spectrum and dynamics on real guitar DI); the capture itself isn't used or
-  shipped.
+  its exact third-order response fitted and turned into a digital filter.
+  The default voicing's constants were fitted by optimization against
+  measurements of a NAM capture of a real amp (gain and harmonics per
+  frequency and level, the clipping curve, and the spectrum and dynamics on
+  real guitar DI); the capture itself isn't used or shipped.
+- **The Pitch Shift** (`pitchShiftKernel.ts`) has two engines. Studio is a
+  phase vocoder over 4096-sample frames (long enough to tell a low chord's
+  notes apart) that finds each spectral peak's true frequency and moves the
+  peak with the bins around it, their phases locked to it, so each partial
+  stays one clean tone; the phases start over on an attack, and the
+  pre-echo a frame would smear ahead of one is brought down to the input's
+  level. Live is a delay-line shifter whose splices land where the waveform
+  matches best (by correlation) and which jumps to just behind each pick
+  attack. Both hold a note to within a fraction of a cent, with no level
+  wobble.
 - **The Tremor** (`tremorModel.ts`) shares the Furnace's oversampling and
   filters. Each voice runs a clean path and a driven one side by side at
   4x the rate, so Blend mixes them without any phase smear between them;

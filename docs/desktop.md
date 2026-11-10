@@ -252,8 +252,7 @@ normalize step at each point instead of gliding (`fx::stepped`): they
 shape an impulse or an LFO's tables, which take too long to make every
 50 ms, and the browser's reverb, too, rebuilds its impulse only once its
 decay stops moving. Delay compensation reads an effect's own setting, so
-automating a Pitch Shift's window or a Saturator's oversampling doesn't
-move it, in either engine.
+automating a Saturator's oversampling doesn't move it, in either engine.
 
 ### Recording
 

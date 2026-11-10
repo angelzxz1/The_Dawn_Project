@@ -44,3 +44,25 @@ export function shiftReadout(pitch: number, fine: number): string {
   const centsText = cents === 0 ? "" : ` ${cents > 0 ? "+" : ""}${cents} ct`;
   return `${midiToNoteName(PITCH_REFERENCE_MIDI)} → ${target}${centsText}`;
 }
+
+/** The shifts a drop pedal offers, for the window's quick buttons. */
+export const QUICK_SHIFTS = [-12, -7, -5, -4, -3, -2, -1, 0, 2, 5, 7, 12];
+
+const TUNINGS: Record<number, string> = {
+  0: "E standard",
+  [-1]: "E♭ standard (half step down)",
+  [-2]: "D standard (whole step down)",
+  [-3]: "C♯ standard",
+  [-4]: "C standard",
+  [-5]: "B standard",
+  [-6]: "B♭ standard",
+  [-7]: "A standard",
+  [-12]: "An octave down (baritone to bass)",
+};
+
+/** What a guitar in E standard is tuned to after the shift, e.g. "D
+ * standard (whole step down)"; null when it isn't a common tuning. */
+export function guitarTuning(pitch: number, fine: number): string | null {
+  const { semitones, cents } = splitShift(pitch, fine);
+  return cents === 0 ? (TUNINGS[semitones] ?? null) : null;
+}

@@ -54,7 +54,7 @@ committed.
     chains now use the Furnace, with new Chime and Lead chains. Ported in
     `amp.rs` (`CLASSICS`); `tests/amp_parity.rs` has a case per amp and
     one that switches amps mid-render.
-  - Not a listed step: the Tremor, a bass amp (2026-11-09, commit to come;
+  - Not a listed step: the Tremor, a bass amp (2026-11-09, `9a651e9`;
     asked for by the user, who named it), after the SGT-DI, the B7K /
     Vintage Ultra and the Parallax X: Tube, Grind and Split voices.
     `src/effects/tremor/`, sharing the Furnace's filters and oversampling
@@ -62,6 +62,15 @@ committed.
     Ported in `crates/dawn-engine/src/effects/tremor.rs`
     (`tests/tremor_parity.rs` matches the JavaScript exactly). The Bass
     chain now uses it, and there's a Heavy Bass chain.
+  - Not a listed step: the Pitch Shift rebuilt (2026-11-09, commit to
+    come; asked for by the user: precise and natural, like a drop pedal).
+    Two engines in `pitchShiftKernel.ts`, a Mode switch: Studio (a
+    phase-locked phase vocoder, the default, also for projects from
+    before) and Live (a correlation-spliced delay line that jumps to each
+    attack). The dry path and Dry/Wet are inside the kernel now (the
+    worklet takes settings by message, like the Crusher's). Quick shift
+    buttons and drop-tuning names in the window, five drop presets. Ported
+    in `pitch_shift.rs` (`tests/pitch_shift_parity.rs` matches exactly).
 - **Next listed: step 35, native file dialogs.** Wait for the user to say "go"
   before starting a step: they ask for each one ("Lets go with step N").
 - **What's left after that,** in order (the full list, with sizes, is in
@@ -370,7 +379,8 @@ To add an effect, follow `docs/desktop.md` → "Porting the next kernel":
 - Glue Compressor with oversampling: 15.
 - Crusher: 15 (always oversampled).
 - Tremor: 16 (always oversampled).
-- Pitch Shift: window·sr/2 + 2.
+- Pitch Shift: Studio a frame (4096 at 44.1/48 kHz, 8192 above); Live
+  4 + 3 ms (where it plays attacks from).
 - Furnace: 16.
 
 **Sidechains** (`keys.rs`, step 24): the studio sends a keyed effect's
