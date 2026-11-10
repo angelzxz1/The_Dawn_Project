@@ -91,11 +91,22 @@ export const EFFECT_CHAINS: EffectChain[] = [
   {
     id: "bass-di",
     name: "Bass",
-    description: "Even dynamics, a little grit that keeps the lows clean, and an 8x10 blended in.",
+    description: "Even dynamics, the Tremor's tube preamp for a little grit, and an 8x10 blended in.",
     steps: [
       { type: "compressor", preset: "factory:compressor:bass-tamer" },
-      { type: "distortion", preset: "factory:distortion:bass-grit-clean-lows", params: { distortion: 0.3 } },
+      { type: "tremor", preset: "factory:tremor:tube-warmth" },
       { type: "irLoader", file: cab("factory-ir:8x10-bass"), params: { wet: 0.6 } },
+      { type: "paramEq", preset: "factory:paramEq:bass-clean-up" },
+    ],
+  },
+  {
+    id: "heavy-bass",
+    name: "Heavy Bass",
+    description: "The Tremor's Grind: clean lows under an aggressive drive, into an 8x10, low end tightened.",
+    steps: [
+      { type: "gate", preset: "factory:gate:guitar-hiss", params: { threshold: -50, release: 0.08 } },
+      { type: "tremor", preset: "factory:tremor:grind-modern-metal" },
+      { type: "irLoader", file: cab("factory-ir:8x10-bass"), params: { wet: 0.7 } },
       { type: "paramEq", preset: "factory:paramEq:bass-clean-up" },
     ],
   },

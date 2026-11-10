@@ -23,6 +23,7 @@ pub mod reverb;
 pub mod saturator;
 pub mod sidechain;
 pub mod tone_lfo;
+pub mod tremor;
 pub mod tuner;
 pub mod utility;
 pub mod wave_shaper;
@@ -45,6 +46,7 @@ pub const PORTED: &[&str] = &[
     "paramEq",
     "pitchShift",
     "reverb",
+    "tremor",
     "tubeAmp",
     "tuner",
     "utility",

@@ -103,3 +103,23 @@ test("the Furnace's Amp selector changes the amp, its switches and its knobs", a
   await page.getByTitle("Close (Esc)", { exact: true }).click();
   await expect(page.getByText("Chime", { exact: true })).toBeVisible();
 });
+
+test("the Tremor's Voice switch shows each voice's own controls", async ({ page, studio }) => {
+  await studio.open("Empty Project");
+  await studio.select("Audio 1");
+  await studio.addEffect("Tremor");
+  await studio.openLastEffect();
+  const voice = page.getByRole("radiogroup", { name: "Voice" });
+  await expect(voice.getByRole("radio", { name: "Tube" })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByRole("radiogroup", { name: "Ultra Lo" })).toBeVisible();
+
+  await voice.getByRole("radio", { name: "Grind" }).click();
+  await expect(page.getByRole("radiogroup", { name: "Ultra Lo" })).toHaveCount(0);
+  await expect(page.getByRole("radiogroup", { name: "Grunt" })).toBeVisible();
+
+  await voice.getByRole("radio", { name: "Split" }).click();
+  await expect(page.getByRole("radiogroup", { name: "Grunt" })).toHaveCount(0);
+  await expect(page.getByRole("slider", { name: /^Low Split,/ })).toBeVisible();
+  await page.getByTitle("Close (Esc)", { exact: true }).click();
+  await expect(page.getByText("Split", { exact: true })).toBeVisible();
+});

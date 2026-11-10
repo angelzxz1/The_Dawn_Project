@@ -66,7 +66,7 @@ Live and Reaper.
 - **Three instruments:** a sampled grand piano, a 16-pad Drum Rack (modeled
   drum-machine voices or your own samples), and Daybreak, a wavetable synth
   with a modulation matrix.
-- **20 effects**, most with their own full-size window, graphs and meters,
+- **21 effects**, most with their own full-size window, graphs and meters,
   plus presets.
 - **Sidechain.** Compressors, gates and multiband dynamics can listen to
   another track (for example, the kick ducking the bass).
@@ -447,6 +447,7 @@ track, from its clips and the keys you play
 | Effect | What it does |
 | --- | --- |
 | **Furnace** | Dawn's own tube amp, modeled stage by stage: triode stages, a real bass/middle/treble tone stack, presence and master into the power amp, with 0-10 knobs (gain, bass, middle, treble, presence, master) and output. The **Amp** selector picks one of five: **Clean American** (a blackface-style combo: clean to about 5, breaking up from 7), **Chime** (a top-boost-style class A combo: early, sweet breakup with even harmonics; Presence is its **Cut** control), **British Crunch** (a plexi-style head), **British Lead** (the same with a fourth stage, for leads) and **High Gain** (the modern head, with **Raw**, **Vintage** and **Modern** channel modes and a **Tube** or **Diode** rectifier). High Gain's Modern voicing was fitted against measurements of a real rectifier head; the classic amps use their circuits' published tone stack values and were tuned by ear and by test. Each amp has a cabinet to go with it in the IR Loader (its window names it), and a chain that puts the two together. |
+| **Tremor** | Dawn's own bass amp, with three voices: **Tube** (a tube preamp after the SGT-DI pedal: warm, round breakup, with **Ultra Lo** Deep or Tight and **Ultra Hi**), **Grind** (a blend drive after the B7K and Vintage Ultra: a hard drive over the clean bass, with **Grunt** for how much low end the drive gets and **Attack** for the top going in) and **Split** (after the Parallax X: the lows stay clean while the mids and highs are distorted on their own, with both crossovers and each band's level). Every voice has Gain, Blend (clean against driven), Comp on the clean path, Bass, Middle (250 Hz to 2 kHz) and Treble, and Output. Runs at 4x the sample rate (16 samples of latency); pair it with a bass cabinet in the IR Loader. |
 | **NAM Amp** | Loads [Neural Amp Modeler](https://www.neuralampmodeler.com/) `.nam` amp captures, with input, a bass/middle/treble tone stack, output and normalize. |
 | **IR Loader** | Loads an impulse response (a speaker cabinet, a room) from an audio file, or one of Dawn's nine built-in cabinets (seven guitar, two bass), with low and high cut, dry/wet and normalize. It draws the IR's frequency response. |
 | **Utility** | Gain, stereo width, balance, mono, bass mono, per-channel phase invert, channel select (stereo, left, right or swapped), a DC filter and mute. |
@@ -1001,9 +1002,10 @@ Double-click a MIDI clip to open it.
 - **Chains** (at the top of the Effects browser) add a whole ready-made chain
   to the selected track in one click: **Clean Guitar**, **Crunch Guitar**,
   **Chime Guitar**, **Lead Guitar**, **High-Gain Guitar**, **Bass**,
-  **Acoustic Guitar** and **Vocal**. The guitar chains each use one of the
-  Furnace's amps with the cabinet that goes with it; swap in a **NAM Amp**
-  with your favorite capture any time.
+  **Heavy Bass**, **Acoustic Guitar** and **Vocal**. The guitar chains each
+  use one of the Furnace's amps with the cabinet that goes with it, and the
+  bass chains the Tremor (its Tube and Grind voices) with the 8x10; swap in
+  a **NAM Amp** with your favorite capture any time.
 
 ### Sidechain
 
@@ -1231,13 +1233,18 @@ and Ctrl/Cmd+O work everywhere but in the tour.
   one the tone stack comes after (after the first on Clean American, so
   the second stage distorts what the controls shaped; after the last on
   the high-gain amps), the stack's parts, and the power amp: push-pull, or
-  class A on the Chime, which clips one side first. The tone stack isn't a stock EQ: the circuit is solved (nodal
-  analysis) whenever a knob moves, its exact third-order response fitted and
-  turned into a digital filter. The default voicing's constants were fitted
+  class A on the Chime, which clips one side first. The tone stack isn't a
+  stock EQ: the circuit is solved (nodal analysis) whenever a knob moves,
+  its exact third-order response fitted and turned into a digital filter. The default voicing's constants were fitted
   by optimization against measurements of a NAM capture of a real amp (gain
   and harmonics per frequency and level, the clipping curve, and the
   spectrum and dynamics on real guitar DI); the capture itself isn't used or
   shipped.
+- **The Tremor** (`tremorModel.ts`) shares the Furnace's oversampling and
+  filters. Each voice runs a clean path and a driven one side by side at
+  4x the rate, so Blend mixes them without any phase smear between them;
+  Split divides the bass with 24 dB/octave (Linkwitz-Riley) crossovers
+  before distorting the mid and high bands on their own.
 - **Latency compensation.** Each effect reports its latency: lookahead,
   oversampling filters, amp models. The engine delays the faster tracks so
   every track reaches the master at the same time. Sidechain keys are delayed

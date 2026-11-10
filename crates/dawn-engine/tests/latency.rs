@@ -214,3 +214,10 @@ fn a_new_version_of_the_song_keeps_what_the_delays_hold() {
     out.extend(render(&mut e, 9600 - AT - 100));
     assert_eq!(out, straight);
 }
+
+#[test]
+fn the_tremors_oversampling_counts_too() {
+    let tremor = EffectSpec::new("t", EffectSettings::from_params("tremor", &[]).unwrap());
+    let s = song(vec![track("a", vec![], vec![tremor])]);
+    assert_eq!(s.prepare(None, SR).latency(), 16 + LOOKAHEAD);
+}

@@ -86,7 +86,10 @@ export interface AmpSettings {
   highHz: number;
 }
 
-export const AMP_SOURCE = String.raw`
+/** The amp's small filters (a one-pole, an RBJ biquad), its oversampling
+ * filter design and its triode: shared with the Tremor (tremorModel.ts),
+ * which builds on them. */
+export const AMP_PARTS_SOURCE = String.raw`
 const AMP_OS = 4;
 const AMP_TAPS = 64;
 
@@ -126,6 +129,29 @@ class Biquad {
   }
 }
 
+// --- Oversampling filters ---
+function designFir() {
+  const h = new Float64Array(AMP_TAPS), fc = 0.45 / AMP_OS, mid = (AMP_TAPS - 1) / 2;
+  let sum = 0;
+  for (let i = 0; i < AMP_TAPS; i++) {
+    const x = i - mid, sinc = x === 0 ? 2 * fc : Math.sin(2 * Math.PI * fc * x) / (Math.PI * x);
+    // Blackman window
+    const w = 0.42 - 0.5 * Math.cos((2 * Math.PI * i) / (AMP_TAPS - 1)) + 0.08 * Math.cos((4 * Math.PI * i) / (AMP_TAPS - 1));
+    h[i] = sinc * w; sum += h[i];
+  }
+  for (let i = 0; i < AMP_TAPS; i++) h[i] /= sum;
+  return h;
+}
+
+// The triode: soft saturation on the positive side (grid conduction), a
+// softer, later limit on the cutoff side.
+function triode(u, asym) {
+  return u >= 0 ? Math.tanh(u) : asym * Math.tanh(u / asym);
+}
+
+`;
+
+export const AMP_SOURCE = AMP_PARTS_SOURCE + String.raw`
 // --- The tone stack: solve the circuit, fit H(s), make a digital filter ---
 
 // Node voltages of the stack for input 1 V at complex frequency s = (0, w).
@@ -228,26 +254,6 @@ function bilinear3(b, a, fs) {
   const B = [0, 0, 0, 0], A = [0, 0, 0, 0];
   for (let k = 0; k <= 3; k++) { const p = poly(k); for (let i = 0; i < 4; i++) { B[i] += b[k] * p[i]; A[i] += a[k] * p[i]; } }
   return { b: B.map((v) => v / A[0]), a: A.map((v) => v / A[0]) };
-}
-
-// --- Oversampling filters ---
-function designFir() {
-  const h = new Float64Array(AMP_TAPS), fc = 0.45 / AMP_OS, mid = (AMP_TAPS - 1) / 2;
-  let sum = 0;
-  for (let i = 0; i < AMP_TAPS; i++) {
-    const x = i - mid, sinc = x === 0 ? 2 * fc : Math.sin(2 * Math.PI * fc * x) / (Math.PI * x);
-    // Blackman window
-    const w = 0.42 - 0.5 * Math.cos((2 * Math.PI * i) / (AMP_TAPS - 1)) + 0.08 * Math.cos((4 * Math.PI * i) / (AMP_TAPS - 1));
-    h[i] = sinc * w; sum += h[i];
-  }
-  for (let i = 0; i < AMP_TAPS; i++) h[i] /= sum;
-  return h;
-}
-
-// The triode: soft saturation on the positive side (grid conduction), a
-// softer, later limit on the cutoff side.
-function triode(u, asym) {
-  return u >= 0 ? Math.tanh(u) : asym * Math.tanh(u / asym);
 }
 
 class AmpKernel {

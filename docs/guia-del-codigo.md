@@ -288,6 +288,7 @@ Los efectos:
 | `pitch-shift/` | Cambio de tono. |
 | `utility/` | Ganancia, panorama, anchura, fase, medidores. |
 | `tuner/` | Afinador. |
+| `tremor/` | Tremor (amplificador de bajo con tres voces: Tube, Grind y Split). |
 | `furnace/` | Amplificador de válvulas modelado etapa por etapa, con cinco amplificadores (Clean American, Chime, British Crunch, British Lead y High Gain). |
 | `nam-amp/` | Amplificador NAM (redes neuronales, motor WebAssembly en `public/nam/`). |
 | `ir-loader/` | Cargador de IRs (bafles); `cabIrs.ts` genera los bafles propios de Dawn. |

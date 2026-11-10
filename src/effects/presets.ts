@@ -293,6 +293,19 @@ export const FACTORY_PRESETS: EffectPreset[] = [
     ["Raw Edge", { mode: 0, gain: 3, bass: 5, mid: 5, treble: 6.5 }],
     ["Raw Crunch", { mode: 0, gain: 6, mid: 5 }],
   ]),
+  // Voice 0-2 = Tube, Grind, Split; Ultra Lo 0-2 = Off, Deep, Tight; Grunt
+  // 0-2 = Raw, Flat, Fat; Attack 0-2 = Cut, Flat, Boost; Mid Freq 0-3 =
+  // 250, 500, 1k, 2k Hz. Output brings each near the input's level.
+  ...factory("tremor", [
+    ["Tube Warmth", {}],
+    ["Tube Deep Dub", { gain: 3, blend: 7, comp: 5, ultraLo: 1, treble: 3 }],
+    ["Tube Growl", { gain: 8, blend: 8, mid: 6.5, ultraHi: 1, output: -8 }],
+    ["Grind Modern Metal", { voice: 1, gain: 7, blend: 5, grunt: 0, attack: 2, bass: 6, mid: 4, treble: 6 }],
+    ["Grind Fat Fuzz", { voice: 1, gain: 9, blend: 4, grunt: 2, treble: 4, output: -4 }],
+    ["Grind Clank", { voice: 1, gain: 5, blend: 4, grunt: 0, attack: 2, mid: 6, midFreq: 3, treble: 7, output: 2 }],
+    ["Split Tight Djent", { voice: 2, gain: 8, blend: 5, comp: 6, lowSplit: 180, highSplit: 2500, highLevel: -8, output: -7 }],
+    ["Split Huge Lows", { voice: 2, gain: 6, blend: 4, comp: 7, lowSplit: 300, bass: 6, output: -3 }],
+  ]),
   ...factory("namAmp", [
     ["Flat", {}],
     ["Scooped", { bass: 7, middle: 3, treble: 7 }],

@@ -21,6 +21,7 @@ import { saturatorAudio } from "./saturator/audio";
 import { reverbAudio } from "./reverb/audio";
 import { delayAudio } from "./delay/audio";
 import { furnaceAudio } from "./furnace/audio";
+import { tremorAudio } from "./tremor/audio";
 import { namAmpAudio } from "./nam-amp/audio";
 import { irLoaderAudio } from "./ir-loader/audio";
 import { utilityAudio } from "./utility/audio";
@@ -50,6 +51,7 @@ const AUDIO: Record<EffectType, EffectAudio> = {
   reverb: reverbAudio,
   delay: delayAudio,
   tubeAmp: furnaceAudio,
+  tremor: tremorAudio,
   namAmp: namAmpAudio,
   irLoader: irLoaderAudio,
   utility: utilityAudio,

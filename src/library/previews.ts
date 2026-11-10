@@ -28,6 +28,7 @@ export const PREVIEW_SOURCE: Record<EffectType, "drums" | "pluck" | null> = {
   reverb: "pluck",
   delay: "pluck",
   tubeAmp: "pluck",
+  tremor: "pluck",
   namAmp: "pluck",
   irLoader: "pluck",
   tuner: null,

@@ -18,6 +18,7 @@ import { saturatorUi } from "../saturator/ui";
 import { reverbUi } from "../reverb/ui";
 import { delayUi } from "../delay/ui";
 import { furnaceUi } from "../furnace/ui";
+import { tremorUi } from "../tremor/ui";
 import { namAmpUi } from "../nam-amp/ui";
 import { irLoaderUi } from "../ir-loader/ui";
 import { utilityUi } from "../utility/ui";
@@ -41,6 +42,7 @@ export const EFFECT_UI: Record<EffectType, EffectUi> = {
   reverb: reverbUi,
   delay: delayUi,
   tubeAmp: furnaceUi,
+  tremor: tremorUi,
   namAmp: namAmpUi,
   irLoader: irLoaderUi,
   utility: utilityUi,

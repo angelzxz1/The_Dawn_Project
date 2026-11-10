@@ -398,38 +398,41 @@ impl Default for AmpSettings {
 
 // --- Small filters (run at the oversampled rate) ---
 
+/// A one-pole low-pass, and the high-pass it leaves (shared with the
+/// Tremor).
 #[derive(Clone, Copy, Default)]
-struct OnePole {
+pub(crate) struct OnePole {
     a: f64,
     z: f64,
 }
 
 impl OnePole {
-    fn lowpass(&mut self, fc: f64, fs: f64) {
+    pub(crate) fn lowpass(&mut self, fc: f64, fs: f64) {
         self.a = ((-2.0 * PI * fc) / fs).exp();
     }
 
-    fn lp(&mut self, x: f64) -> f64 {
+    pub(crate) fn lp(&mut self, x: f64) -> f64 {
         self.z = x + self.a * (self.z - x);
         self.z
     }
 
-    fn hp(&mut self, x: f64) -> f64 {
+    pub(crate) fn hp(&mut self, x: f64) -> f64 {
         x - self.lp(x)
     }
 }
 
 #[derive(Clone, Copy)]
-enum Shape {
+pub(crate) enum Shape {
     Lp,
     Hp,
     Peak,
     HighShelf,
+    LowShelf,
 }
 
 /// RBJ biquad, transposed direct form II.
 #[derive(Clone, Copy)]
-struct Biquad {
+pub(crate) struct Biquad {
     b0: f64,
     b1: f64,
     b2: f64,
@@ -454,7 +457,7 @@ impl Default for Biquad {
 }
 
 impl Biquad {
-    fn set(&mut self, shape: Shape, fc: f64, q: f64, db: f64, fs: f64) {
+    pub(crate) fn set(&mut self, shape: Shape, fc: f64, q: f64, db: f64, fs: f64) {
         let w = (2.0 * PI * fc.min(fs * 0.45)) / fs;
         let c = w.cos();
         let s = w.sin();
@@ -496,6 +499,17 @@ impl Biquad {
                     a + 1.0 - (a - 1.0) * c - sq,
                 )
             }
+            Shape::LowShelf => {
+                let sq = 2.0 * a.sqrt() * alpha;
+                (
+                    a * (a + 1.0 - (a - 1.0) * c + sq),
+                    2.0 * a * (a - 1.0 - (a + 1.0) * c),
+                    a * (a + 1.0 - (a - 1.0) * c - sq),
+                    a + 1.0 + (a - 1.0) * c + sq,
+                    -2.0 * (a - 1.0 + (a + 1.0) * c),
+                    a + 1.0 + (a - 1.0) * c - sq,
+                )
+            }
         };
         self.b0 = b0 / a0;
         self.b1 = b1 / a0;
@@ -504,7 +518,7 @@ impl Biquad {
         self.a2 = a2 / a0;
     }
 
-    fn run(&mut self, x: f64) -> f64 {
+    pub(crate) fn run(&mut self, x: f64) -> f64 {
         let y = self.b0 * x + self.z1;
         self.z1 = self.b1 * x - self.a1 * y + self.z2;
         self.z2 = self.b2 * x - self.a2 * y;
@@ -701,7 +715,7 @@ fn bilinear3(b: &[f64; 4], a: &[f64; 4], fs: f64) -> ([f64; 4], [f64; 4]) {
 }
 
 /// The oversampling filters' taps (`designFir`): a Blackman-windowed sinc.
-fn design_fir() -> [f64; TAPS] {
+pub(crate) fn design_fir() -> [f64; TAPS] {
     let mut h = [0.0f64; TAPS];
     let fc = 0.45 / OS as f64;
     let mid = (TAPS as f64 - 1.0) / 2.0;
@@ -727,7 +741,7 @@ fn design_fir() -> [f64; TAPS] {
 
 /// The triode: soft saturation on the positive side (grid conduction), a
 /// softer, later limit on the cutoff side.
-fn triode(u: f64, asym: f64) -> f64 {
+pub(crate) fn triode(u: f64, asym: f64) -> f64 {
     if u >= 0.0 {
         u.tanh()
     } else {

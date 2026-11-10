@@ -37,6 +37,7 @@ use crate::effects::param_eq::{ParamEqKernel, ParamEqSettings};
 use crate::effects::pitch_shift::{PitchShiftSettings, PitchShifter};
 use crate::effects::reverb::{ReverbKernel, ReverbSettings};
 use crate::effects::saturator::{SaturatorKernel, SaturatorSettings};
+use crate::effects::tremor::{self, TremorKernel, TremorSettings};
 use crate::effects::tuner::{TunerKernel, TunerSettings, TunerTap};
 use crate::effects::utility::{UtilityKernel, UtilitySettings};
 use crate::params::ParamSource;
@@ -123,6 +124,7 @@ impl PartialEq for PluginSettings {
 #[derive(Clone, Debug, PartialEq)]
 pub enum EffectSettings {
     Amp(Box<AmpSettings>),
+    Tremor(Box<TremorSettings>),
     Chorus(Box<ChorusSettings>),
     Compressor(CompressorSettings),
     Crusher(CrusherSettings),
@@ -147,6 +149,7 @@ pub enum EffectSettings {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EffectKind {
     Amp,
+    Tremor,
     Chorus,
     Compressor,
     Crusher,
@@ -183,6 +186,7 @@ impl EffectSettings {
             "eq3" => Self::EqThree(EqThreeSettings::from_params(params)),
             "filter" => Self::Filter(FilterSettings::from_params(params)),
             "tubeAmp" => Self::Amp(Box::new(AmpSettings::from_params(params))),
+            "tremor" => Self::Tremor(Box::new(TremorSettings::from_params(params))),
             "gate" => Self::Gate(GateSettings::from_params(params, false)),
             "glue" => Self::Glue(GlueSettings::from_params(params, false)),
             "irLoader" => Self::IrLoader(Box::new(IrLoaderSettings::from_params(params))),
@@ -205,6 +209,7 @@ impl EffectSettings {
     pub fn latency(&self, sample_rate: f64) -> usize {
         match self {
             Self::Amp(_) => amp::LATENCY,
+            Self::Tremor(_) => tremor::LATENCY,
             Self::Crusher(_) => crate::effects::crusher::LATENCY,
             Self::Glue(s) if s.oversample => OS_LATENCY,
             Self::Limiter(_) => lookahead_frames(sample_rate),
@@ -315,6 +320,7 @@ impl EffectSettings {
     pub fn kind(&self) -> EffectKind {
         match self {
             Self::Amp(_) => EffectKind::Amp,
+            Self::Tremor(_) => EffectKind::Tremor,
             Self::Chorus(_) => EffectKind::Chorus,
             Self::Compressor(_) => EffectKind::Compressor,
             Self::Crusher(_) => EffectKind::Crusher,
@@ -405,6 +411,7 @@ impl EffectSpec {
 
 enum Kernel {
     Amp(Box<AmpEffect>),
+    Tremor(Box<TremorKernel>),
     Chorus(Box<ChorusKernel>),
     Compressor(Box<CompressorKernel>),
     Crusher(Box<CrusherKernel>),
@@ -438,6 +445,9 @@ impl Effect {
     pub fn new(settings: &EffectSettings, sample_rate: f64) -> Self {
         let kernel = match settings {
             EffectSettings::Amp(s) => Kernel::Amp(Box::new(AmpEffect::new(sample_rate, s))),
+            EffectSettings::Tremor(s) => {
+                Kernel::Tremor(Box::new(TremorKernel::new(sample_rate, s)))
+            }
             EffectSettings::Chorus(s) => {
                 Kernel::Chorus(Box::new(ChorusKernel::new(sample_rate, s)))
             }
@@ -494,6 +504,7 @@ impl Effect {
     pub fn kind(&self) -> EffectKind {
         match self.kernel {
             Kernel::Amp(_) => EffectKind::Amp,
+            Kernel::Tremor(_) => EffectKind::Tremor,
             Kernel::Chorus(_) => EffectKind::Chorus,
             Kernel::Compressor(_) => EffectKind::Compressor,
             Kernel::Crusher(_) => EffectKind::Crusher,
@@ -521,6 +532,7 @@ impl Effect {
     pub fn configure(&mut self, settings: &EffectSettings) {
         match (&mut self.kernel, settings) {
             (Kernel::Amp(k), EffectSettings::Amp(s)) => k.set(s),
+            (Kernel::Tremor(k), EffectSettings::Tremor(s)) => k.set(s),
             (Kernel::Chorus(k), EffectSettings::Chorus(s)) => k.set(s),
             (Kernel::Compressor(k), EffectSettings::Compressor(s)) => k.set(s),
             (Kernel::Crusher(k), EffectSettings::Crusher(s)) => k.set(s),
@@ -551,6 +563,7 @@ impl Effect {
         let key = key.map(|(kl, kr)| (&kl[..n], &kr[..n]));
         match &mut self.kernel {
             Kernel::Amp(k) => k.process_in_place(&mut l[..n], &mut r[..n]),
+            Kernel::Tremor(k) => k.process_in_place(&mut l[..n], &mut r[..n]),
             Kernel::Chorus(k) => k.process_in_place(&mut l[..n], &mut r[..n]),
             Kernel::Compressor(k) => k.process_in_place(
                 &mut l[..n],

@@ -172,7 +172,8 @@ and MIDI devices through the engine, files through native dialogs.
   arithmetic in the same order. So far the Compressor, the Glue Compressor,
   the Crusher,
   the Noise Gate, the Limiter, the Multiband Compressor, Multiband Dynamics,
-  the Parametric EQ, the Pitch Shift, the Furnace amp and the Utility. The
+  the Parametric EQ, the Pitch Shift, the Furnace amp, the Tremor and the
+  Utility. The
   Filter, the EQ Three, the Chorus, the Delay, the Reverb, the Saturator
   and the IR Loader are built from the browser's nodes (BiquadFilter,
   Delay, WaveShaper, Convolver, and Tone.js's LFO), so they're ports of

@@ -28,6 +28,7 @@ const EFFECT_NOTES: Record<EffectType, string> = {
   distortion: "From warmth to grit, with oversampling.",
   reverb: "Rooms, halls and plates, from short to huge.",
   delay: "Tempo-synced repeats with feedback.",
+  tremor: "A bass amp with three voices: a tube preamp, a blend drive and a three-band split distortion.",
   tubeAmp: "A modeled tube amp with five amps: Clean American, Chime, British Crunch, British Lead and a high-gain head.",
   namAmp: "Real amp captures via Neural Amp Modeler.",
   irLoader: "Cabinet impulse responses for any amp.",

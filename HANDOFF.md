@@ -44,8 +44,8 @@ committed.
     for by the user, who named it). `src/effects/crusher/`, ported in
     `crates/dawn-engine/src/effects/crusher.rs` (`tests/crusher_parity.rs`
     matches the JavaScript exactly). No sidechain (yet).
-  - Not a listed step: the Furnace's Amp selector (2026-11-09, commit to
-    come; asked for by the user). Clean American, Chime, British Crunch,
+  - Not a listed step: the Furnace's Amp selector (2026-11-09, `77d1fb6`;
+    asked for by the user). Clean American, Chime, British Crunch,
     British Lead and High Gain (the head that was the only amp, still the
     default, so older projects sound the same). The kernel gained
     `stackAt` (which stage the tone stack follows) and `powerBias` (class
@@ -54,6 +54,14 @@ committed.
     chains now use the Furnace, with new Chime and Lead chains. Ported in
     `amp.rs` (`CLASSICS`); `tests/amp_parity.rs` has a case per amp and
     one that switches amps mid-render.
+  - Not a listed step: the Tremor, a bass amp (2026-11-09, commit to come;
+    asked for by the user, who named it), after the SGT-DI, the B7K /
+    Vintage Ultra and the Parallax X: Tube, Grind and Split voices.
+    `src/effects/tremor/`, sharing the Furnace's filters and oversampling
+    (`AMP_PARTS_SOURCE`; in Rust, `amp.rs`'s parts made `pub(crate)`).
+    Ported in `crates/dawn-engine/src/effects/tremor.rs`
+    (`tests/tremor_parity.rs` matches the JavaScript exactly). The Bass
+    chain now uses it, and there's a Heavy Bass chain.
 - **Next listed: step 35, native file dialogs.** Wait for the user to say "go"
   before starting a step: they ask for each one ("Lets go with step N").
 - **What's left after that,** in order (the full list, with sizes, is in
@@ -361,6 +369,7 @@ To add an effect, follow `docs/desktop.md` → "Porting the next kernel":
 - Limiter: its lookahead, 240 frames at 48 kHz.
 - Glue Compressor with oversampling: 15.
 - Crusher: 15 (always oversampled).
+- Tremor: 16 (always oversampled).
 - Pitch Shift: window·sr/2 + 2.
 - Furnace: 16.
 
@@ -508,8 +517,8 @@ Temporary, never committed:
     `Send.pre`), buses;
   - every effect but the NAM Amp: `PORTED` = chorus, compressor, crusher, delay,
     distortion (the Saturator), eq3, filter, gate, glue, irLoader,
-    limiter, mbDynamics, multiband, paramEq, pitchShift, reverb, tubeAmp,
-    tuner, utility;
+    limiter, mbDynamics, multiband, paramEq, pitchShift, reverb, tremor,
+    tubeAmp, tuner, utility;
   - delay compensation, the master limiter and the metronome (its four
     click sounds).
 - **The Audio panel lists what it doesn't play:**

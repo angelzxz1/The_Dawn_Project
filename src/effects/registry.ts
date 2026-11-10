@@ -24,6 +24,7 @@ import { saturatorEffect } from "./saturator";
 import { reverbEffect } from "./reverb";
 import { delayEffect } from "./delay";
 import { furnaceEffect } from "./furnace";
+import { tremorEffect } from "./tremor";
 import { namAmpEffect } from "./nam-amp";
 import { irLoaderEffect } from "./ir-loader";
 import { utilityEffect } from "./utility";
@@ -50,6 +51,7 @@ const EFFECTS = [
   reverbEffect,
   delayEffect,
   furnaceEffect,
+  tremorEffect,
   namAmpEffect,
   irLoaderEffect,
   utilityEffect,
