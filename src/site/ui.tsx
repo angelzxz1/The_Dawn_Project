@@ -86,14 +86,6 @@ export function PilotLamp({ className = "" }: { className?: string }) {
   return <span aria-hidden="true" className={`inline-block size-2 shrink-0 rounded-full bg-[#ffd08a] shadow-[0_0_0_2px_rgba(0,0,0,0.35),0_0_10px_2px_rgba(255,176,77,0.75)] ${className}`} />;
 }
 
-export function ArrowIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M5 12h14M13 6l6 6-6 6" />
-    </svg>
-  );
-}
-
 export function CheckIcon({ size = 18 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0 text-accent">

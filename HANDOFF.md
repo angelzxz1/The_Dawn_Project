@@ -92,13 +92,17 @@ committed.
     asked for): the Features page (the effects as units in a rack, with a blank
     vented panel for an odd slot; hardware filter buttons with a lamp; the
     illustrations' `Well` as an inset screen; no numbers or PLANNED tags;
-    `PageIntro`'s eyebrow optional). Step 3 (2026-11-12, commit to
-    come): How it works (the walkthrough as one device, its step buttons
+    `PageIntro`'s eyebrow optional). Step 3 (2026-11-12, `39d21bd`;
+    asked for): How it works (the walkthrough as one device, its step buttons
     with lamps and a screen that comes into view on a phone; the setup
     guides with a hardware switch; latency and troubleshooting on screwed
     panels, sentence-case headers) and two of Features' What's next items
-    (the desktop app in beta, a sampled bass). Next: guides, FAQ, support,
-    the legal pages and the not-found page.
+    (the desktop app in beta, a sampled bass). Step 4 (2026-11-12, commit
+    to come): Guides (each guide on the list as a printed owner's manual,
+    cream paper stapled at the spine; in a guide, chapter and step numbers
+    in Fraunces, steps as one list, the tips as a note with a lamp, no
+    all-caps labels; `ArrowIcon` removed). Next: FAQ, support, the legal
+    pages and the not-found page.
 - **Next listed: step 35, native file dialogs.** Wait for the user to say "go"
   before starting a step: they ask for each one ("Lets go with step N").
 - **What's left after that,** in order (the full list, with sizes, is in

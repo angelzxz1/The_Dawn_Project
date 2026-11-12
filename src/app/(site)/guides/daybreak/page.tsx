@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { DAYBREAK_PRESET_NOTES, DAYBREAK_SECTIONS, PRESET_CATEGORY_NOTES } from "@/content/daybreakGuide";
 import { FACTORY_SYNTH_PRESETS, PRESET_CATEGORIES } from "@/instruments/synth/synthPresets";
 import { GuideContents, GuideSectionView } from "@/site/guide";
-import { Container, CtaBand, OpenDawn, PageIntro, cardClass } from "@/site/ui";
+import { Container, CtaBand, OpenDawn, PageIntro, cardClass, textLink } from "@/site/ui";
 
 export const metadata: Metadata = {
   title: "Daybreak guide",
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 
 function FlowBox({ title, sub, accent = false }: { title: string; sub?: string; accent?: boolean }) {
   return (
-    <div className={`flex flex-col gap-0.5 rounded-lg border px-3 py-2 ${accent ? "border-accent bg-glow" : "border-border bg-background"}`}>
+    <div className={`flex flex-col gap-0.5 rounded-md border px-3 py-2 ${accent ? "border-accent bg-glow" : "border-black/60 bg-[#141316]"}`}>
       <span className="text-[14px] font-semibold text-foreground">{title}</span>
       {sub && <span className="text-[12px] leading-snug text-muted">{sub}</span>}
     </div>
@@ -23,7 +23,7 @@ function FlowBox({ title, sub, accent = false }: { title: string; sub?: string; 
 function FlowColumn({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-[11px] font-semibold tracking-[1.6px] text-muted">{label}</span>
+      <span className="text-[13px] font-semibold text-muted">{label}</span>
       {children}
     </div>
   );
@@ -43,30 +43,30 @@ function SignalFlow() {
   return (
     <figure className={`${cardClass} flex flex-col gap-5 p-[clamp(16px,3vw,28px)]`}>
       <div className="grid gap-3 md:grid-cols-[1fr_auto_1fr_auto_1fr]">
-        <FlowColumn label="SOURCES">
+        <FlowColumn label="Sources">
           <FlowBox title="Osc 1" sub="wavetable, warp, unison" />
           <FlowBox title="Osc 2" sub="wavetable, warp, unison" />
           <FlowBox title="Sub" sub="up to 2 octaves down" />
           <FlowBox title="Noise" sub="white or pink" />
         </FlowColumn>
         <Arrow />
-        <FlowColumn label="FILTERS · EACH SOURCE'S “TO”">
+        <FlowColumn label="Filters, as each source's To says">
           <FlowBox title="Filter 1" />
-          <span className="text-center font-code text-[11px] text-muted">1 → 2 serial · 1 | 2 parallel</span>
+          <span className="text-center text-[12px] text-muted">1 → 2 in series, 1 | 2 in parallel</span>
           <FlowBox title="Filter 2" />
           <FlowBox title="Out" sub="skips the filters" />
         </FlowColumn>
         <Arrow />
-        <FlowColumn label="OUTPUT">
+        <FlowColumn label="Output">
           <FlowBox title="Env 1 · Amp" sub="each note's loudness" />
           <FlowBox title="Volume" sub="the whole synth" accent />
         </FlowColumn>
       </div>
       <div className="flex flex-col gap-2 border-t border-border pt-4">
-        <span className="text-[11px] font-semibold tracking-[1.6px] text-muted">MODULATORS · DRAG ONTO ANY KNOB THAT CAN BE MODULATED</span>
+        <span className="text-[13px] font-semibold text-muted">Modulators: drag one onto any knob that can be modulated</span>
         <div className="flex flex-wrap gap-1.5">
           {["Env 2", "Env 3", "LFO 1", "LFO 2", "LFO 3", "Velocity", "Note", "Mod Wheel", "Pitch Bend", "Random", "Macros 1–4"].map((m) => (
-            <span key={m} className="rounded-full border border-border bg-background px-2.5 py-1 text-[12.5px] text-soft">
+            <span key={m} className="rounded-md border border-black/60 bg-[#141316] px-2.5 py-1 text-[13px] text-soft">
               {m}
             </span>
           ))}
@@ -79,7 +79,7 @@ function SignalFlow() {
 
 function MapCell({ href, title, sub, className = "" }: { href: string; title: string; sub: string; className?: string }) {
   return (
-    <a href={href} className={`flex flex-col justify-center gap-0.5 rounded-lg border border-border bg-background px-3 py-2.5 no-underline hover:border-accent ${className}`}>
+    <a href={href} className={`flex flex-col justify-center gap-0.5 rounded-md border border-black/60 bg-[#141316] px-3 py-2.5 no-underline hover:border-accent ${className}`}>
       <span className="text-[14px] font-semibold text-foreground">{title}</span>
       <span className="text-[12px] leading-snug text-muted">{sub}</span>
     </a>
@@ -124,7 +124,7 @@ function PresetList() {
         return (
           <div key={cat} className={`${cardClass} flex flex-col gap-3 p-5`}>
             <div className="flex flex-col gap-0.5">
-              <h3 className="font-display text-[20px] font-semibold text-foreground">{cat}</h3>
+              <h3 className="font-display text-[22px] font-bold text-foreground">{cat}</h3>
               <p className="text-[14px] text-muted">{PRESET_CATEGORY_NOTES[cat]}</p>
             </div>
             <dl className="flex flex-col gap-2.5">
@@ -157,13 +157,13 @@ export default function DaybreakGuidePage() {
   return (
     <>
       <PageIntro
-        eyebrow="Guide · Instrument"
+        eyebrow="Instrument guide"
         title="Daybreak, knob by knob."
         lead="Daybreak is Dawn's wavetable synth. This guide walks through every panel and every knob: what it's for, how to use it, and recipes to build your own sounds."
       >
         <div className="flex flex-wrap items-center gap-3 pt-2">
           <OpenDawn>Open Dawn and follow along</OpenDawn>
-          <Link href="/guides" className="text-[15px] text-soft hover:text-foreground">
+          <Link href="/guides" className={`${textLink} text-[15px]`}>
             All guides
           </Link>
         </div>
