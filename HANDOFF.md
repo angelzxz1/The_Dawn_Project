@@ -62,8 +62,8 @@ committed.
     Ported in `crates/dawn-engine/src/effects/tremor.rs`
     (`tests/tremor_parity.rs` matches the JavaScript exactly). The Bass
     chain now uses it, and there's a Heavy Bass chain.
-  - Not a listed step: the Pitch Shift rebuilt (2026-11-09, commit to
-    come; asked for by the user: precise and natural, like a drop pedal).
+  - Not a listed step: the Pitch Shift rebuilt (2026-11-09, `5e323c1`;
+    asked for by the user: precise and natural, like a drop pedal).
     Two engines in `pitchShiftKernel.ts`, a Mode switch: Studio (a
     phase-locked phase vocoder, the default, also for projects from
     before) and Live (a correlation-spliced delay line that jumps to each
@@ -71,6 +71,13 @@ committed.
     worklet takes settings by message, like the Crusher's). Quick shift
     buttons and drop-tuning names in the window, five drop presets. Ported
     in `pitch_shift.rs` (`tests/pitch_shift_parity.rs` matches exactly).
+  - Not a listed step: the CPU meter follows the native engine
+    (2026-11-12, commit to come; asked for by the user). The engine's
+    status says how long its callbacks took and how much audio they made
+    since the last status (`busyMs`, `audioMs`, from `Status::take_busy`
+    in `stream.rs`); `cpuMeter.ts` (`noteNativeLoad`) sums them into the
+    same quarter-second readings as the browser's probes and shows them
+    while they come, saying which engine it measures in the panel.
 - **Next listed: step 35, native file dialogs.** Wait for the user to say "go"
   before starting a step: they ask for each one ("Lets go with step N").
 - **What's left after that,** in order (the full list, with sizes, is in

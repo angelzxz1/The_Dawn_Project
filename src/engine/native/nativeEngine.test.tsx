@@ -37,6 +37,8 @@ const bridge = vi.hoisted(() => ({
     master: [0, 0],
     limiterGain: 1,
     load: 0,
+    busyMs: 0,
+    audioMs: 0,
     errors: 0,
     inputs: [0.1, 0.4],
     roundTrip: 0.012,

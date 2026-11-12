@@ -66,6 +66,10 @@ export interface NativeStatus {
   limiterGain: number;
   /** How much of each buffer's time the engine takes (0-1). */
   load: number;
+  /** The time the engine took and the audio it made since the last status
+   * (ms), for the CPU meter. */
+  busyMs: number;
+  audioMs: number;
   /** Dropouts and stream errors since the device opened. */
   errors: number;
   /** The input's peaks since the last status, per channel (0-1). */

@@ -117,12 +117,20 @@ export function AudioStatus() {
             <h3 className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-muted">
               <Cpu size={12} /> CPU
             </h3>
-            <Row label="Audio engine load" value={cpu ? `${Math.round(load * 100)}%` : "idle"} />
+            <Row label={cpu?.source === "native" ? "Native engine load" : "Audio engine load"} value={cpu ? `${Math.round(load * 100)}%` : "idle"} />
             <Row label="Peak (last few seconds)" value={cpu ? `${Math.round(cpu.peak * 100)}%` : "–"} />
-            <p className="text-[11px] leading-snug text-muted">
-              The share of real time the browser spends rendering the project&apos;s audio. Near 100% it can&apos;t keep up and
-              you&apos;ll hear crackles - remove or bypass heavy effects (NAM Amp, Multiband).
-            </p>
+            {cpu?.source === "native" ? (
+              <p className="text-[11px] leading-snug text-muted">
+                The share of each audio buffer&apos;s time the native engine spends rendering the project&apos;s audio. Near 100% it
+                can&apos;t keep up and you&apos;ll hear dropouts - choose a larger buffer size in Preferences, or remove or bypass
+                heavy effects.
+              </p>
+            ) : (
+              <p className="text-[11px] leading-snug text-muted">
+                The share of real time the browser spends rendering the project&apos;s audio. Near 100% it can&apos;t keep up and
+                you&apos;ll hear crackles - remove or bypass heavy effects (NAM Amp, Multiband).
+              </p>
+            )}
           </section>
 
           <section className="flex flex-col gap-1.5 border-t border-border pt-3">

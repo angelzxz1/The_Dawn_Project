@@ -12,6 +12,11 @@ import { noteIssue } from "../services/issues";
 // millisecond clock, but the ticks land at random points within each
 // quantum, so summed over a few hundred quanta the tick counts average out
 // to the true time.
+//
+// In the desktop app, with the native engine on, the meter shows that
+// engine's load instead: its status says how long its callbacks took and
+// how much audio they made since the last status (noteNativeLoad), summed
+// here into readings of the same length.
 
 const MODULE_KEY = "dawn-cpu-meter-v1";
 const START = "dawn-cpu-start";
@@ -56,6 +61,8 @@ registerProcessor("${END}", DawnCpuEnd);
 `;
 
 export interface CpuReading {
+  /** Which engine it measures. */
+  source: "browser" | "native";
   /** Average share of real time spent rendering, 0..1+, over ~1 s. */
   average: number;
   /** Highest 0.25 s reading in the last few seconds. */
@@ -63,7 +70,14 @@ export interface CpuReading {
 }
 
 let installed: Promise<void> | null = null;
-const readings: { load: number; at: number }[] = [];
+type Reading = { load: number; at: number };
+const readings: Reading[] = [];
+const native = { busy: 0, audio: 0, readings: [] as Reading[] };
+
+function keep(list: Reading[], load: number): void {
+  list.push({ load, at: performance.now() });
+  while (list.length > 16) list.shift();
+}
 
 /** Puts the probes in front of the speakers (once). */
 export function installCpuMeter(): Promise<void> {
@@ -81,8 +95,7 @@ export function installCpuMeter(): Promise<void> {
         channelInterpretation: "speakers",
       });
       end.port.onmessage = (e: MessageEvent<{ busy: number; audio: number }>) => {
-        readings.push({ load: e.data.busy / e.data.audio, at: performance.now() });
-        while (readings.length > 16) readings.shift();
+        keep(readings, e.data.busy / e.data.audio);
       };
       const destination = Tone.getDestination();
       // Tone's master output normally goes straight to the speakers; route
@@ -99,15 +112,34 @@ export function installCpuMeter(): Promise<void> {
   return installed;
 }
 
-/** The latest load, or null when the meter isn't running or the audio has
- * been idle (the browser suspends rendering). */
-export function cpuReading(): CpuReading | null {
+/** The native engine's time since its last status: how long its
+ * callbacks took and how much audio they made (ms). */
+export function noteNativeLoad(busyMs: number, audioMs: number): void {
+  if (!(busyMs >= 0 && audioMs > 0)) return;
+  native.busy += busyMs;
+  native.audio += audioMs;
+  if (native.audio >= REPORT_SECONDS * 1000) {
+    keep(native.readings, native.busy / native.audio);
+    native.busy = 0;
+    native.audio = 0;
+  }
+}
+
+function readingOf(list: Reading[], source: CpuReading["source"]): CpuReading | null {
   const now = performance.now();
-  const recent = readings.filter((r) => now - r.at < 3000);
+  const recent = list.filter((r) => now - r.at < 3000);
   if (!recent.length || now - recent[recent.length - 1].at > 1000) return null;
   const last = recent.slice(-4);
   return {
+    source,
     average: last.reduce((sum, r) => sum + r.load, 0) / last.length,
     peak: Math.max(...recent.map((r) => r.load)),
   };
+}
+
+/** The latest load: the native engine's while it's playing the song, else
+ * the browser's; null when neither is running or the audio has been idle
+ * (the browser suspends rendering). */
+export function cpuReading(): CpuReading | null {
+  return readingOf(native.readings, "native") ?? readingOf(readings, "browser");
 }

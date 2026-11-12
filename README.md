@@ -1107,7 +1107,8 @@ playback.
 
 Click the engine-load display in the header to see:
 
-- the audio engine's CPU load, and its peak over the last few seconds;
+- the audio engine's CPU load, and its peak over the last few seconds (in
+  the desktop app with the native engine on, that engine's load);
 - the sample rate, and your output and input devices' own rates. When a
   device runs at a different rate than Dawn (48 kHz), the browser converts
   the audio, which adds delay; the panel then says how to set the device to

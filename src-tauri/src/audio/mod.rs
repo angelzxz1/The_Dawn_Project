@@ -530,6 +530,10 @@ pub struct EngineStatus {
     limiter_gain: f32,
     /// How much of each buffer's time the engine takes (0-1).
     load: f32,
+    /// The time the engine took and the audio it made since the last
+    /// status (ms), for the CPU meter.
+    busy_ms: f64,
+    audio_ms: f64,
     /// Dropouts and stream errors since the device opened.
     errors: u32,
     /// The input's peaks since the last status, per channel (0-1).
@@ -625,6 +629,8 @@ pub fn engine_status(state: State<'_, AudioState>) -> EngineStatus {
             master: [0.0; 2],
             limiter_gain: 1.0,
             load: 0.0,
+            busy_ms: 0.0,
+            audio_ms: 0.0,
             errors: 0,
             inputs: vec![],
             round_trip: 0.0,
@@ -638,6 +644,7 @@ pub fn engine_status(state: State<'_, AudioState>) -> EngineStatus {
         .map_or((0, 0), |s| (s.tracks.len(), s.buses.len()));
     let s = &r.status;
     let (tracks, buses, master) = s.take_peaks(tracks, buses);
+    let (busy_ms, audio_ms) = s.take_busy();
     EngineStatus {
         open: true,
         sample_rate: r.sample_rate,
@@ -648,6 +655,8 @@ pub fn engine_status(state: State<'_, AudioState>) -> EngineStatus {
         master,
         limiter_gain: s.limiter_gain(),
         load: s.load(),
+        busy_ms,
+        audio_ms,
         errors: s.errors(),
         inputs: s.take_input_peaks(r.input.as_ref().map_or(0, |i| i.channels)),
         round_trip: s.round_trip(),

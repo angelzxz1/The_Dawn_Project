@@ -25,6 +25,7 @@ import { warpedBuffer, warpKey } from "../warpRender";
 import { nativeBridge, type NativeStatus } from "./bridge";
 import { PROBE_CLICKS, probeClick, TakeBuckets } from "./nativeTake";
 import { detectRoundTrip } from "../latency";
+import { noteNativeLoad } from "../cpuMeter";
 import { describeSong, SUB_TABLE, type NativeAudioIds, type NativeSession } from "./describe";
 import { decodeEffectFileAudio } from "../../effects/effectFiles";
 import { loadDrumSample } from "../../instruments/drum-rack/drumRack";
@@ -349,6 +350,7 @@ class NativeEngine {
       try {
         const status = await nativeBridge.status();
         this.statusAt = performance.now();
+        noteNativeLoad(status.busyMs, status.audioMs);
         if (status.take && this.take) {
           this.take.buckets.add(status.take.min, status.take.max);
           this.take.downbeat = status.take.downbeat;

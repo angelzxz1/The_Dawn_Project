@@ -121,6 +121,10 @@ pub struct Status {
     /// The share of each buffer's time the last callbacks took (0-1, as
     /// f32 bits, smoothed).
     load: AtomicU32,
+    /// The time the callbacks took and the audio they made since the last
+    /// read (ns), for the studio's CPU meter.
+    busy_ns: AtomicU64,
+    audio_ns: AtomicU64,
     /// Dropouts and other stream errors since it opened.
     errors: AtomicU32,
     /// The limiter's gain reduction, from its last meter reading (f32 bits).
@@ -151,6 +155,8 @@ impl Status {
                 .map(|_| AtomicU32::new(0))
                 .collect(),
             load: AtomicU32::new(0),
+            busy_ns: AtomicU64::new(0),
+            audio_ns: AtomicU64::new(0),
             errors: AtomicU32::new(0),
             limiter_gain: AtomicU32::new(1.0f32.to_bits()),
             missing: AtomicBool::new(false),
@@ -225,6 +231,14 @@ impl Status {
 
     pub fn load(&self) -> f32 {
         f32::from_bits(self.load.load(Ordering::Relaxed))
+    }
+
+    /// Reads and resets the time the callbacks took and the audio they
+    /// made since the last read (ms).
+    pub fn take_busy(&self) -> (f64, f64) {
+        let audio = self.audio_ns.swap(0, Ordering::Relaxed);
+        let busy = self.busy_ns.swap(0, Ordering::Relaxed);
+        (busy as f64 / 1e6, audio as f64 / 1e6)
     }
 
     pub fn errors(&self) -> u32 {
@@ -540,7 +554,14 @@ impl Callback {
         }
         if frames > 0 {
             let budget = frames as f64 / self.sample_rate;
-            let used = (started.elapsed().as_secs_f64() / budget) as f32;
+            let elapsed = started.elapsed();
+            let used = (elapsed.as_secs_f64() / budget) as f32;
+            status
+                .busy_ns
+                .fetch_add(elapsed.as_nanos() as u64, Ordering::Relaxed);
+            status
+                .audio_ns
+                .fetch_add((budget * 1e9) as u64, Ordering::Relaxed);
             let before = f32::from_bits(status.load.load(Ordering::Relaxed));
             status
                 .load
