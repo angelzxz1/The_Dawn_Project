@@ -111,12 +111,15 @@ committed.
     Why support, the comparison table, the ways to help and the closing
     question on panels, without numbers, arrows or all-caps labels; each
     pack's cover the sun behind a grille, a little lower each month).
-    Step 7 (2026-11-12, commit to come): the legal pages (Privacy,
+    Step 7 (2026-11-12, `c089acc`; asked for): the legal pages (Privacy,
     Credits, License printed on a cream sheet with a letterhead, at a
     reading width; the texts are the About window's, unchanged, and
     `.paper` in globals.css re-points their colours and sets their
-    headings in Fraunces and their type at reading size). Next: the
-    not-found page.
+    headings in Fraunces and their type at reading size). Step 8
+    (2026-11-12, commit to come): the not-found page, the amp from the
+    foot of every page switched off (lamp dark, the sun dim behind the
+    grille), without the 404 label. The redesign covers every page of
+    the website now; the studio wasn't part of it.
 - **Next listed: step 35, native file dialogs.** Wait for the user to say "go"
   before starting a step: they ask for each one ("Lets go with step N").
 - **What's left after that,** in order (the full list, with sizes, is in
