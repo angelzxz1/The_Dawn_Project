@@ -490,14 +490,3 @@ export async function renderProject(params: BounceParams, options: RenderOptions
   const channels = Array.from({ length: raw.numberOfChannels }, (_, ch) => raw.getChannelData(ch).slice(start, start + length));
   return { channels, sampleRate: raw.sampleRate };
 }
-
-export function downloadWavBlob(blob: Blob, name: string): void {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${name.replace(/\s+/g, "-").toLowerCase() || "project"}.wav`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}

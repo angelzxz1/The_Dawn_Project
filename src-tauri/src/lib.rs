@@ -5,6 +5,7 @@
 //! docs/desktop.md.
 
 mod audio;
+mod files;
 mod plugins;
 
 use std::ffi::OsString;
@@ -147,6 +148,7 @@ pub fn run() {
         })
         .manage(audio::AudioState::default())
         .manage(plugins::PluginsState::default())
+        .manage(files::FilesState::default())
         // The studio's own windows go with the main one: otherwise the app
         // keeps running for them.
         .on_window_event(|window, event| {
@@ -190,6 +192,14 @@ pub fn run() {
             plugins::plugins_scan,
             plugins::plugins_add_folder,
             plugins::plugins_remove_folder,
+            files::files_pick_folder,
+            files::files_save_dialog,
+            files::files_list,
+            files::files_kind,
+            files::files_make_folder,
+            files::files_read,
+            files::files_write,
+            files::files_remove,
         ])
         .run(tauri::generate_context!())
         .expect("error while running the Dawn desktop app");

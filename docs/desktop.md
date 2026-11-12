@@ -142,15 +142,45 @@ depend on the platform:
 - **Windows** uses WebView2, which is Chromium: the studio should behave as
   in Chrome or Edge.
 - **macOS** uses WKWebView (Safari's engine) and **Linux** WebKitGTK. Neither
-  has the File System Access API, so projects save as a single
-  `.dawnproject` file rather than to folders, nor Web MIDI, so MIDI
-  controllers don't work there yet. On macOS the system asks once for the
-  microphone. Recording on Linux is untested.
+  has Web MIDI, so MIDI controllers don't work there yet. On macOS the
+  system asks once for the microphone. Recording on Linux is untested.
+- Files go through the system's own dialogs on every platform (see
+  "Files", below), so projects are folders everywhere.
 - Links to other sites don't open in your browser yet; that needs Tauri's
   opener plugin.
 
 These differences go away as the native side takes over each job: audio
-and MIDI devices through the engine, files through native dialogs.
+and MIDI devices through the engine.
+
+## Files
+
+In the desktop app, files go through the system's own dialogs
+(`src-tauri/src/files.rs`, with the `rfd` crate; `src/services/files.ts`):
+
+- **Save As.** Exports (the mix, the ZIP of stems), a track's or clip's
+  MIDI, a pack of your presets and the recovery backup open a Save As
+  dialog and are written where you choose, instead of going to Downloads.
+  Cancelling it saves nothing (the export dialog stays open).
+- **Project folders.** New, Open and Save As pick the folder in the
+  system's folder dialog, and the app reads and writes it itself
+  (`src/project/nativeFolder.ts`, shaped like the browser's folder handle,
+  so `projectFiles.ts` saves and opens it the same way). This works on
+  macOS and Linux too, and never asks for permission again. Recent
+  projects are remembered by their path.
+- **Plugin folders.** "Choose a folder…" in the Plugins tab's folders, as
+  well as typing a path.
+- **Opening files** (audio, IRs, amp models, presets, a `.dawnproject`)
+  still uses the page's file picker, which is the system's dialog already.
+
+The studio can only read and write what was picked in one of these
+dialogs: a folder and everything in it, or the one file a Save As named.
+Picked project folders are remembered across launches (the newest 64, in
+`granted-folders.json` in the app's data folder), so a recent project
+opens without asking; a Save As file only until the app quits. A plugin
+folder gives only its path. Paths that climb out with `..`, relative ones
+and links out of a folder are refused. Files are written beside their
+place first and then moved in, so a save that fails halfway leaves the old
+file as it was.
 
 ## The native engine
 
@@ -592,8 +622,8 @@ another track's audio ("Audio From") in it.
 1. **Plugins**: finding them, and VST3 and CLAP effects and instruments,
    are done (above). Audio Units on macOS wait for a Mac to build and try
    them on.
-2. **Shipping**: exporting through the engine is done (above); next,
-   native file dialogs and signed installers.
+2. **Shipping**: exporting through the engine and the system's file
+   dialogs are done (above); next, signed installers.
 
 ## Checks
 

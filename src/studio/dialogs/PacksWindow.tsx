@@ -4,7 +4,7 @@ import { useRef, useState, useSyncExternalStore } from "react";
 import { Download, Loader2, Package, Trash2, Upload, X } from "lucide-react";
 import { PACK_EXTENSION } from "@/project/dawnPack";
 import { buildMyPresetsPack, installedPacks, subscribePacks, type InstalledPack } from "@/project/packStore";
-import { downloadBlob } from "@/export/exportProject";
+import { saveFile } from "@/services/files";
 import { safeFileName } from "@/export/exportFormats";
 import { useShortcuts } from "@/ui/shortcuts";
 
@@ -72,7 +72,8 @@ export function PacksWindow({
         setMessage({ ok: false, text: "You haven't saved any presets or kits of your own yet." });
         return;
       }
-      downloadBlob(new Blob([bytes as Uint8Array<ArrayBuffer>], { type: "application/zip" }), `${safeFileName(info.name, "My Presets")}${PACK_EXTENSION}`);
+      const pack = new Blob([bytes as Uint8Array<ArrayBuffer>], { type: "application/zip" });
+      if (!(await saveFile(pack, `${safeFileName(info.name, "My Presets")}${PACK_EXTENSION}`, "Save your presets"))) return;
       setMessage({
         ok: true,
         text:

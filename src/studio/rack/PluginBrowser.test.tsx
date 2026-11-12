@@ -14,6 +14,8 @@ const bridge = vi.hoisted(() => ({
   removeFolder: vi.fn<(path: string) => Promise<void>>(async () => {}),
 }));
 vi.mock("@/engine/native/bridge", () => ({ pluginBridge: bridge }));
+const files = vi.hoisted(() => ({ pickFolder: vi.fn<(title: string, grant: boolean) => Promise<string | null>>(async () => null) }));
+vi.mock("@/services/files", () => ({ nativeFiles: files }));
 
 import { PluginBrowser } from "./PluginBrowser";
 import { EffectBrowser } from "./EffectBrowser";
@@ -115,6 +117,22 @@ describe("the Plugins tab", () => {
     await userEvent.fill(screen.getByRole("textbox", { name: "Folder to add" }), "/nope");
     await userEvent.keyboard("{Enter}");
     await expect.element(screen.getByText("There's no folder there.")).toBeVisible();
+  });
+
+  test("takes a folder picked in the system's folder dialog", async () => {
+    const screen = await renderTab();
+    await userEvent.click(screen.getByRole("button", { name: "Folders" }));
+    files.pickFolder.mockResolvedValueOnce("C:\Audio\VST3");
+    await userEvent.click(screen.getByRole("button", { name: "Choose a folder…" }));
+    // Only its path: the studio isn't given its files.
+    expect(files.pickFolder).toHaveBeenCalledWith("Choose a plugin folder", false);
+    await expect.poll(() => bridge.addFolder.mock.calls.at(-1)).toEqual(["C:\Audio\VST3"]);
+    // Cancelled: nothing is added.
+    bridge.addFolder.mockClear();
+    files.pickFolder.mockResolvedValueOnce(null);
+    await userEvent.click(screen.getByRole("button", { name: "Choose a folder…" }));
+    await expect.poll(() => files.pickFolder.mock.calls.length).toBe(2);
+    expect(bridge.addFolder).not.toHaveBeenCalled();
   });
 
   test("says when it found nothing", async () => {

@@ -6,17 +6,23 @@
 //     history.json        the undo/redo history, so it survives reopening
 //     Samples/            recordings, imported audio, IRs and amp models
 //
-// Folders need the File System Access API (Chrome, Edge, Opera). Other
-// browsers save and open the same project as a single .dawnproject file
-// (a small bundle: a JSON header followed by the files' bytes).
+// Folders need the File System Access API (Chrome, Edge, Opera), or the
+// desktop app, which picks them with the system's folder dialog and reads
+// and writes them itself (nativeFolder.ts). Other browsers save and open
+// the same project as a single .dawnproject file (a small bundle: a JSON
+// header followed by the files' bytes).
 //
-// Recent projects are remembered by their folder handles, in IndexedDB.
+// Recent projects are remembered by their folder handles (the desktop
+// app's: their paths), in IndexedDB.
 
 import type { ProjectState } from "./project";
 import { PROJECT_VERSION, normalizeProject, type SerializedClip, type SerializedProject, type SerializedTakeLane } from "./projectSchema";
 import type { AudioClipInstance, ClipInstance, MidiClipInstance, TakeLane } from "./types";
 import { shareFiles } from "./sharedFiles";
 import { clipLabel } from "./clipEdits";
+import { NativeFolder, revive } from "./nativeFolder";
+import { isDesktopApp } from "@/services/desktop";
+import { nativeFiles } from "@/services/files";
 
 export const PROJECT_FILE = "project.dawn.json";
 export const HISTORY_FILE = "history.json";
@@ -254,7 +260,7 @@ declare global {
 }
 
 export function supportsFolders(): boolean {
-  return typeof window !== "undefined" && typeof window.showDirectoryPicker === "function";
+  return isDesktopApp() || (typeof window !== "undefined" && typeof window.showDirectoryPicker === "function");
 }
 
 /** Brave is Chromium but ships with the folder API turned off (it can be
@@ -263,7 +269,11 @@ export function isBrave(): boolean {
   return typeof navigator !== "undefined" && "brave" in navigator;
 }
 
-async function pickDirectory(): Promise<DirectoryHandle | null> {
+async function pickDirectory(title: string): Promise<DirectoryHandle | null> {
+  if (isDesktopApp()) {
+    const path = await nativeFiles.pickFolder(title, true);
+    return path ? new NativeFolder(path) : null;
+  }
   try {
     return (await window.showDirectoryPicker?.({ mode: "readwrite", id: "dawn-projects" })) ?? null;
   } catch {
@@ -287,7 +297,7 @@ async function hasEntry(dir: DirectoryHandle, name: string): Promise<boolean> {
 /** Asks where to put a new project and creates its folder there (a name
  * that's taken gets " 2", " 3"...). Null if cancelled. */
 export async function createProjectFolder(name: string): Promise<ProjectFolder | null> {
-  const parent = await pickDirectory();
+  const parent = await pickDirectory("Choose where to put the project");
   if (!parent) return null;
   const base = safeName(name);
   let folderName = base;
@@ -298,7 +308,7 @@ export async function createProjectFolder(name: string): Promise<ProjectFolder |
 /** Asks for an existing project folder. Null if cancelled; throws if the
  * folder isn't a project. */
 export async function pickProjectFolder(): Promise<ProjectFolder | null> {
-  const dir = await pickDirectory();
+  const dir = await pickDirectory("Open a project folder");
   if (!dir) return null;
   if (!(await hasEntry(dir, PROJECT_FILE))) throw new Error(`"${dir.name}" isn't a project folder (it has no ${PROJECT_FILE}).`);
   return dir;
@@ -460,7 +470,8 @@ export interface RecentProject {
 }
 
 export async function recentProjects(): Promise<RecentProject[]> {
-  return ((await idb<RecentProject[]>("readonly", (s) => s.get("recent")).catch(() => undefined)) ?? []).filter((r) => r?.folder);
+  const list = (await idb<RecentProject[]>("readonly", (s) => s.get("recent")).catch(() => undefined)) ?? [];
+  return list.filter((r) => r?.folder).map((r) => ({ ...r, folder: revive(r.folder) }));
 }
 
 export async function rememberRecent(name: string, folder: ProjectFolder): Promise<void> {
@@ -492,7 +503,8 @@ export interface OpenProjectInfo {
 }
 
 export async function readOpenProject(): Promise<OpenProjectInfo | null> {
-  return (await idb<OpenProjectInfo>("readonly", (s) => s.get("open")).catch(() => undefined)) ?? null;
+  const info = await idb<OpenProjectInfo>("readonly", (s) => s.get("open")).catch(() => undefined);
+  return info ? { ...info, folder: revive(info.folder) } : null;
 }
 
 export async function writeOpenProject(info: OpenProjectInfo): Promise<void> {

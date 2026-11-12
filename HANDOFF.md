@@ -116,15 +116,30 @@ committed.
     reading width; the texts are the About window's, unchanged, and
     `.paper` in globals.css re-points their colours and sets their
     headings in Fraunces and their type at reading size). Step 8
-    (2026-11-12, commit to come): the not-found page, the amp from the
+    (2026-11-12, `ff315d8`; asked for): the not-found page, the amp from the
     foot of every page switched off (lamp dark, the sun dim behind the
     grille), without the 404 label. The redesign covers every page of
     the website now; the studio wasn't part of it.
-- **Next listed: step 35, native file dialogs.** Wait for the user to say "go"
+- **Step 35, native file dialogs** (2026-11-12, commit to come; asked for,
+  with rfd chosen and all three parts: Save As, project folders, plugin
+  folders). In the desktop app, every download (exports, MIDI, preset
+  packs, the backup) is a Save As through `saveFile` in
+  `src/services/files.ts`, whose cancel returns false (the export dialog
+  stays open); project folders are `NativeFolder`s
+  (`src/project/nativeFolder.ts`), picked with the folder dialog and read
+  and written by `src-tauri/src/files.rs`, revived from IndexedDB by path;
+  the Plugins tab has "Choose a folder…". files.rs only touches what was
+  picked in a dialog (folders remembered in `granted-folders.json`, Save As
+  files for the session) and writes through a `.partial` file. A MIDI save
+  that fails is noted as an issue (`export.midi`), not shown: Daw.tsx's
+  notice is declared after the MIDI handlers, and reaching it there trips
+  the React Compiler lint. Not yet tried in the real desktop app: the
+  user's to try (`npm run desktop`).
+- **Next listed: step 36, signed installers.** Wait for the user to say "go"
   before starting a step: they ask for each one ("Lets go with step N").
 - **What's left after that,** in order (the full list, with sizes, is in
   `nextSteps.md`; a summary is under "The road ahead" below):
-  plugins (AU, on a Mac), shipping (native dialogs, signed installers), an accessibility pass, and last the desktop's driver,
+  plugins (AU, on a Mac), shipping (signed installers), an accessibility pass, and last the desktop's driver,
   device and inputs picker, which waits for ASIO.
 - **Known loose ends:**
   - With the native engine on, the loudness readout still reads the

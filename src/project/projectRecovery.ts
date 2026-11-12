@@ -1,5 +1,6 @@
 import { backupProject, clearSavedProject, latestBackup, loadProject } from "./persistence";
 import { noteIssue } from "../services/issues";
+import { saveFile } from "../services/files";
 
 const NOTICE_KEY = "dawn-recovery-notice";
 
@@ -51,13 +52,6 @@ export async function downloadLatestBackup(): Promise<boolean> {
     audioClipIds: backup.blobs.map(([id]) => id),
     project: backup.project,
   };
-  const url = URL.createObjectURL(new Blob([JSON.stringify(file, null, 2)], { type: "application/json" }));
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `dawn-project-backup-${backup.createdAt}.json`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
+  await saveFile(new Blob([JSON.stringify(file, null, 2)], { type: "application/json" }), `dawn-project-backup-${backup.createdAt}.json`, "Save the backup");
   return true;
 }

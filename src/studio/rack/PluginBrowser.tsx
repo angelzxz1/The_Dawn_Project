@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useSyncExternalStore } from "react";
-import { ChevronRight, FolderPlus, RefreshCw, Search, X } from "lucide-react";
+import { ChevronRight, FolderOpen, FolderPlus, RefreshCw, Search, X } from "lucide-react";
 import { plugins as pluginStore } from "@/engine/native/plugins";
 import type { PluginFormat, PluginInfo } from "@/engine/native/bridge";
+import { nativeFiles } from "@/services/files";
 
 const GROUPS: { kind: PluginInfo["kind"]; name: string }[] = [
   { kind: "instrument", name: "Instruments" },
@@ -49,12 +50,22 @@ export function PluginBrowser({
       return next;
     });
 
-  const addFolder = async () => {
-    if (!newFolder.trim()) return;
+  const addFolder = async (path: string) => {
+    if (!path.trim()) return;
     try {
-      await pluginStore.addFolder(newFolder);
+      await pluginStore.addFolder(path);
       setNewFolder("");
       setFolderError(null);
+    } catch (e) {
+      setFolderError(String(e));
+    }
+  };
+
+  /** The system's folder dialog; the folder picked is added. */
+  const chooseFolder = async () => {
+    try {
+      const path = await nativeFiles.pickFolder("Choose a plugin folder", false);
+      if (path) await addFolder(path);
     } catch (e) {
       setFolderError(String(e));
     }
@@ -246,18 +257,26 @@ export function PluginBrowser({
                     </li>
                   ))}
                 </ul>
+                <button
+                  type="button"
+                  onClick={() => void chooseFolder()}
+                  className="flex items-center gap-1.5 self-start rounded border border-border px-1.5 py-0.5 text-[10.5px] text-soft hover:border-accent hover:text-foreground"
+                >
+                  <FolderOpen size={11} />
+                  Choose a folder…
+                </button>
                 <form
                   className="flex items-center gap-1"
                   onSubmit={(e) => {
                     e.preventDefault();
-                    void addFolder();
+                    void addFolder(newFolder);
                   }}
                 >
                   <input
                     value={newFolder}
                     onChange={(e) => setNewFolder(e.target.value)}
                     onKeyDown={(e) => e.stopPropagation()}
-                    placeholder="Another folder's path"
+                    placeholder="Or type a folder's path"
                     aria-label="Folder to add"
                     className="min-w-0 flex-1 rounded border border-border bg-background px-1.5 py-0.5 text-[10.5px] text-foreground outline-none placeholder:text-muted focus:border-accent"
                   />

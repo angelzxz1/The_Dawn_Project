@@ -105,7 +105,7 @@ import { audioEngine } from "@/engine/audioEngine";
 import { defaultLoop, formatPosition, loopAround, loopsFrom, nudgeLoop, type ArrangementLoop } from "@/project/arrangementLoop";
 import { beatAtSeconds, bpmAtSeconds, formatBpm, makeGrid, makeTempoMap, remapSeconds, roundUpToBarFrom, secondsAtBeat, type TempoChange } from "@/project/tempoMap";
 import { notesAtBeats, retimeProject, sameTempo, secondsForBeats } from "@/project/tempoEdits";
-import { downloadMidiFile, parseMidiFile } from "@/export/midiFile";
+import { parseMidiFile, saveMidiFile } from "@/export/midiFile";
 import { midiToNoteName } from "@/instruments/piano/piano";
 import { listenToWebMidi } from "@/engine/webMidi";
 import { MASTER_COLOR, trackColorOf, type TrackColor } from "@/project/colors";
@@ -1341,7 +1341,7 @@ export function Daw() {
       const flattened = clipsOf(channelId)
         .filter(isMidiClip)
         .flatMap((c) => c.notes.map((n) => ({ ...n, time: c.offset + n.time })));
-      downloadMidiFile(flattened, channel?.name ?? "track", tempo);
+      saveMidiFile(flattened, channel?.name ?? "track", tempo).catch((err) => noteIssue("export.midi", err));
     },
     [channels, clipsOf, tempo]
   );
@@ -1352,7 +1352,7 @@ export function Daw() {
       const channel = channels.find((c) => c.id === channelId);
       const clip = clipsOf(channelId).find((c) => c.id === clipId);
       const notes = clip?.kind === "midi" ? clip.notes : [];
-      downloadMidiFile(notes, channel?.name ?? "clip", tempo, clip?.offset ?? 0);
+      saveMidiFile(notes, channel?.name ?? "clip", tempo, clip?.offset ?? 0).catch((err) => noteIssue("export.midi", err));
     },
     [channels, clipsOf, tempo]
   );

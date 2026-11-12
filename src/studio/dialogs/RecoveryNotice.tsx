@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Download, X } from "lucide-react";
 import { clearRecoveryNotice, downloadLatestBackup, readRecoveryNotice } from "@/project/projectRecovery";
+import { isDesktopApp } from "@/services/desktop";
 
 /** Shown when the last saved project couldn't be opened and the studio
  * started fresh: the old project is kept as a backup in this browser,
@@ -33,7 +34,7 @@ export function RecoveryNotice() {
         className="flex shrink-0 items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs hover:bg-surface"
       >
         <Download size={13} />
-        Download backup
+        {isDesktopApp() ? "Save backup" : "Download backup"}
       </button>
       <button
         type="button"

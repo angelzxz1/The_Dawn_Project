@@ -103,14 +103,3 @@ export async function exportProject(
   const zip = zipSync(files, { level: 0 });
   return { blob: new Blob([zip as Uint8Array<ArrayBuffer>], { type: "application/zip" }), fileName: `${title} - Stems.zip`, files: tracks.length };
 }
-
-export function downloadBlob(blob: Blob, fileName: string): void {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = fileName;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 10000);
-}

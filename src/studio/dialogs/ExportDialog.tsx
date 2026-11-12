@@ -3,9 +3,10 @@
 import { useRef, useState, type ReactNode } from "react";
 import { Download, Loader2, X } from "lucide-react";
 import type { BounceParams } from "@/export/bounce";
-import { downloadBlob, ExportCancelled, exportProject, stemTracks, type ExportResult, type ExportStatus } from "@/export/exportProject";
+import { ExportCancelled, exportProject, stemTracks, type ExportResult, type ExportStatus } from "@/export/exportProject";
 import { loadExportSettings, MP3_BITRATES, saveExportSettings, safeFileName, TAIL_CHOICES, type ExportSettings } from "@/export/exportFormats";
 import { reportError } from "@/services/telemetry";
+import { saveFile } from "@/services/files";
 import { useShortcuts } from "@/ui/shortcuts";
 import { nativeEngine } from "@/engine/native/nativeEngine";
 import { unsupported } from "@/engine/native/describe";
@@ -129,7 +130,8 @@ export function ExportDialog({
         // the engine plays (its plugins included).
         renderer: native ? (o) => nativeEngine.render({ ...o, contentEnd: params.contentEndSeconds }) : undefined,
       });
-      downloadBlob(result.blob, result.fileName);
+      // Cancelling the Save As (the desktop app) goes back to the dialog.
+      if (!(await saveFile(result.blob, result.fileName, "Export"))) return;
       onExported(result, s);
     } catch (err) {
       if (err instanceof ExportCancelled) {

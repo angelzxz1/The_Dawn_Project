@@ -1,6 +1,7 @@
 import { Midi } from "@tonejs/midi";
 import type { NoteEvent } from "../project/types";
 import { beatAtSeconds, type TempoMap } from "../project/tempoMap";
+import { saveFile } from "../services/files";
 
 /**
  * Parses a standard MIDI file into a flat list of note events (all tracks
@@ -61,14 +62,9 @@ export function encodeMidiFile(notes: NoteEvent[], trackName: string, tempo: Tem
   return new Blob([new Uint8Array(midi.toArray())], { type: "audio/midi" });
 }
 
-export function downloadMidiFile(notes: NoteEvent[], trackName: string, tempo: TempoMap, origin = 0): void {
+/** Saves notes as a .mid file (a Save As in the desktop app, a download
+ * in a browser). False if the Save As was cancelled. */
+export function saveMidiFile(notes: NoteEvent[], trackName: string, tempo: TempoMap, origin = 0): Promise<boolean> {
   const blob = encodeMidiFile(notes, trackName, tempo, origin);
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${trackName.replace(/\s+/g, "-").toLowerCase() || "clip"}.mid`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
+  return saveFile(blob, `${trackName.replace(/\s+/g, "-").toLowerCase() || "clip"}.mid`, "Export MIDI");
 }

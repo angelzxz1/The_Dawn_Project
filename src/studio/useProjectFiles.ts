@@ -30,6 +30,7 @@ import {
 import { startFreshKeepingBackup } from "@/project/projectRecovery";
 import type { ProjectLayout, SerializedProject } from "@/project/projectSchema";
 import { track } from "@/services/telemetry";
+import { saveFile } from "@/services/files";
 import { autosaveBlobs, documentToSave, openInStore, serializeProject, type SessionSettings } from "@/state/projectDocument";
 import { projectStore, useProjectDoc } from "@/state/projectStore";
 import { LATEST_VERSION } from "@/content/whatsNew";
@@ -226,14 +227,7 @@ export function useProjectFiles(session: SessionSettings, events: ProjectFilesEv
   const downloadFile = useCallback(
     async (fileName: string) => {
       const blob = await encodeBundle(documentToSave(buildProject(), fileName));
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${safeName(fileName)}${BUNDLE_EXTENSION}`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.setTimeout(() => URL.revokeObjectURL(url), 10000);
+      await saveFile(blob, `${safeName(fileName)}${BUNDLE_EXTENSION}`, "Save the project");
       track("project_saved", { target: "file" });
     },
     [buildProject]
