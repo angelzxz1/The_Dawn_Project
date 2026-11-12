@@ -88,12 +88,17 @@ committed.
     labels or arrows on links), the header with a phone menu, the footer
     and the home page (the hero as an amp, a spec plate, the features as a
     signal chain, the steps as pedals). The logo's stripes made real gaps
-    (`sunBands`, 2026-11-12, `6c887be`). Step 2 (2026-11-12, commit to
-    come): the Features page (the effects as units in a rack, with a blank
+    (`sunBands`, 2026-11-12, `6c887be`). Step 2 (2026-11-12, `eb79d90`;
+    asked for): the Features page (the effects as units in a rack, with a blank
     vented panel for an odd slot; hardware filter buttons with a lamp; the
     illustrations' `Well` as an inset screen; no numbers or PLANNED tags;
-    `PageIntro`'s eyebrow optional). Next: how it works, guides, FAQ,
-    support, the legal pages and the not-found page.
+    `PageIntro`'s eyebrow optional). Step 3 (2026-11-12, commit to
+    come): How it works (the walkthrough as one device, its step buttons
+    with lamps and a screen that comes into view on a phone; the setup
+    guides with a hardware switch; latency and troubleshooting on screwed
+    panels, sentence-case headers) and two of Features' What's next items
+    (the desktop app in beta, a sampled bass). Next: guides, FAQ, support,
+    the legal pages and the not-found page.
 - **Next listed: step 35, native file dialogs.** Wait for the user to say "go"
   before starting a step: they ask for each one ("Lets go with step N").
 - **What's left after that,** in order (the full list, with sizes, is in

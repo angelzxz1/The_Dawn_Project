@@ -49,8 +49,8 @@ const HOOD: [string, string][] = [
 ];
 
 const NEXT: [string, string][] = [
-  ["Desktop app", "Dawn installed on Windows and macOS, playing your VST3 and CLAP plugins."],
-  ["Bass instrument", "A sampled bass, plus bass amp captures."],
+  ["Desktop app (in beta)", "Dawn installed on Windows and macOS, playing your VST3 and CLAP plugins."],
+  ["Bass instrument", "A sampled bass to play from keys, pads or a controller."],
   ["Sampler", "Load a sample, play it chromatically or slice loops."],
   ["Spanish interface", "Dawn en español."],
   ["Reference tracks", "A/B your mix against a song you love."],

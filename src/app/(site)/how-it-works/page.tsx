@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { InputLevel, LatencyBar, RecordedClip, StatusChips, Well } from "@/site/illustrations";
 import { SetupGuides, Walkthrough, type WalkStep } from "@/site/interactive";
-import { CheckIcon, Container, CtaBand, Eyebrow, JumpLinks, PageIntro, SectionHead, h2Class, leadClass } from "@/site/ui";
+import { CheckIcon, Container, CtaBand, Eyebrow, JumpLinks, PageIntro, Screws, SectionHead, h2Class, leadClass } from "@/site/ui";
 import { PROJECT_TEMPLATES } from "@/project/templates";
 
 export const metadata: Metadata = {
@@ -49,11 +49,11 @@ const STEPS: WalkStep[] = [
         text="Open Dawn and choose a starting point. Every template is a real project with tracks, instruments and effects already set up, so it makes sound within three clicks."
         visual={
           <Well className="flex flex-col gap-3">
-            <div className="text-[11px] font-semibold tracking-[1.6px] text-muted">START A NEW PROJECT</div>
+            <div className="text-[13px] font-semibold text-muted">Start a new project</div>
             <div className="grid grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-2.5">
               {PROJECT_TEMPLATES.map((t, i) => (
-                <div key={t.id} className={`flex flex-col gap-1 rounded-[10px] border p-3.5 ${i === 0 ? "border-accent bg-glow" : "border-border bg-surface"}`}>
-                  <span className="font-display text-[16px] font-semibold text-foreground">{t.name}</span>
+                <div key={t.id} className={`flex flex-col gap-1 rounded-md border p-3.5 ${i === 0 ? "border-accent bg-glow" : "border-border bg-surface"}`}>
+                  <span className="font-display text-[17px] font-bold text-foreground">{t.name}</span>
                   <span className="text-[13px] leading-snug text-muted">{t.description}</span>
                 </div>
               ))}
@@ -105,9 +105,9 @@ const STEPS: WalkStep[] = [
         visual={
           <Well className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4">
             <div className="flex flex-col gap-2">
-              <div className="text-[11px] font-semibold tracking-[1.6px] text-muted">GROOVES</div>
+              <div className="text-[13px] font-semibold text-muted">Grooves</div>
               {GROOVES.map(([name, sections]) => (
-                <div key={name} className="rounded-lg border border-border bg-surface px-3 py-2">
+                <div key={name} className="rounded-md border border-border bg-surface px-3 py-2">
                   <div className="text-[14px] font-semibold text-foreground">{name}</div>
                   <div className="text-[12px] text-muted">{sections}</div>
                 </div>
@@ -123,14 +123,14 @@ const STEPS: WalkStep[] = [
                   <span className="w-14 shrink-0 text-[12px] font-semibold text-soft">{track}</span>
                   <div className="grid flex-1 grid-cols-3 gap-1">
                     {(clips as string[]).map((c, i) => (
-                      <span key={i} className={`h-8 truncate rounded-md px-1.5 py-1 text-[11px] font-semibold ${c ? "bg-accent/80 text-background" : "bg-surface-raised"}`}>
+                      <span key={i} className={`h-8 truncate rounded-md px-1.5 py-1 text-[11px] font-semibold ${c ? "bg-accent/80 text-on-accent" : "bg-surface-raised"}`}>
                         {c}
                       </span>
                     ))}
                   </div>
                 </div>
               ))}
-              <p className="pt-1 font-code text-[10.5px] text-muted">Drag a groove onto the drum track · Ctrl/Cmd+C, V to copy a clip</p>
+              <p className="pt-1 text-[12px] text-muted">Drag a groove onto the drum track. Ctrl/Cmd+C, V copies a clip.</p>
             </div>
           </Well>
         }
@@ -146,10 +146,10 @@ const STEPS: WalkStep[] = [
         text="Balance the levels, add an EQ or a reverb send, then export. MP3 for your band chat, WAV for quality, stems and MIDI for another DAW."
         visual={
           <Well className="flex max-w-[420px] flex-col gap-2.5">
-            <div className="font-display text-[17px] font-semibold text-foreground">Export</div>
+            <div className="font-display text-[18px] font-bold text-foreground">Export</div>
             <div className="flex gap-1.5">
               {["MP3", "WAV", "Stems"].map((f) => (
-                <span key={f} className={`rounded-md border px-2.5 py-1 text-[12px] font-semibold ${f === "MP3" ? "border-accent bg-accent text-background" : "border-border text-soft"}`}>
+                <span key={f} className={`rounded-md border px-2.5 py-1 text-[12px] font-semibold ${f === "MP3" ? "border-accent bg-accent text-on-accent" : "border-border text-soft"}`}>
                   {f}
                 </span>
               ))}
@@ -165,7 +165,7 @@ const STEPS: WalkStep[] = [
                 <span className="font-code text-foreground">{v}</span>
               </div>
             ))}
-            <span className="mt-1 rounded-lg bg-accent px-3 py-2 text-center text-[13px] font-semibold text-background">Export late-night-riff.mp3</span>
+            <span className="mt-1 rounded-md bg-accent px-3 py-2 text-center text-[13px] font-semibold text-on-accent">Export late-night-riff.mp3</span>
           </Well>
         }
         tips={["Exports render exactly what you hear.", "MIDI exports from a track or clip's menu, as a .mid file."]}
@@ -217,7 +217,7 @@ const FIXES: [string, string][] = [
 export default function HowItWorksPage() {
   return (
     <>
-      <PageIntro eyebrow="How it works" title="Idea to demo before the idea fades." lead="Five steps from an empty tab to an MP3 you can send. Most people get there in about ten minutes.">
+      <PageIntro title="Idea to demo before the idea fades." lead="Five steps from an empty tab to an MP3 you can send. Most people get there in about ten minutes.">
         <JumpLinks
           label="On this page"
           links={[
@@ -247,7 +247,8 @@ export default function HowItWorksPage() {
 
       <section id="latency" aria-labelledby="lat-h" className="scroll-mt-6 pt-[104px]">
         <Container>
-          <div className="flex flex-col gap-7 rounded-[18px] border border-border bg-surface p-[clamp(24px,4vw,44px)]">
+          <div className="faceplate relative flex flex-col gap-7 rounded-lg border border-border-strong p-[clamp(28px,4vw,52px)]">
+            <Screws />
             <div className="flex max-w-[720px] flex-col gap-3.5">
               <Eyebrow>Latency, simply</Eyebrow>
               <h2 id="lat-h" className={`${h2Class} text-[clamp(28px,3vw,38px)]`}>
@@ -259,14 +260,19 @@ export default function HowItWorksPage() {
               </p>
             </div>
             <LatencyBar />
-            <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3">
+            <ul className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-x-8 gap-y-5 border-t border-black/50 pt-6">
               {LATENCY_TIPS.map(([title, text]) => (
-                <div key={title} className="flex flex-col gap-1.5 rounded-xl border border-border bg-background p-4">
-                  <strong className="text-[15px] font-semibold text-foreground">{title}</strong>
-                  <span className="text-[14.5px] leading-normal text-soft">{text}</span>
-                </div>
+                <li key={title} className="flex items-start gap-2.5">
+                  <span className="pt-0.5">
+                    <CheckIcon size={16} />
+                  </span>
+                  <span className="flex flex-col gap-1">
+                    <strong className="text-[16px] font-semibold text-foreground">{title}</strong>
+                    <span className="text-[15px] leading-normal text-soft">{text}</span>
+                  </span>
+                </li>
               ))}
-            </div>
+            </ul>
           </div>
         </Container>
       </section>
@@ -274,25 +280,25 @@ export default function HowItWorksPage() {
       <section id="troubleshooting" aria-labelledby="tr-h" className="scroll-mt-6 pt-[104px]">
         <Container className="flex flex-col gap-7">
           <SectionHead id="tr-h" eyebrow="Troubleshooting" title="Something not right?" lead="Still stuck? Ask in #help on the Discord and include your browser and audio interface." />
-          <div className="overflow-x-auto rounded-xl border border-border">
+          <div className="faceplate overflow-x-auto rounded-lg border border-border-strong">
             <table className="w-full min-w-[560px] border-collapse text-left">
               <thead>
-                <tr className="border-b border-border">
-                  <th scope="col" className="px-4 py-3 text-[11px] font-semibold tracking-[1.6px] text-muted">
-                    PROBLEM
+                <tr className="border-b border-black/50">
+                  <th scope="col" className="px-5 py-3.5 text-[14px] font-semibold text-muted">
+                    Problem
                   </th>
-                  <th scope="col" className="px-4 py-3 text-[11px] font-semibold tracking-[1.6px] text-muted">
-                    TRY THIS
+                  <th scope="col" className="px-5 py-3.5 text-[14px] font-semibold text-muted">
+                    Try this
                   </th>
                 </tr>
               </thead>
               <tbody>
                 {FIXES.map(([problem, fix]) => (
-                  <tr key={problem} className="border-b border-border last:border-b-0">
-                    <th scope="row" className="w-[28%] px-4 py-4 align-top text-[16px] font-semibold text-foreground">
+                  <tr key={problem} className="border-b border-black/40 last:border-b-0">
+                    <th scope="row" className="w-[28%] px-5 py-4 align-top font-display text-[18px] font-bold text-foreground">
                       {problem}
                     </th>
-                    <td className="px-4 py-4 text-[15px] leading-normal text-soft">{fix}</td>
+                    <td className="px-5 py-4 text-[16px] leading-normal text-soft">{fix}</td>
                   </tr>
                 ))}
               </tbody>

@@ -4,10 +4,10 @@
 // HTML from the start (closed answers are hidden, not missing), so it reads
 // fine before scripts load and search engines see it all.
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { FAQ_CATEGORIES, FAQS, type Faq } from "@/content/faq";
 import { APP_PATH, supportLink } from "./siteLinks";
-import { CheckIcon, Screw } from "./ui";
+import { CheckIcon, Screw, Screws } from "./ui";
 
 function PlusIcon({ open }: { open: boolean }) {
   return (
@@ -222,11 +222,24 @@ export interface WalkStep {
 
 export function Walkthrough({ steps }: { steps: WalkStep[] }) {
   const [step, setStep] = useState(0);
+  const screenRef = useRef<HTMLDivElement>(null);
   const last = steps.length - 1;
   const current = steps[step];
+  // On a phone the screen is below the buttons: a step chosen there brings
+  // the screen into view.
+  const choose = (i: number) => {
+    setStep(i);
+    if (window.matchMedia("(max-width: 1023px)").matches) {
+      const smooth = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      screenRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "start" });
+    }
+  };
+  // One device: its step buttons, each with a lamp (lit on the step shown,
+  // dimmer on the ones done), and a screen with the step on it.
   return (
-    <div className="flex flex-wrap items-start gap-6">
-      <ol className="flex max-w-[340px] flex-[1_1_260px] flex-col gap-2">
+    <div className="faceplate relative grid gap-5 rounded-lg border border-border-strong p-[clamp(14px,2.5vw,28px)] pt-[clamp(26px,3vw,36px)] lg:grid-cols-[300px_minmax(0,1fr)]">
+      <Screws />
+      <ol className="flex flex-col gap-2">
         {steps.map((s, i) => {
           const on = i === step;
           const done = i < step;
@@ -235,12 +248,14 @@ export function Walkthrough({ steps }: { steps: WalkStep[] }) {
               <button
                 type="button"
                 aria-current={on ? "step" : undefined}
-                onClick={() => setStep(i)}
-                className={`flex min-h-[60px] w-full items-center gap-3.5 rounded-xl border px-3.5 py-2.5 text-left ${on ? "border-accent bg-glow" : "border-border bg-surface hover:border-border-strong"}`}
+                onClick={() => choose(i)}
+                className={`flex min-h-[60px] w-full cursor-pointer items-center gap-3.5 rounded-md border px-3.5 py-2.5 text-left transition-colors active:translate-y-px ${on ? "border-accent bg-[#2c2721]" : "border-black/50 bg-[#1f1e23] hover:border-border-strong"}`}
               >
-                <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full font-code text-[12px] ${on || done ? "bg-accent text-background" : "bg-surface-raised text-soft"}`}>
-                  {String(i + 1).padStart(2, "0")}
-                </span>
+                <span
+                  aria-hidden="true"
+                  className={`size-2.5 shrink-0 rounded-full ${on ? "bg-[#ffd08a] shadow-[0_0_10px_2px_rgba(255,176,77,0.75)]" : done ? "bg-[#a77a3c]" : "bg-[#3b2f20] shadow-[inset_0_1px_1px_rgba(0,0,0,0.6)]"}`}
+                />
+                <span className="w-4 shrink-0 font-display text-[18px] font-bold text-muted">{i + 1}</span>
                 <span className="flex flex-col">
                   <span className="text-[16px] font-semibold text-foreground">{s.title}</span>
                   <span className="text-[13px] text-muted">{s.time}</span>
@@ -250,23 +265,27 @@ export function Walkthrough({ steps }: { steps: WalkStep[] }) {
           );
         })}
       </ol>
-      <div className="flex min-w-0 flex-[2_1_480px] flex-col gap-5 rounded-2xl border border-border bg-surface p-[clamp(20px,3vw,32px)]" aria-live="polite">
-        <div className="flex items-baseline gap-3">
-          <span className="font-code text-[13px] text-accent">{String(step + 1).padStart(2, "0")}</span>
-          <h3 className="font-display text-[clamp(24px,2.6vw,30px)] font-semibold text-foreground">{current.title}</h3>
-        </div>
+      <div ref={screenRef} className="flex min-w-0 scroll-mt-4 flex-col gap-5 rounded-md border border-black/70 bg-[#141316] p-[clamp(18px,3vw,32px)] shadow-[inset_0_2px_12px_rgba(0,0,0,0.7)]" aria-live="polite">
+        <h3 className="flex items-baseline gap-3 font-display text-[clamp(24px,2.6vw,30px)] font-bold text-foreground">
+          <span className="text-accent">{step + 1}</span>
+          {current.title}
+        </h3>
         {current.body}
         <div className="flex flex-wrap justify-between gap-2.5 pt-1">
           <button
             type="button"
             onClick={() => setStep(Math.max(0, step - 1))}
             disabled={step === 0}
-            className="min-h-11 rounded-[10px] border border-border px-4 text-[15px] font-medium text-foreground hover:border-border-strong disabled:opacity-45"
+            className="faceplate min-h-11 cursor-pointer rounded-md border border-border-strong px-4 text-[15px] font-medium text-foreground hover:border-metal-hi active:translate-y-px disabled:cursor-default disabled:opacity-45"
           >
-            ← Previous
+            Previous
           </button>
-          <button type="button" onClick={() => setStep(step >= last ? 0 : step + 1)} className="min-h-11 rounded-[10px] bg-accent px-4 text-[15px] font-semibold text-background hover:bg-accent-strong">
-            {step >= last ? "Start over" : `Next: ${steps[step + 1].title} →`}
+          <button
+            type="button"
+            onClick={() => setStep(step >= last ? 0 : step + 1)}
+            className="min-h-11 cursor-pointer rounded-md bg-accent px-4 text-[15px] font-semibold text-on-accent shadow-[inset_0_1px_0_rgba(255,255,255,0.45),inset_0_-2px_0_rgba(0,0,0,0.22),0_2px_0_rgba(0,0,0,0.5)] hover:bg-accent-strong active:translate-y-px"
+          >
+            {step >= last ? "Start over" : `Next: ${steps[step + 1].title}`}
           </button>
         </div>
       </div>
@@ -286,7 +305,7 @@ export function SetupGuides({ guides }: { guides: { id: string; label: string; s
   const guide = guides.find((g) => g.id === id) ?? guides[0];
   return (
     <>
-      <div role="group" aria-label="Choose a guide" className="flex self-start rounded-xl border border-border bg-surface p-1">
+      <div role="group" aria-label="Choose a guide" className="flex self-start rounded-md border border-black/60 bg-[#121114] p-1 shadow-[inset_0_1px_4px_rgba(0,0,0,0.7)]">
         {guides.map((g) => {
           const on = g.id === id;
           return (
@@ -295,19 +314,19 @@ export function SetupGuides({ guides }: { guides: { id: string; label: string; s
               type="button"
               aria-pressed={on}
               onClick={() => setId(g.id)}
-              className={`min-h-10 rounded-lg px-4 text-[15px] font-semibold ${on ? "bg-accent text-background" : "text-soft hover:text-foreground"}`}
+              className={`min-h-10 cursor-pointer rounded px-4 text-[15px] font-semibold transition-colors ${on ? "bg-accent text-on-accent shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_1px_0_rgba(0,0,0,0.5)]" : "text-soft hover:text-foreground"}`}
             >
               {g.label}
             </button>
           );
         })}
       </div>
-      <ol className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-3">
+      <ol className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-x-10 border-t border-border">
         {guide.steps.map((s, i) => (
-          <li key={s.title} className="flex gap-3.5 rounded-xl border border-border bg-surface px-[18px] py-[18px]">
-            <span className="pt-[3px] font-code text-[12px] text-accent">{String(i + 1).padStart(2, "0")}</span>
+          <li key={s.title} className="flex gap-4 border-b border-border py-5">
+            <span className="w-5 shrink-0 font-display text-[22px] font-bold leading-none text-accent">{i + 1}</span>
             <span className="flex flex-col gap-1.5">
-              <span className="text-[16px] font-semibold text-foreground">{s.title}</span>
+              <span className="text-[17px] font-semibold text-foreground">{s.title}</span>
               <span className="text-[15px] leading-normal text-soft">{s.text}</span>
             </span>
           </li>

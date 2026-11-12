@@ -48,6 +48,19 @@ test("on a phone, the pages are behind the Menu button, which closes on a new pa
   }
 });
 
+test("the walkthrough's steps show on its screen, which comes into view on a phone", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/how-it-works");
+  const steps = page.locator("#walkthrough ol");
+  await steps.getByRole("button", { name: /Mix and export/ }).click();
+  await expect(steps.getByRole("button", { name: /Mix and export/ })).toHaveAttribute("aria-current", "step");
+  const heading = page.locator("#walkthrough h3");
+  await expect(heading).toHaveText(/Mix and export/);
+  await expect(heading).toBeInViewport();
+  await page.getByRole("button", { name: "Start over" }).click();
+  await expect(heading).toHaveText(/Pick a template/);
+});
+
 test("no page links to or mentions GitHub: feedback goes to the Discord", async ({ page }) => {
   for (const path of PAGES) {
     await page.goto(path);
