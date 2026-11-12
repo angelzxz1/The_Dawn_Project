@@ -28,7 +28,7 @@ export function ChainChips({ items, hot = [] }: { items: string[]; hot?: string[
 
 /** The well a drawing sits in on a card. */
 export function Well({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <div className={`overflow-hidden rounded-[14px] border border-border bg-background p-5 ${className}`}>{children}</div>;
+  return <div className={`overflow-hidden rounded-lg border border-black/60 bg-[#141316] p-5 shadow-[inset_0_2px_10px_rgba(0,0,0,0.6)] ${className}`}>{children}</div>;
 }
 
 /** A parametric EQ curve with three band handles. */

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { AlignedTake, ChainChips, DeviceCard, ExportList, FileTree, PianoRoll, Routing, StatusChips, Well } from "@/site/illustrations";
 import { EffectsGrid, type EffectInfo } from "@/site/interactive";
-import { CheckList, Container, CtaBand, JumpLinks, PageIntro, SectionHead, secondaryButton } from "@/site/ui";
+import { CheckList, Container, CtaBand, JumpLinks, PageIntro, Screws, SectionHead, secondaryButton } from "@/site/ui";
 import { EFFECT_COUNT, EFFECT_GROUPS, EFFECT_LABELS, type EffectType } from "@/effects/registry";
 import Link from "next/link";
 
@@ -91,7 +91,6 @@ export default function FeaturesPage() {
   return (
     <>
       <PageIntro
-        eyebrow="Features"
         title="A real studio, in the tab you already have open."
         lead={`Recording, guitar amps, ${EFFECT_COUNT} effects, sidechain, buses, automation, three instruments and honest exports. Here is everything Dawn does today.`}
       >
@@ -205,7 +204,7 @@ export default function FeaturesPage() {
               {["Grand piano", "Drum kit", "Wavetable synth"].map((name) => (
                 <span
                   key={name}
-                  className={`rounded-lg border px-3 py-1.5 text-[13px] font-semibold ${name === "Wavetable synth" ? "border-accent bg-accent text-background" : "border-border-strong bg-surface text-foreground"}`}
+                  className={`rounded-md border px-3 py-1.5 text-[13px] font-semibold ${name === "Wavetable synth" ? "border-accent bg-accent text-on-accent" : "border-border-strong bg-surface text-foreground"}`}
                 >
                   {name}
                 </span>
@@ -250,14 +249,17 @@ export default function FeaturesPage() {
       <section id="hood" aria-labelledby="hood-h" className="scroll-mt-6 pt-[104px]">
         <Container className="flex flex-col gap-8">
           <SectionHead id="hood-h" eyebrow="Under the hood" title="Built like a real audio engine." lead="For the curious: what makes Dawn sound right and stay in time in a browser tab." />
-          <div className="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-px overflow-hidden rounded-2xl border border-border bg-border">
-            {HOOD.map(([title, text], i) => (
-              <div key={title} className="flex flex-col gap-2 bg-background p-6">
-                <span className="font-code text-[12px] text-accent">{String(i + 1).padStart(2, "0")}</span>
-                <h3 className="font-display text-[20px] font-semibold text-foreground">{title}</h3>
-                <p className="text-[15px] leading-normal text-soft">{text}</p>
-              </div>
-            ))}
+          {/* The back of the amp: what's inside, in a grid of plates. */}
+          <div className="faceplate relative rounded-lg border border-border-strong p-[clamp(16px,2.5vw,28px)]">
+            <Screws />
+            <ul className="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-px overflow-hidden rounded-md bg-black/50">
+              {HOOD.map(([title, text]) => (
+                <li key={title} className="flex flex-col gap-2 bg-[#1f1e23] p-6">
+                  <h3 className="font-display text-[21px] font-bold text-foreground">{title}</h3>
+                  <p className="text-[15px] leading-normal text-soft">{text}</p>
+                </li>
+              ))}
+            </ul>
           </div>
         </Container>
       </section>
@@ -270,12 +272,11 @@ export default function FeaturesPage() {
               Vote as a supporter
             </Link>
           </div>
-          <ul className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-3">
+          <ul className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-x-8 border-t border-border">
             {NEXT.map(([title, text]) => (
-              <li key={title} className="flex flex-col gap-1.5 rounded-xl border border-border bg-surface px-[18px] py-4">
-                <span className="font-code text-[10px] tracking-[1px] text-accent">PLANNED</span>
-                <span className="text-[16px] font-semibold text-foreground">{title}</span>
-                <span className="text-[14.5px] text-soft">{text}</span>
+              <li key={title} className="flex flex-col gap-1 border-b border-border py-4">
+                <span className="font-display text-[19px] font-bold text-foreground">{title}</span>
+                <span className="text-[15px] text-soft">{text}</span>
               </li>
             ))}
           </ul>

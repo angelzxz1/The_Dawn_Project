@@ -87,8 +87,13 @@ committed.
     a pilot lamp and beveled buttons in `src/site/ui.tsx`; no all-caps
     labels or arrows on links), the header with a phone menu, the footer
     and the home page (the hero as an amp, a spec plate, the features as a
-    signal chain, the steps as pedals). Next: features, how it works,
-    guides, FAQ, support, the legal pages and the not-found page.
+    signal chain, the steps as pedals). The logo's stripes made real gaps
+    (`sunBands`, 2026-11-12, `6c887be`). Step 2 (2026-11-12, commit to
+    come): the Features page (the effects as units in a rack, with a blank
+    vented panel for an odd slot; hardware filter buttons with a lamp; the
+    illustrations' `Well` as an inset screen; no numbers or PLANNED tags;
+    `PageIntro`'s eyebrow optional). Next: how it works, guides, FAQ,
+    support, the legal pages and the not-found page.
 - **Next listed: step 35, native file dialogs.** Wait for the user to say "go"
   before starting a step: they ask for each one ("Lets go with step N").
 - **What's left after that,** in order (the full list, with sizes, is in

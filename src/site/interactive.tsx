@@ -7,7 +7,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { FAQ_CATEGORIES, FAQS, type Faq } from "@/content/faq";
 import { APP_PATH, supportLink } from "./siteLinks";
-import { CheckIcon } from "./ui";
+import { CheckIcon, Screw } from "./ui";
 
 function PlusIcon({ open }: { open: boolean }) {
   return (
@@ -141,6 +141,17 @@ export interface EffectInfo {
   description: string;
 }
 
+/** A rack unit's ear: the strip at each end, screwed to the rails. */
+function RackEar() {
+  return (
+    <span aria-hidden="true" className="flex w-7 shrink-0 flex-col items-center justify-between bg-[linear-gradient(90deg,#1b1a1f,#26252b,#1b1a1f)] py-2.5">
+      <Screw />
+      <Screw className="rotate-45" />
+    </span>
+  );
+}
+
+/** The effects, as units in a rack, with buttons to show one kind. */
 export function EffectsGrid({ categories, effects }: { categories: string[]; effects: EffectInfo[] }) {
   const [category, setCategory] = useState("All");
   const shown = effects.filter((e) => category === "All" || e.category === category);
@@ -155,24 +166,47 @@ export function EffectsGrid({ categories, effects }: { categories: string[]; eff
               type="button"
               aria-pressed={on}
               onClick={() => setCategory(c)}
-              className={`flex min-h-11 items-center gap-2 rounded-full border px-4 text-[15px] font-semibold ${on ? "border-accent bg-accent text-background" : "border-border bg-surface text-foreground hover:border-border-strong"}`}
+              className={`faceplate flex min-h-11 cursor-pointer items-center gap-2.5 rounded-md border px-4 text-[15px] font-semibold transition-colors active:translate-y-px ${on ? "border-accent text-foreground" : "border-border-strong text-soft hover:text-foreground"}`}
             >
+              <span
+                aria-hidden="true"
+                className={`size-2 rounded-full ${on ? "bg-[#ffd08a] shadow-[0_0_8px_2px_rgba(255,176,77,0.7)]" : "bg-[#3b2f20] shadow-[inset_0_1px_1px_rgba(0,0,0,0.6)]"}`}
+              />
               {c}
-              <span className={`font-code text-[12px] ${on ? "text-background/70" : "text-muted"}`}>
-                {c === "All" ? effects.length : effects.filter((e) => e.category === c).length}
-              </span>
+              <span className="text-[13px] font-medium tabular-nums text-muted">{c === "All" ? effects.length : effects.filter((e) => e.category === c).length}</span>
             </button>
           );
         })}
       </div>
-      <ul className="grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-3.5">
+      <ul
+        className="grid gap-2 rounded-lg border border-black/70 bg-[#0e0d10] p-2 shadow-[inset_0_2px_14px_rgba(0,0,0,0.8)] sm:p-3 lg:grid-cols-2"
+      >
         {shown.map((e) => (
-          <li key={e.name} className="flex flex-col gap-1.5 rounded-xl border border-border bg-surface px-[18px] py-4">
-            <span className="font-code text-[10px] uppercase tracking-[1px] text-accent">{e.category}</span>
-            <h3 className="font-display text-[19px] font-semibold text-foreground">{e.name}</h3>
-            <p className="text-[14.5px] leading-normal text-soft">{e.description}</p>
+          <li key={e.name} className="faceplate flex min-h-[84px] overflow-hidden rounded-[3px] border border-black/60">
+            <RackEar />
+            <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 border-x border-black/40 px-4 py-3">
+              <div className="flex flex-col gap-x-3 gap-y-0.5 sm:flex-row sm:items-baseline sm:justify-between">
+                <h3 className="font-display text-[20px] font-bold leading-tight text-foreground">{e.name}</h3>
+                <span className="text-[13px] text-muted">{e.category}</span>
+              </div>
+              <p className="text-[15px] leading-snug text-soft">{e.description}</p>
+            </div>
+            <RackEar />
           </li>
         ))}
+        {/* An odd number leaves a slot in the two-column rack: a blank
+            panel fills it, vented, as in a real one. */}
+        {shown.length % 2 === 1 && (
+          <li aria-hidden="true" className="faceplate hidden min-h-[84px] overflow-hidden rounded-[3px] border border-black/60 lg:flex">
+            <RackEar />
+            <span className="flex flex-1 items-center justify-center gap-2 border-x border-black/40 px-6">
+              {Array.from({ length: 9 }, (_, i) => (
+                <span key={i} className="h-8 w-1.5 rounded-full bg-[#0e0d10] shadow-[inset_0_1px_2px_rgba(0,0,0,0.9),0_1px_0_rgba(255,255,255,0.05)]" />
+              ))}
+            </span>
+            <RackEar />
+          </li>
+        )}
       </ul>
     </>
   );

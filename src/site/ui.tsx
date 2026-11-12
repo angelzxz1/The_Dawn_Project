@@ -183,10 +183,10 @@ export function Logo() {
 }
 
 /** A page's opening: eyebrow, big heading, lead and optional extras. */
-export function PageIntro({ eyebrow, title, lead, children }: { eyebrow: string; title: string; lead: ReactNode; children?: ReactNode }) {
+export function PageIntro({ eyebrow, title, lead, children }: { eyebrow?: string; title: string; lead: ReactNode; children?: ReactNode }) {
   return (
     <Container className="flex flex-col gap-[22px] pt-[clamp(40px,6vw,80px)]">
-      <Eyebrow>{eyebrow}</Eyebrow>
+      {eyebrow && <Eyebrow>{eyebrow}</Eyebrow>}
       <h1 className={`${h1Class} max-w-[940px]`}>{title}</h1>
       <p className={`${leadClass} max-w-[680px] text-[clamp(17px,1.6vw,20px)]`}>{lead}</p>
       {children}
