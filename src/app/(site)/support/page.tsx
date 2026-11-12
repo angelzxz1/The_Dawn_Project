@@ -3,7 +3,7 @@ import Link from "next/link";
 import { PERKS, TIERS } from "@/content/tiers";
 import { PackCover } from "@/site/illustrations";
 import { Tiers } from "@/site/interactive";
-import { CheckIcon, Container, CtaBand, Eyebrow, PageIntro, SectionHead, h2Class, leadClass, primaryButton, secondaryButton } from "@/site/ui";
+import { CheckIcon, Container, CtaBand, PageIntro, Screws, SectionHead, h2Class, leadClass, primaryButton, secondaryButton } from "@/site/ui";
 import { supportLink } from "@/site/siteLinks";
 import { contactEmail, membershipPlatforms } from "@/services/support";
 
@@ -45,7 +45,7 @@ export default function SupportPage() {
 
   return (
     <>
-      <PageIntro eyebrow="Support" title="Keep Dawn free for everyone." lead="Dawn has no ads and no paywalls. It's made by one developer and kept going by the people who use it.">
+      <PageIntro title="Keep Dawn free for everyone." lead="Dawn has no ads and no paywalls. It's made by one developer and kept going by the people who use it.">
         <div className="flex flex-wrap gap-3 pt-1">
           <a href="#tiers" className={primaryButton}>
             See memberships
@@ -60,9 +60,9 @@ export default function SupportPage() {
 
       <section aria-labelledby="why-h" className="pt-[96px]">
         <Container>
-          <div className="grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-10 rounded-[18px] border border-border bg-surface p-[clamp(24px,4vw,44px)]">
+          <div className="faceplate relative grid gap-10 rounded-lg border border-border-strong p-[clamp(28px,4vw,48px)] lg:grid-cols-[1.2fr_1fr]">
+            <Screws />
             <div className="flex flex-col gap-3.5">
-              <Eyebrow>Why support</Eyebrow>
               <h2 id="why-h" className={`${h2Class} text-[clamp(28px,3vw,38px)]`}>
                 One developer, no ads, no paywalls.
               </h2>
@@ -72,17 +72,17 @@ export default function SupportPage() {
               </p>
               <p className={leadClass}>Every quarter I&rsquo;ll share how Dawn is doing: users, supporters and what the money paid for.</p>
             </div>
-            <ul className="flex flex-col gap-3 self-center">
-              {WHERE_IT_GOES.map(([title, text], i) => (
-                <li key={title} className="flex gap-3.5 rounded-xl border border-border bg-background p-4">
-                  <span className="pt-0.5 font-code text-[12px] text-accent">{String(i + 1).padStart(2, "0")}</span>
-                  <span className="flex flex-col gap-1">
+            <div className="flex flex-col gap-3 self-center">
+              <h3 className="text-[15px] font-semibold text-foreground">Where the money goes</h3>
+              <ul className="flex flex-col divide-y divide-black/40 rounded-md border border-black/60 bg-[#141316] shadow-[inset_0_2px_8px_rgba(0,0,0,0.6)]">
+                {WHERE_IT_GOES.map(([title, text]) => (
+                  <li key={title} className="flex flex-col gap-1 px-5 py-4">
                     <span className="text-[16px] font-semibold text-foreground">{title}</span>
-                    <span className="text-[15px] text-soft">{text}</span>
-                  </span>
-                </li>
-              ))}
-            </ul>
+                    <span className="text-[15px] leading-normal text-soft">{text}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         </Container>
       </section>
@@ -92,13 +92,13 @@ export default function SupportPage() {
           <SectionHead id="tiers-h" eyebrow="Memberships" title="Pick what feels right." />
           <Tiers tiers={TIERS} variant="billing" />
           <p className="text-[14px] text-muted">Memberships run on {membershipPlatforms().join(" and ")}. Cancel any time. Prices in USD; taxes may apply.</p>
-          <div className="overflow-x-auto rounded-xl border border-border">
+          <div className="faceplate overflow-x-auto rounded-lg border border-border-strong">
             <table className="w-full min-w-[640px] border-collapse text-left">
-              <caption className="px-4 pt-4 text-left font-display text-[20px] font-semibold text-foreground">Compare tiers</caption>
+              <caption className="px-5 pt-5 text-left font-display text-[22px] font-bold text-foreground">Compare tiers</caption>
               <thead>
-                <tr className="border-b border-border">
-                  <th scope="col" className="px-4 py-3 text-[11px] font-semibold tracking-[1.6px] text-muted">
-                    PERK
+                <tr className="border-b border-black/50">
+                  <th scope="col" className="px-5 py-3 text-[13px] font-semibold text-muted">
+                    Perk
                   </th>
                   {TIERS.map((t) => (
                     <th key={t.name} scope="col" className={`px-3 py-3 text-center text-[13px] font-semibold ${t.name === "Studio" ? "text-accent" : "text-soft"}`}>
@@ -109,8 +109,8 @@ export default function SupportPage() {
               </thead>
               <tbody>
                 {PERKS.map(([perk, from]) => (
-                  <tr key={perk} className="border-b border-border last:border-b-0">
-                    <th scope="row" className="px-4 py-3 text-[15px] font-normal text-foreground">
+                  <tr key={perk} className="border-b border-black/40 last:border-b-0">
+                    <th scope="row" className="px-5 py-3 text-[15px] font-normal text-foreground">
                       {perk}
                     </th>
                     {TIERS.map((t, i) => (
@@ -144,10 +144,10 @@ export default function SupportPage() {
           />
           <ul className="grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-3">
             {PACKS.map(([name, text], i) => (
-              <li key={name} className="flex flex-col overflow-hidden rounded-xl border border-border bg-surface">
+              <li key={name} className="faceplate flex flex-col overflow-hidden rounded-lg border border-border-strong">
                 <PackCover n={i + 1} />
-                <div className="flex flex-col gap-1.5 px-[18px] py-4">
-                  <h3 className="font-display text-[19px] font-semibold text-foreground">{name}</h3>
+                <div className="flex flex-col gap-1.5 px-5 py-4">
+                  <h3 className="font-display text-[20px] font-bold text-foreground">{name}</h3>
                   <p className="text-[14px] leading-normal text-soft">{text}</p>
                 </div>
               </li>
@@ -166,14 +166,12 @@ export default function SupportPage() {
             {ways.map((w) => {
               const inner = (
                 <>
-                  <span className="font-code text-[10.5px] uppercase tracking-[1px] text-muted">{w.label}</span>
-                  <span className="text-[17px] font-semibold text-foreground">
-                    {w.title} <span className="text-accent">→</span>
-                  </span>
+                  <span className="text-[13px] text-muted">{w.label}</span>
+                  <span className="text-[17px] font-semibold text-foreground underline decoration-accent/0 decoration-2 underline-offset-4 transition-colors group-hover:decoration-accent">{w.title}</span>
                   <span className="text-[15px] leading-normal text-soft">{w.text}</span>
                 </>
               );
-              const className = "flex flex-col gap-2 rounded-xl border border-border bg-surface p-5 no-underline hover:border-accent";
+              const className = "faceplate group flex flex-col gap-2 rounded-lg border border-border-strong p-5 no-underline hover:border-accent";
               return w.external ? (
                 <a key={w.title} href={w.href} {...(w.href.startsWith("mailto:") ? {} : { target: "_blank", rel: "noreferrer" })} className={className}>
                   {inner}
@@ -190,7 +188,8 @@ export default function SupportPage() {
 
       <section aria-labelledby="sfaq-h" className="pt-[88px]">
         <Container>
-          <div className="flex flex-wrap items-center justify-between gap-5 rounded-[18px] border border-border bg-surface p-[clamp(24px,4vw,40px)]">
+          <div className="faceplate relative flex flex-wrap items-center justify-between gap-5 rounded-lg border border-border-strong p-[clamp(28px,4vw,48px)]">
+            <Screws />
             <div className="flex max-w-[620px] flex-col gap-2">
               <h2 id="sfaq-h" className={`${h2Class} text-[clamp(26px,2.8vw,34px)]`}>
                 Questions about supporting?

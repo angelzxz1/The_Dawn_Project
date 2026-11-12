@@ -284,11 +284,11 @@ const PACK_SUN = sunBands(150, 74, 60, [
 /** A monthly pack's cover: the dawn, a little lower each month. */
 export function PackCover({ n }: { n: number }) {
   return (
-    <div className="relative h-[74px] overflow-hidden border-b border-border bg-background">
-      <svg width="100%" height="74" viewBox="0 0 300 74" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
-        <path d={PACK_SUN} className="fill-accent" opacity={0.95 - (n - 1) * 0.1} />
+    <div className="grille relative h-[120px] overflow-hidden border-b border-black/60">
+      <svg width="100%" height="120" viewBox="0 0 300 120" preserveAspectRatio="xMidYMax slice" aria-hidden="true" className="absolute inset-x-0 bottom-0" style={{ transform: `translateY(${(n - 1) * 6}px)` }}>
+        <path d={PACK_SUN} className="fill-accent" transform="translate(0 46)" />
       </svg>
-      <span className={`${mono} absolute left-3 top-2.5 text-[10px] tracking-[1px] text-soft`}>PACK {String(n).padStart(2, "0")}</span>
+      <span className="absolute left-4 top-3 font-display text-[16px] font-bold text-foreground">Pack {n}</span>
     </div>
   );
 }

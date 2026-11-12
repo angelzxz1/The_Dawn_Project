@@ -7,7 +7,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { FAQ_CATEGORIES, FAQS, type Faq } from "@/content/faq";
 import { APP_PATH, supportLink } from "./siteLinks";
-import { CheckIcon, Screw, Screws } from "./ui";
+import { CheckIcon, Screw, Screws, primaryButton, secondaryButton } from "./ui";
 
 function PlusIcon({ open }: { open: boolean }) {
   return (
@@ -362,10 +362,8 @@ function TierButton({ tier, highlight }: { tier: Tier; highlight: boolean }) {
   const page = supportLink("patreon");
   // A tier's own link only once Patreon is set up for this deployment.
   const href = page && tier.join && /^https:\/\/(www\.)?patreon\.com\//.test(tier.join) ? tier.join : page;
-  const className = `mt-auto flex min-h-12 items-center justify-center rounded-[10px] border text-[15px] font-semibold no-underline ${
-    highlight ? "border-accent bg-accent text-background hover:bg-accent-strong" : "border-border bg-background text-foreground hover:border-border-strong"
-  }`;
-  if (!href) return <span className={`${className} cursor-default opacity-60`}>Memberships open soon</span>;
+  const className = `${highlight ? primaryButton : secondaryButton} mt-auto w-full`;
+  if (!href) return <span className="mt-auto flex min-h-12 w-full items-center justify-center rounded-md border border-dashed border-border-strong text-[15px] text-muted">Memberships open soon</span>;
   return (
     <a href={href} target="_blank" rel="noreferrer" className={className}>
       {tier.cta}
@@ -381,16 +379,16 @@ export function Tiers({ tiers, variant }: { tiers: Tier[]; variant: "perks" | "b
   return (
     <div className="flex flex-col gap-5">
       {variant === "billing" && (
-        <div role="group" aria-label="Billing period" className="flex self-start rounded-xl border border-border bg-surface p-1">
+        <div role="group" aria-label="Billing period" className="flex self-start rounded-md border border-black/60 bg-[#121114] p-1 shadow-[inset_0_1px_4px_rgba(0,0,0,0.7)]">
           {[false, true].map((y) => (
             <button
               key={String(y)}
               type="button"
               aria-pressed={yearly === y}
               onClick={() => setYearly(y)}
-              className={`min-h-10 rounded-lg px-4 text-[15px] font-semibold ${yearly === y ? "bg-accent text-background" : "text-soft hover:text-foreground"}`}
+              className={`min-h-10 cursor-pointer rounded px-4 text-[15px] font-semibold transition-colors ${yearly === y ? "bg-accent text-on-accent shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_1px_0_rgba(0,0,0,0.5)]" : "text-soft hover:text-foreground"}`}
             >
-              {y ? "Yearly · save 15%" : "Monthly"}
+              {y ? "Yearly, save 15%" : "Monthly"}
             </button>
           ))}
         </div>
@@ -402,13 +400,23 @@ export function Tiers({ tiers, variant }: { tiers: Tier[]; variant: "perks" | "b
           const price = t.price === 0 ? "Free" : `$${variant === "billing" && yearly ? year : t.price}`;
           const per = t.price === 0 ? "" : variant === "billing" && yearly ? "/year" : "/month";
           return (
-            <article key={t.name} className={`flex flex-col gap-4 rounded-2xl border p-6 ${highlight ? "border-accent bg-glow" : "border-border bg-surface"}`}>
+            <article
+              key={t.name}
+              className={`faceplate relative flex flex-col gap-4 rounded-lg border px-6 pb-6 pt-7 ${highlight ? "border-accent shadow-[0_0_40px_-14px_rgba(230,173,94,0.6)]" : "border-border-strong"}`}
+            >
+              <Screws />
               <div className="flex items-center justify-between gap-2">
-                <h3 className={`text-[14px] font-semibold uppercase tracking-[1.6px] ${highlight ? "text-accent" : "text-soft"}`}>{t.name}</h3>
-                {highlight && <span className="rounded-full bg-accent px-2 py-0.5 text-[10.5px] font-bold tracking-[1px] text-background">BEST VALUE</span>}
+                <h3 className="flex items-center gap-2.5 font-display text-[22px] font-bold text-foreground">
+                  <span
+                    aria-hidden="true"
+                    className={`size-2 shrink-0 rounded-full ${highlight ? "bg-[#ffd08a] shadow-[0_0_8px_2px_rgba(255,176,77,0.7)]" : "bg-[#3b2f20] shadow-[inset_0_1px_1px_rgba(0,0,0,0.6)]"}`}
+                  />
+                  {t.name}
+                </h3>
+                {highlight && <span className="text-[13px] font-semibold text-accent">Best value</span>}
               </div>
               <div className="flex items-baseline gap-1.5">
-                <span className="font-display text-[38px] font-semibold leading-none text-foreground">{price}</span>
+                <span className="font-display text-[42px] font-bold leading-none tracking-[-0.02em] text-foreground">{price}</span>
                 {per && <span className="text-[14px] text-muted">{per}</span>}
               </div>
               {variant === "billing" && t.price > 0 && yearly && <div className="-mt-2 text-[13px] text-muted">About ${(year / 12).toFixed(2)} a month</div>}

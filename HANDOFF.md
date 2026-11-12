@@ -101,11 +101,17 @@ committed.
     asked for): Guides (each guide on the list as a printed owner's manual,
     cream paper stapled at the spine; in a guide, chapter and step numbers
     in Fraunces, steps as one list, the tips as a note with a lamp, no
-    all-caps labels; `ArrowIcon` removed). Step 5 (2026-11-12, commit to
-    come): the FAQ (the search box as a screen set in a faceplate, its
+    all-caps labels; `ArrowIcon` removed). Step 5 (2026-11-12, `76b0415`;
+    asked for): the FAQ (the search box as a screen set in a faceplate, its
     focus shown on the screen; the categories as lamp buttons, in rows on
     a phone; sentence-case category labels; Still have a question? on a
-    screwed panel). Next: support, the legal pages and the not-found page.
+    screwed panel). Step 6 (2026-11-12, commit to come): Support (the
+    membership cards as screwed panels with a lamp, Studio's lit, sentence
+    case and hardware buttons, also on the home page; the billing switch;
+    Why support, the comparison table, the ways to help and the closing
+    question on panels, without numbers, arrows or all-caps labels; each
+    pack's cover the sun behind a grille, a little lower each month).
+    Next: the legal pages and the not-found page.
 - **Next listed: step 35, native file dialogs.** Wait for the user to say "go"
   before starting a step: they ask for each one ("Lets go with step N").
 - **What's left after that,** in order (the full list, with sizes, is in
