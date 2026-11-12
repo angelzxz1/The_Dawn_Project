@@ -4,6 +4,7 @@
 // sharp and follow the site's colors.
 
 import type { ReactNode } from "react";
+import { sunBands } from "./ui";
 
 const mono = "font-code";
 
@@ -274,15 +275,18 @@ export function LatencyBar() {
   );
 }
 
+const PACK_SUN = sunBands(150, 74, 60, [
+  [34, 3],
+  [50, 4],
+  [64, 5],
+]);
+
 /** A monthly pack's cover: the dawn, a little lower each month. */
 export function PackCover({ n }: { n: number }) {
   return (
     <div className="relative h-[74px] overflow-hidden border-b border-border bg-background">
       <svg width="100%" height="74" viewBox="0 0 300 74" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
-        <path d="M90 74 A60 60 0 0 1 210 74 Z" className="fill-accent" opacity={0.95 - (n - 1) * 0.1} />
-        <rect x="0" y="34" width="300" height="3" className="fill-background" />
-        <rect x="0" y="50" width="300" height="4" className="fill-background" />
-        <rect x="0" y="64" width="300" height="5" className="fill-background" />
+        <path d={PACK_SUN} className="fill-accent" opacity={0.95 - (n - 1) * 0.1} />
       </svg>
       <span className={`${mono} absolute left-3 top-2.5 text-[10px] tracking-[1px] text-soft`}>PACK {String(n).padStart(2, "0")}</span>
     </div>

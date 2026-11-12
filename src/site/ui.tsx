@@ -138,26 +138,44 @@ const STRIPES: [number, number][] = [
   [344.7, 33.1],
 ];
 
-/** The dawn: a half sun whose stripes widen toward the horizon. The stripes
- * are cut in the color of what's behind it (`cut`). */
-export function Sun({ cut = "fill-background", className = "" }: { cut?: string; className?: string }) {
+/** A half sun (center `cx`, horizon `base`, radius `r`) with `stripes`
+ * ([top, height]) left out: the bands between them, as one path. The
+ * stripes are gaps, so whatever is behind the sun shows through them. */
+export function sunBands(cx: number, base: number, r: number, stripes: [number, number][]): string {
+  const half = (y: number) => Math.sqrt(Math.max(0, r * r - (base - y) * (base - y)));
+  const f = (v: number) => Math.round(v * 100) / 100;
+  const edges = [base - r, ...stripes.flat().map((v, i) => (i % 2 ? stripes[(i - 1) / 2][0] + v : v)), base];
+  const bands: string[] = [];
+  for (let i = 0; i < edges.length; i += 2) {
+    const [top, bottom] = [edges[i], edges[i + 1]];
+    const [wt, wb] = [half(top), half(bottom)];
+    bands.push(
+      `M${f(cx - wt)} ${f(top)}H${f(cx + wt)}A${r} ${r} 0 0 1 ${f(cx + wb)} ${f(bottom)}H${f(cx - wb)}A${r} ${r} 0 0 1 ${f(cx - wt)} ${f(top)}Z`,
+    );
+  }
+  return bands.join("");
+}
+
+const SUN_PATH = sunBands(380, 380, 380, STRIPES);
+const LOGO_PATH = sunBands(13, 13, 12, [
+  [5.6, 1.1],
+  [9, 1.5],
+]);
+
+/** The dawn: a half sun whose stripes widen toward the horizon. */
+export function Sun({ className = "" }: { className?: string }) {
   return (
     <svg width="100%" viewBox="0 0 760 380" preserveAspectRatio="xMidYMax meet" aria-hidden="true" className={`block ${className}`}>
-      <path d="M0 380 A380 380 0 0 1 760 380 Z" className="fill-accent" />
-      {STRIPES.map(([y, h]) => (
-        <rect key={y} x="0" y={y} width="760" height={h} className={cut} />
-      ))}
+      <path d={SUN_PATH} className="fill-accent" />
     </svg>
   );
 }
 
-export function Logo({ cut = "fill-background" }: { cut?: string }) {
+export function Logo() {
   return (
     <Link href="/" aria-label="The Dawn Project home" className="flex min-h-11 items-center gap-2.5 no-underline">
       <svg width="28" height="15" viewBox="0 0 26 14" aria-hidden="true">
-        <path d="M1 13 A12 12 0 0 1 25 13 Z" className="fill-accent" />
-        <rect x="0" y="5.6" width="26" height="1.1" className={cut} />
-        <rect x="0" y="9" width="26" height="1.5" className={cut} />
+        <path d={LOGO_PATH} className="fill-accent" />
       </svg>
       <span className="font-display text-[20px] font-bold tracking-[-0.01em] text-foreground">The Dawn Project</span>
     </Link>
@@ -221,7 +239,7 @@ export function CtaBand() {
           <div className="piping" />
           <div className="grille flex justify-center rounded-b px-6 pt-10">
             <div className="w-[min(520px,90%)]">
-              <Sun cut="fill-grille" />
+              <Sun />
             </div>
           </div>
         </div>

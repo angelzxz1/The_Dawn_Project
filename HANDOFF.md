@@ -82,7 +82,7 @@ committed.
     the frontend-design and UI UX Pro Max skills; the studio isn't
     touched). The user chose a studio-gear look, keeping the striped sun,
     the amber and the fonts, with the studio screenshot in the hero, done
-    in steps. Step 1 (2026-11-12, commit to come): the base (tolex,
+    in steps. Step 1 (2026-11-12, `775c056`): the base (tolex,
     faceplate, grille and piping in `globals.css`; screws, cabinet corners,
     a pilot lamp and beveled buttons in `src/site/ui.tsx`; no all-caps
     labels or arrows on links), the header with a phone menu, the footer

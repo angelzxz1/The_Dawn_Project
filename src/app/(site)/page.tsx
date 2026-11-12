@@ -133,7 +133,7 @@ export default function Home() {
             <div className="piping" />
             <div className="grille relative overflow-hidden rounded-b px-[clamp(10px,3vw,40px)] pt-[clamp(28px,4vw,48px)]">
               <div className="mx-auto w-[min(640px,80%)]">
-                <Sun cut="fill-grille" />
+                <Sun />
               </div>
               <div className="relative -mt-[clamp(40px,10vw,140px)] overflow-hidden rounded-t-md border border-b-0 border-black/70 shadow-[0_-10px_40px_rgba(0,0,0,0.55)]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
