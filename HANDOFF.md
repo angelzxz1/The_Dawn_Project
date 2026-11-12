@@ -105,13 +105,18 @@ committed.
     asked for): the FAQ (the search box as a screen set in a faceplate, its
     focus shown on the screen; the categories as lamp buttons, in rows on
     a phone; sentence-case category labels; Still have a question? on a
-    screwed panel). Step 6 (2026-11-12, commit to come): Support (the
+    screwed panel). Step 6 (2026-11-12, `0cc74b3`; asked for): Support (the
     membership cards as screwed panels with a lamp, Studio's lit, sentence
     case and hardware buttons, also on the home page; the billing switch;
     Why support, the comparison table, the ways to help and the closing
     question on panels, without numbers, arrows or all-caps labels; each
     pack's cover the sun behind a grille, a little lower each month).
-    Next: the legal pages and the not-found page.
+    Step 7 (2026-11-12, commit to come): the legal pages (Privacy,
+    Credits, License printed on a cream sheet with a letterhead, at a
+    reading width; the texts are the About window's, unchanged, and
+    `.paper` in globals.css re-points their colours and sets their
+    headings in Fraunces and their type at reading size). Next: the
+    not-found page.
 - **Next listed: step 35, native file dialogs.** Wait for the user to say "go"
   before starting a step: they ask for each one ("Lets go with step N").
 - **What's left after that,** in order (the full list, with sizes, is in

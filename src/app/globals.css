@@ -139,6 +139,70 @@
   border-radius: 4px;
 }
 
+/* Paper: the legal pages, printed on the cream stock that comes in the box.
+ * The texts are the studio's About window's, so the colours are re-pointed
+ * here and its small window type is set at reading size. */
+.site .paper {
+  --foreground: #2a241b;
+  --soft: #4a4134;
+  --muted: #5f5546;
+  --accent: #8a5a1c;
+  --surface: #e7dcc6;
+  --border: #cdbfa3;
+  --border-strong: #b9ab8f;
+  background: linear-gradient(100deg, #e9dfca 0, #f1e8d6 18px, #efe6d3 60%, #ebe1cd);
+  color: var(--foreground);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.4) inset,
+    0 2px 0 #b9ad95,
+    0 24px 48px -16px rgba(0, 0, 0, 0.85);
+}
+
+.site .paper :focus-visible {
+  outline-color: #8a5a1c;
+}
+
+.site .paper h3 {
+  font-family: var(--font-fraunces), Georgia, serif;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-transform: none;
+  color: var(--foreground);
+}
+
+.site .paper section {
+  gap: 10px;
+}
+
+.site .paper > div {
+  gap: 28px;
+}
+
+.site .paper p {
+  font-size: 16px;
+  line-height: 1.65;
+  color: var(--soft);
+}
+
+.site .paper li,
+.site .paper li span,
+.site .paper li p {
+  font-size: 15px;
+}
+
+.site .paper li span:first-child {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* License names, set in the window's mono, in the page's own type. */
+.site .paper .font-mono {
+  font-family: inherit;
+  font-weight: 600;
+  color: var(--accent);
+}
+
 /* The FAQ's search box shows its focus on the screen around it. */
 .site .faq-search:focus-visible {
   outline: none;
