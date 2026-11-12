@@ -97,12 +97,15 @@ committed.
     with lamps and a screen that comes into view on a phone; the setup
     guides with a hardware switch; latency and troubleshooting on screwed
     panels, sentence-case headers) and two of Features' What's next items
-    (the desktop app in beta, a sampled bass). Step 4 (2026-11-12, commit
-    to come): Guides (each guide on the list as a printed owner's manual,
+    (the desktop app in beta, a sampled bass). Step 4 (2026-11-12, `5449346`;
+    asked for): Guides (each guide on the list as a printed owner's manual,
     cream paper stapled at the spine; in a guide, chapter and step numbers
     in Fraunces, steps as one list, the tips as a note with a lamp, no
-    all-caps labels; `ArrowIcon` removed). Next: FAQ, support, the legal
-    pages and the not-found page.
+    all-caps labels; `ArrowIcon` removed). Step 5 (2026-11-12, commit to
+    come): the FAQ (the search box as a screen set in a faceplate, its
+    focus shown on the screen; the categories as lamp buttons, in rows on
+    a phone; sentence-case category labels; Still have a question? on a
+    screwed panel). Next: support, the legal pages and the not-found page.
 - **Next listed: step 35, native file dialogs.** Wait for the user to say "go"
   before starting a step: they ask for each one ("Lets go with step N").
 - **What's left after that,** in order (the full list, with sizes, is in

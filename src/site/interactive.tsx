@@ -37,10 +37,10 @@ function FaqItem({ faq, open, onToggle, showCategory }: { faq: Faq; open: boolea
           aria-expanded={open}
           aria-controls={panel}
           onClick={onToggle}
-          className="flex min-h-[60px] w-full items-center gap-4 py-4 text-left"
+          className="flex min-h-[60px] w-full cursor-pointer items-center gap-4 py-4 text-left"
         >
           <span className="flex flex-1 flex-col gap-1">
-            {showCategory && <span className="font-code text-[10px] uppercase tracking-[1px] text-muted">{faq.category}</span>}
+            {showCategory && <span className="text-[13px] text-muted">{faq.category}</span>}
             <span className="text-[18px] font-semibold text-foreground">{faq.q}</span>
           </span>
           <PlusIcon open={open} />
@@ -79,26 +79,29 @@ export function FaqBrowser() {
   return (
     <>
       <div className="flex max-w-[720px] flex-col gap-3.5 pt-1.5">
-        <label htmlFor="faq-search" className="text-[13px] font-semibold text-soft">
+        <label htmlFor="faq-search" className="text-[15px] font-semibold text-foreground">
           Search the FAQ
         </label>
-        <div className="flex min-h-[52px] items-center gap-2.5 rounded-xl border border-border-strong bg-surface px-4 focus-within:border-accent">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true" className="text-muted">
-            <circle cx="11" cy="11" r="7" />
-            <path d="M20 20l-4-4" />
-          </svg>
-          <input
-            id="faq-search"
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder='Try "latency" or "offline"'
-            className="min-w-0 flex-1 bg-transparent text-[16px] text-foreground outline-none placeholder:text-muted"
-          />
+        {/* A screen set into a faceplate. */}
+        <div className="faceplate rounded-lg border border-border-strong p-1.5">
+          <div className="flex min-h-[54px] items-center gap-3 rounded-md border border-black/70 bg-[#121114] px-4 shadow-[inset_0_2px_10px_rgba(0,0,0,0.75)] focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true" className="shrink-0 text-accent">
+              <circle cx="11" cy="11" r="7" />
+              <path d="M20 20l-4-4" />
+            </svg>
+            <input
+              id="faq-search"
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder='Try "latency" or "offline"'
+              className="faq-search min-w-0 flex-1 bg-transparent text-[17px] text-foreground caret-accent outline-none placeholder:text-muted"
+            />
+          </div>
         </div>
       </div>
       <div className="flex flex-wrap items-start gap-10 pt-12">
-        <nav aria-label="FAQ categories" className="flex max-w-[280px] flex-[1_1_220px] flex-col gap-1.5">
+        <nav aria-label="FAQ categories" className="flex w-full flex-wrap gap-1.5 md:w-auto md:max-w-[280px] md:flex-[1_1_220px] md:flex-col">
           {["All", ...FAQ_CATEGORIES].map((c) => {
             const on = category === c;
             return (
@@ -107,17 +110,22 @@ export function FaqBrowser() {
                 type="button"
                 aria-pressed={on}
                 onClick={() => setCategory(c)}
-                className={`flex min-h-11 items-center justify-between gap-2.5 rounded-[10px] border px-3.5 text-left text-[15px] font-semibold text-foreground ${on ? "border-accent bg-glow" : "border-transparent hover:bg-surface"}`}
+                className={`faceplate flex min-h-11 cursor-pointer items-center gap-3 rounded-md border px-3.5 text-left text-[15px] font-semibold transition-colors active:translate-y-px ${on ? "border-accent text-foreground" : "border-border-strong text-soft hover:text-foreground"}`}
               >
-                {c}
-                <span className={`font-code text-[12px] ${on ? "text-accent" : "text-muted"}`}>{FAQS.filter((f) => matches(f) && inCategory(f, c)).length}</span>
+                <span
+                  aria-hidden="true"
+                  className={`size-2 shrink-0 rounded-full ${on ? "bg-[#ffd08a] shadow-[0_0_8px_2px_rgba(255,176,77,0.7)]" : "bg-[#3b2f20] shadow-[inset_0_1px_1px_rgba(0,0,0,0.6)]"}`}
+                />
+                <span className="flex-1">{c}</span>
+                <span className="text-[13px] font-medium tabular-nums text-muted">{FAQS.filter((f) => matches(f) && inCategory(f, c)).length}</span>
               </button>
             );
           })}
         </nav>
         <div className="flex min-w-0 flex-[3_1_480px] flex-col">
           {list.length === 0 && (
-            <div className="flex flex-col gap-2.5 rounded-xl border border-border bg-surface p-7">
+            <div className="faceplate relative flex flex-col gap-2.5 rounded-lg border border-border-strong p-8">
+              <Screws />
               <span className="text-[17px] font-semibold text-foreground">No questions match &ldquo;{query}&rdquo;.</span>
               <span className="text-[15px] text-soft">Try another word, or ask in #help on the Discord.</span>
             </div>

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { FaqBrowser } from "@/site/interactive";
-import { Container, CtaBand, Eyebrow, h1Class, h2Class, leadClass, primaryButton, secondaryButton } from "@/site/ui";
+import { Container, CtaBand, Screws, h1Class, h2Class, leadClass, primaryButton, secondaryButton } from "@/site/ui";
 import { supportLink } from "@/site/siteLinks";
 
 export const metadata: Metadata = {
@@ -15,7 +15,6 @@ export default function FaqPage() {
     <>
       <section>
         <Container className="flex flex-col gap-[22px] pt-[clamp(40px,6vw,80px)]">
-          <Eyebrow>FAQ</Eyebrow>
           <h1 className={`${h1Class} max-w-[940px]`}>Questions, answered straight.</h1>
           <p className={`${leadClass} max-w-[680px] text-[clamp(17px,1.6vw,20px)]`}>
             Everything people ask about Dawn: recording, privacy, browsers and support. Can&rsquo;t find yours? Ask in the Discord.
@@ -26,7 +25,8 @@ export default function FaqPage() {
 
       <section aria-labelledby="ask-h" className="pt-[88px]">
         <Container>
-          <div className="flex flex-wrap items-center justify-between gap-5 rounded-[18px] border border-border bg-surface p-[clamp(24px,4vw,40px)]">
+          <div className="faceplate relative flex flex-wrap items-center justify-between gap-5 rounded-lg border border-border-strong p-[clamp(28px,4vw,48px)]">
+            <Screws />
             <div className="flex max-w-[620px] flex-col gap-2">
               <h2 id="ask-h" className={`${h2Class} text-[clamp(26px,2.8vw,34px)]`}>
                 Still have a question?
