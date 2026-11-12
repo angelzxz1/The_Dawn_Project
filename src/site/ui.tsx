@@ -1,5 +1,6 @@
 // Building blocks shared by the website's pages: layout, type, buttons and
-// the dawn motif (a striped half sun).
+// the gear they're dressed as (faceplates, screws, an amp cabinet's corner
+// protectors), and the dawn motif (a striped half sun).
 
 import Link from "next/link";
 import type { ComponentProps, ReactNode } from "react";
@@ -13,17 +14,77 @@ export function Container({ className = "", children, ...rest }: ComponentProps<
   );
 }
 
+/** A small label naming what a section is about. */
 export function Eyebrow({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <p className={`text-[12px] font-semibold uppercase tracking-[2.4px] text-accent ${className}`}>{children}</p>;
+  return <p className={`text-[15px] font-semibold text-accent ${className}`}>{children}</p>;
 }
 
-export const h1Class = "font-display text-[clamp(42px,6.4vw,80px)] font-semibold leading-[1.02] tracking-[-1.4px] text-foreground";
-export const h2Class = "font-display text-[clamp(32px,4vw,48px)] font-semibold leading-[1.08] tracking-[-0.6px] text-foreground";
+export const h1Class = "font-display text-[clamp(42px,6.4vw,80px)] font-bold leading-none tracking-[-0.02em] text-foreground text-balance";
+export const h2Class = "font-display text-[clamp(32px,4vw,48px)] font-bold leading-[1.06] tracking-[-0.015em] text-foreground text-balance";
 export const leadClass = "text-[17px] leading-[1.6] text-soft";
 
-const buttonBase = "inline-flex min-h-12 items-center justify-center gap-2.5 rounded-[10px] text-[16px] no-underline transition-colors";
-export const primaryButton = `${buttonBase} bg-accent px-6 font-semibold text-background hover:bg-accent-strong`;
-export const secondaryButton = `${buttonBase} border border-border bg-surface px-[22px] font-medium text-foreground hover:border-border-strong`;
+// Buttons are hardware: lit from above, pressed in when pushed.
+const buttonBase =
+  "inline-flex min-h-12 cursor-pointer items-center justify-center gap-2.5 rounded-md text-[16px] no-underline transition-[background-color,box-shadow,transform] duration-150 active:translate-y-px";
+export const primaryButton = `${buttonBase} bg-accent px-6 font-semibold text-on-accent shadow-[inset_0_1px_0_rgba(255,255,255,0.45),inset_0_-2px_0_rgba(0,0,0,0.22),0_2px_0_rgba(0,0,0,0.5),0_0_24px_-6px_rgba(230,173,94,0.55)] hover:bg-accent-strong active:shadow-[inset_0_2px_3px_rgba(0,0,0,0.3)]`;
+export const secondaryButton = `${buttonBase} faceplate border border-border-strong px-[22px] font-medium text-foreground hover:border-metal-hi`;
+/** A text link that leads somewhere (in place of a button). */
+export const textLink = "text-[16px] font-semibold text-accent underline decoration-accent/40 underline-offset-4 hover:decoration-accent";
+
+/** A screw, as on a faceplate's corners. */
+export function Screw({ className = "" }: { className?: string }) {
+  return (
+    <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" className={`shrink-0 ${className}`}>
+      <circle cx="5" cy="5" r="4.5" fill="#6a6971" stroke="#141316" strokeWidth="1" />
+      <path d="M2.4 6.2 7.6 3.8" stroke="#2a292e" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** Four screws in a panel's corners (the panel is `relative`). */
+export function Screws() {
+  return (
+    <>
+      <Screw className="absolute left-2.5 top-2.5" />
+      <Screw className="absolute right-2.5 top-2.5 rotate-90" />
+      <Screw className="absolute bottom-2.5 left-2.5 rotate-45" />
+      <Screw className="absolute bottom-2.5 right-2.5 -rotate-12" />
+    </>
+  );
+}
+
+function Corner({ className }: { className: string }) {
+  return (
+    <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true" className={`pointer-events-none absolute z-10 ${className}`}>
+      <defs>
+        <linearGradient id="corner-metal" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#cfcdd5" />
+          <stop offset="0.5" stopColor="#8d8b94" />
+          <stop offset="1" stopColor="#57565e" />
+        </linearGradient>
+      </defs>
+      <path d="M6 0h28v9H9v25H0V6a6 6 0 0 1 6-6z" fill="url(#corner-metal)" />
+      <circle cx="4.6" cy="4.6" r="1.5" fill="#3d3c43" />
+    </svg>
+  );
+}
+
+/** An amp cabinet's metal corner protectors, on a `relative` box. */
+export function CabinetCorners() {
+  return (
+    <>
+      <Corner className="-left-1 -top-1" />
+      <Corner className="-right-1 -top-1 rotate-90" />
+      <Corner className="-bottom-1 -right-1 rotate-180" />
+      <Corner className="-bottom-1 -left-1 -rotate-90" />
+    </>
+  );
+}
+
+/** A pilot lamp: lit amber, as on an amp that's on. */
+export function PilotLamp({ className = "" }: { className?: string }) {
+  return <span aria-hidden="true" className={`inline-block size-2 shrink-0 rounded-full bg-[#ffd08a] shadow-[0_0_0_2px_rgba(0,0,0,0.35),0_0_10px_2px_rgba(255,176,77,0.75)] ${className}`} />;
+}
 
 export function ArrowIcon() {
   return (
@@ -42,11 +103,10 @@ export function CheckIcon({ size = 18 }: { size?: number }) {
 }
 
 /** "Open Dawn": the studio, opened in this tab. */
-export function OpenDawn({ className = primaryButton, arrow = true, children = "Open Dawn" }: { className?: string; arrow?: boolean; children?: ReactNode }) {
+export function OpenDawn({ className = primaryButton, children = "Open Dawn" }: { className?: string; children?: ReactNode }) {
   return (
     <a href={APP_PATH} className={className}>
       {children}
-      {arrow && <ArrowIcon />}
     </a>
   );
 }
@@ -93,13 +153,13 @@ export function Sun({ cut = "fill-background", className = "" }: { cut?: string;
 
 export function Logo({ cut = "fill-background" }: { cut?: string }) {
   return (
-    <Link href="/" aria-label="The Dawn Project home" className="flex items-center gap-2.5 no-underline">
-      <svg width="26" height="14" viewBox="0 0 26 14" aria-hidden="true">
+    <Link href="/" aria-label="The Dawn Project home" className="flex min-h-11 items-center gap-2.5 no-underline">
+      <svg width="28" height="15" viewBox="0 0 26 14" aria-hidden="true">
         <path d="M1 13 A12 12 0 0 1 25 13 Z" className="fill-accent" />
         <rect x="0" y="5.6" width="26" height="1.1" className={cut} />
         <rect x="0" y="9" width="26" height="1.5" className={cut} />
       </svg>
-      <span className="font-display text-[19px] font-semibold tracking-[-0.2px] text-foreground">The Dawn Project</span>
+      <span className="font-display text-[20px] font-bold tracking-[-0.01em] text-foreground">The Dawn Project</span>
     </Link>
   );
 }
@@ -121,7 +181,7 @@ export function JumpLinks({ label, links }: { label: string; links: [string, str
   return (
     <nav aria-label={label} className="flex flex-wrap gap-2 pt-2.5">
       {links.map(([href, text]) => (
-        <a key={href} href={href} className="flex min-h-11 items-center rounded-full border border-border bg-surface px-4 text-[15px] text-foreground no-underline hover:border-accent">
+        <a key={href} href={href} className="faceplate flex min-h-11 items-center rounded-md border border-border-strong px-4 text-[15px] text-foreground no-underline hover:border-accent">
           {text}
         </a>
       ))}
@@ -142,19 +202,27 @@ export function SectionHead({ id, eyebrow, title, lead, className = "" }: { id?:
   );
 }
 
-/** The closing call to action at the bottom of every page. */
+/** The closing call to action at the bottom of every page: an amp's front,
+ * its badge the sun. */
 export function CtaBand() {
   return (
     <section aria-labelledby="cta-h" className="pt-[110px]">
       <Container>
-        <div className="relative flex flex-col items-center gap-5 overflow-hidden rounded-[22px] border border-border bg-surface px-6 pt-[clamp(40px,6vw,72px)] text-center">
-          <h2 id="cta-h" className={`${h2Class} text-[clamp(36px,5vw,60px)]`}>
-            Plug in. Press record. Share.
-          </h2>
-          <p className={`${leadClass} max-w-[520px]`}>Open Dawn and turn the idea in your head into a demo you can send tonight.</p>
-          <OpenDawn />
-          <div className="mt-7 w-[min(560px,90%)]">
-            <Sun cut="fill-surface" />
+        <div className="relative rounded-lg bg-[#121114] p-2 shadow-[0_30px_80px_-30px_rgba(0,0,0,0.9)]">
+          <CabinetCorners />
+          <div className="faceplate relative flex flex-col items-center gap-5 rounded-t px-6 pb-10 pt-[clamp(40px,6vw,64px)] text-center">
+            <Screws />
+            <h2 id="cta-h" className={`${h2Class} text-[clamp(36px,5vw,60px)]`}>
+              Plug in. Press record. Share.
+            </h2>
+            <p className={`${leadClass} max-w-[520px]`}>Open Dawn and turn the idea in your head into a demo you can send tonight.</p>
+            <OpenDawn />
+          </div>
+          <div className="piping" />
+          <div className="grille flex justify-center rounded-b px-6 pt-10">
+            <div className="w-[min(520px,90%)]">
+              <Sun cut="fill-grille" />
+            </div>
           </div>
         </div>
       </Container>
@@ -163,4 +231,4 @@ export function CtaBand() {
 }
 
 /** A card: the site's raised panel. */
-export const cardClass = "rounded-xl border border-border bg-surface";
+export const cardClass = "faceplate rounded-lg border border-border";

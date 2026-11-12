@@ -72,12 +72,23 @@ committed.
     buttons and drop-tuning names in the window, five drop presets. Ported
     in `pitch_shift.rs` (`tests/pitch_shift_parity.rs` matches exactly).
   - Not a listed step: the CPU meter follows the native engine
-    (2026-11-12, commit to come; asked for by the user). The engine's
+    (2026-11-12, `e7cc7df`; asked for by the user). The engine's
     status says how long its callbacks took and how much audio they made
     since the last status (`busyMs`, `audioMs`, from `Status::take_busy`
     in `stream.rs`); `cpuMeter.ts` (`noteNativeLoad`) sums them into the
     same quarter-second readings as the browser's probes and shows them
     while they come, saying which engine it measures in the panel.
+  - Not a listed step: the website redesigned (asked for by the user, with
+    the frontend-design and UI UX Pro Max skills; the studio isn't
+    touched). The user chose a studio-gear look, keeping the striped sun,
+    the amber and the fonts, with the studio screenshot in the hero, done
+    in steps. Step 1 (2026-11-12, commit to come): the base (tolex,
+    faceplate, grille and piping in `globals.css`; screws, cabinet corners,
+    a pilot lamp and beveled buttons in `src/site/ui.tsx`; no all-caps
+    labels or arrows on links), the header with a phone menu, the footer
+    and the home page (the hero as an amp, a spec plate, the features as a
+    signal chain, the steps as pedals). Next: features, how it works,
+    guides, FAQ, support, the legal pages and the not-found page.
 - **Next listed: step 35, native file dialogs.** Wait for the user to say "go"
   before starting a step: they ask for each one ("Lets go with step N").
 - **What's left after that,** in order (the full list, with sizes, is in

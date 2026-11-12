@@ -26,6 +26,28 @@ test("Open Dawn leads to the studio", async ({ page }) => {
   await expect(page.getByRole("dialog", { name: "Start" })).toBeVisible();
 });
 
+test("on a phone, the pages are behind the Menu button, which closes on a new page and on Escape", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  const menu = page.getByRole("button", { name: "Menu" });
+  const features = page.locator("#site-menu").getByRole("link", { name: "Features" });
+  await expect(features).toHaveCount(0);
+  await menu.click();
+  await expect(menu).toHaveAttribute("aria-expanded", "true");
+  await features.click();
+  await expect(page).toHaveURL(/\/features\/?$/);
+  await expect(page.locator("#site-menu")).toHaveCount(0);
+  await menu.click();
+  await expect(page.locator("#site-menu").getByRole("link", { name: "FAQ" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#site-menu")).toHaveCount(0);
+  // Every page's links fit the phone: nothing scrolls sideways.
+  for (const path of PAGES) {
+    await page.goto(path);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth), path).toBeLessThanOrEqual(390);
+  }
+});
+
 test("no page links to or mentions GitHub: feedback goes to the Discord", async ({ page }) => {
   for (const path of PAGES) {
     await page.goto(path);
