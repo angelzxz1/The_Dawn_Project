@@ -8,12 +8,19 @@
 // needs LLVM installed on Windows; cpal fetches the ASIO SDK itself, or reads
 // it from CPAL_ASIO_DIR.
 //
+// A build signs the installers when the environment holds this platform's
+// signing settings (scripts/signing.mjs), as the installers workflow does
+// once they're set up; otherwise it's unsigned.
+//
 //   node scripts/desktop.mjs dev [more tauri arguments]
 //   node scripts/desktop.mjs build [more tauri arguments]
 
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { parseEnv } from "node:util";
+import { signing } from "./signing.mjs";
 
 const [command = "dev", ...rest] = process.argv.slice(2);
 
@@ -30,7 +37,7 @@ function env(name) {
 
 const asio = /^(1|true|yes|on)$/i.test((env("DAWN_ASIO") ?? "").trim());
 const args = ["--yes", "@tauri-apps/cli@2", command, ...rest];
-const childEnv = { ...process.env };
+let childEnv = { ...process.env };
 if (asio) {
   if (process.platform === "win32") {
     // The SDK's bindings are made with libclang, from LLVM.
@@ -50,6 +57,30 @@ if (asio) {
   args.push("--features", "asio");
   console.log("DAWN_ASIO is on: building with ASIO.");
   if (command === "build") console.log("Don't share this build: ASIO isn't licensed for distribution yet.");
+}
+
+if (command === "build") {
+  const sign = signing(childEnv, process.platform);
+  childEnv = sign.env;
+  if (sign.missing.length > 0) {
+    console.error(`Some of the signing settings are set, but not these: ${sign.missing.join(", ")}.
+Set them all to sign the installers, or none to build them unsigned.`);
+    process.exit(1);
+  }
+  if (sign.config && asio) {
+    // A signed build is one to hand out, and ASIO can't be handed out yet.
+    console.error("ASIO is on, so this build isn't signed: it can't be shared until Steinberg's licence is signed.\nTurn ASIO off with DAWN_ASIO=0 to sign it.");
+    process.exit(1);
+  }
+  if (sign.config) {
+    const file = join(mkdtempSync(join(tmpdir(), "dawn-signing-")), "tauri.signing.json");
+    writeFileSync(file, JSON.stringify(sign.config));
+    args.push("--config", `"${file}"`);
+    console.log("Signing the installers.");
+  }
+  // Tells the workflow whether to check the signatures.
+  if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `signed=${sign.config ? "true" : "false"}
+`);
 }
 
 const result = spawnSync("npx", args, { stdio: "inherit", shell: true, env: childEnv });

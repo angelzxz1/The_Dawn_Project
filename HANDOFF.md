@@ -120,7 +120,7 @@ committed.
     foot of every page switched off (lamp dark, the sun dim behind the
     grille), without the 404 label. The redesign covers every page of
     the website now; the studio wasn't part of it.
-- **Step 35, native file dialogs** (2026-11-12, commit to come; asked for,
+- **Step 35, native file dialogs** (2026-11-12, `9f6f25d`; asked for,
   with rfd chosen and all three parts: Save As, project folders, plugin
   folders). In the desktop app, every download (exports, MIDI, preset
   packs, the backup) is a Save As through `saveFile` in
@@ -135,11 +135,24 @@ committed.
   notice is declared after the MIDI handlers, and reaching it there trips
   the React Compiler lint. Not yet tried in the real desktop app: the
   user's to try (`npm run desktop`).
-- **Next listed: step 36, signed installers.** Wait for the user to say "go"
-  before starting a step: they ask for each one ("Lets go with step N").
+- **Step 36, signed installers** (2026-11-12, commit to come; asked for,
+  with Azure Artifact Signing chosen for Windows). `scripts/signing.mjs`
+  decides from the environment: all of a platform's settings sign, none
+  builds unsigned, some stops the build naming what's missing; empty ones
+  (CI's unset secrets) are dropped before Tauri sees them. Windows merges a
+  `signCommand` (artifact-signing-cli, object form) into the config; macOS
+  sets `signingIdentity` to `APPLE_SIGNING_IDENTITY` in place of "-" (the
+  env var too, so it doesn't matter which Tauri prefers) and Tauri imports
+  the certificate and notarizes with the Apple ID. `desktop.mjs` passes it
+  as `--config` and writes `signed=` for the workflow, whose check steps
+  run only on a signed build. Not run signed yet: no accounts exist; the
+  owner's to set up (docs/desktop.md, "Signing").
+- **Next listed: step 37, the accessibility pass** (Part 2 #27). Wait for
+  the user to say "go" before starting a step: they ask for each one
+  ("Lets go with step N").
 - **What's left after that,** in order (the full list, with sizes, is in
   `nextSteps.md`; a summary is under "The road ahead" below):
-  plugins (AU, on a Mac), shipping (signed installers), an accessibility pass, and last the desktop's driver,
+  plugins (AU, on a Mac), an accessibility pass, and last the desktop's driver,
   device and inputs picker, which waits for ASIO.
 - **Known loose ends:**
   - With the native engine on, the loudness readout still reads the
@@ -346,7 +359,8 @@ L a stage of its own).
   saved). 31, VST3 effects (NAM's own plugin first). 32, plugin
   instruments. 33, Audio Units.
 - **Phase 10, shipping:** 34, export through the engine. 35, native file
-  dialogs. 36, signed installers.
+  dialogs. 36, signed installers. Done 2026-11-12 (switch on with the
+  accounts).
 - **Throughout:** 37, Part 2 #27, accessibility (labels and focus as each
   piece is built, a full pass after Phase 6).
 - **Last:** 38, the desktop's driver type, then device, then its inputs,

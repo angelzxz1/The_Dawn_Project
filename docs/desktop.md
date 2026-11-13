@@ -44,9 +44,8 @@ Apple Silicon and Intel Macs, and an `.msi` and a setup `.exe` for Windows.
    **Dawn-Windows** (a `.zip` with the installer in it). Runs keep them for
    30 days; **Run workflow** on that page makes a fresh set.
 
-They aren't signed with a developer certificate yet (that takes an Apple
-Developer account and a Windows code-signing certificate), so each system
-asks once:
+They're signed once the repository holds the signing settings ("Signing",
+below). Until then they aren't, and each system asks once:
 
 - **macOS**: open the `.dmg` and drag Dawn to Applications. The first time
   you open it, macOS says it can't verify the developer: click **Done**,
@@ -58,6 +57,53 @@ asks once:
   later.
 - **Windows**: run the `.msi` or the setup `.exe`. If SmartScreen says it
   protected your PC, click **More info → Run anyway**.
+
+## Signing
+
+The installers workflow signs them when the repository holds a platform's
+settings, all of them (`scripts/signing.mjs`, used by `npm run
+desktop:build`): with none it builds unsigned, as now, and with only some it
+stops and names what's missing. A signed run then checks the signatures the
+way each system will, and fails rather than hand out a bad one. Settings go
+in the repository's **Settings → Secrets and variables → Actions**: secrets
+for the private ones, variables for the rest.
+
+**Windows, Azure Artifact Signing** (formerly Trusted Signing; about $10 a
+month; individuals in the US and Canada, companies in the US, Canada, the
+EU and the UK). In the Azure portal:
+
+1. Create an Artifact Signing account, and in it a certificate profile
+   (Public Trust), after the identity check Microsoft asks for.
+2. Create an App Registration with a client secret, and give it the
+   **Artifact Signing Certificate Profile Signer** role on the account.
+3. Secrets: `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_TENANT_ID`
+   (the registration's). Variables: `AZURE_SIGNING_ENDPOINT` (the account's
+   endpoint, e.g. `https://wus2.codesigning.azure.net`),
+   `AZURE_SIGNING_ACCOUNT` (its name), `AZURE_SIGNING_PROFILE` (the
+   certificate profile's name).
+
+The workflow installs `artifact-signing-cli`, and Tauri runs it on the app
+and on both installers.
+
+**macOS, a Developer ID with notarization** (the Apple Developer Program,
+$99 a year; only the account holder can make the certificate):
+
+1. Make a **Developer ID Application** certificate, export it from
+   Keychain Access as a `.p12` with a password, and turn it into text with
+   `openssl base64 -A -in certificate.p12 -out certificate.txt`.
+2. Make an app-specific password for the Apple ID at account.apple.com.
+3. Secrets: `APPLE_CERTIFICATE` (the text), `APPLE_CERTIFICATE_PASSWORD`,
+   `APPLE_ID` (the account's email), `APPLE_PASSWORD` (the app-specific
+   password). Variables: `APPLE_SIGNING_IDENTITY` (as `security
+   find-identity -v -p codesigning` shows it, e.g. `Developer ID
+   Application: Name (TEAMID)`), `APPLE_TEAM_ID`.
+
+Tauri signs with it in place of the ad hoc signature, with the hardened
+runtime and `Entitlements.plist`, and has Apple notarize the app.
+
+Once signed, macOS opens the app without asking, and Windows shows the
+publisher's name; SmartScreen may still warn on the first downloads until
+the certificate has built up a reputation.
 
 ## Running it
 
@@ -622,8 +668,9 @@ another track's audio ("Audio From") in it.
 1. **Plugins**: finding them, and VST3 and CLAP effects and instruments,
    are done (above). Audio Units on macOS wait for a Mac to build and try
    them on.
-2. **Shipping**: exporting through the engine and the system's file
-   dialogs are done (above); next, signed installers.
+2. **Shipping**: exporting through the engine, the system's file dialogs
+   and signing the installers are done (above); signing switches on once
+   the accounts are set up ("Signing").
 
 ## Checks
 

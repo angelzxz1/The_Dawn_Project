@@ -2,8 +2,10 @@
 # main, and when run by hand from the Actions tab: a .dmg for macOS (one
 # app for Apple Silicon and Intel Macs) and an .msi and a setup .exe for
 # Windows. They're kept for 30 days as the run's artifacts, to download
-# and try. They aren't signed with a developer certificate yet, so each
-# system asks once before opening them (docs/desktop.md says how).
+# and try. They're signed once the repository holds the signing settings
+# (docs/desktop.md, "Signing"): Azure Artifact Signing for Windows, a
+# Developer ID with notarization for macOS. Until then they're unsigned, and
+# each system asks once before opening them.
 
 name: Desktop installers
 
@@ -62,9 +64,48 @@ jobs:
         run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
       - uses: Swatinem/rust-cache@v2
       - run: npm ci
+      # Signs Windows's installers and the app in them through Azure
+      # Artifact Signing, once its account is set up.
+      - name: Signing tool for Windows
+        if: runner.os == 'Windows' && vars.AZURE_SIGNING_ACCOUNT != ''
+        run: cargo install artifact-signing-cli --locked
       # Builds the site (out/) first, then the app around it and its
-      # installers.
-      - run: npm run desktop:build -- ${{ matrix.args }}
+      # installers, signed when this platform's settings are all set
+      # (scripts/signing.mjs); unset ones arrive empty and are ignored.
+      - id: build
+        run: npm run desktop:build -- ${{ matrix.args }}
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_SIGNING_ENDPOINT: ${{ vars.AZURE_SIGNING_ENDPOINT }}
+          AZURE_SIGNING_ACCOUNT: ${{ vars.AZURE_SIGNING_ACCOUNT }}
+          AZURE_SIGNING_PROFILE: ${{ vars.AZURE_SIGNING_PROFILE }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ vars.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+      # A signed build is checked as each system will: a signature that
+      # isn't valid fails the run rather than reaching anyone.
+      - name: Check the Windows signatures
+        if: runner.os == 'Windows' && steps.build.outputs.signed == 'true'
+        shell: pwsh
+        run: |
+          $files = Get-ChildItem target/release/bundle/msi/*.msi, target/release/bundle/nsis/*.exe, target/release/dawn-desktop.exe
+          foreach ($f in $files) {
+            $sig = Get-AuthenticodeSignature $f.FullName
+            Write-Output "$($f.Name): $($sig.Status) ($($sig.SignerCertificate.Subject))"
+            if ($sig.Status -ne 'Valid') { throw "$($f.Name) isn't signed properly: $($sig.StatusMessage)" }
+          }
+      - name: Check the Mac signature and notarization
+        if: runner.os == 'macOS' && steps.build.outputs.signed == 'true'
+        run: |
+          app=$(ls -d target/universal-apple-darwin/release/bundle/macos/*.app | head -1)
+          codesign --verify --deep --strict --verbose=2 "$app"
+          spctl --assess --type execute --verbose=2 "$app"
+          xcrun stapler validate "$app"
       - uses: actions/upload-artifact@v7
         with:
           name: Dawn-${{ matrix.name }}
