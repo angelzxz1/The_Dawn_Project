@@ -3,15 +3,16 @@
 Read this first in a new session. It says where the project is, how the
 work is done and what comes next, then keeps the technical notes (the
 native engine's techniques, and what each finished item changed).
-Updated 2026-11-04, at `main` = `3d3dbb5`, with step 31 not yet
-committed.
+Updated 2026-11-12, at `main` = `f384f15`, with the "What's still missing" list
+not yet committed.
 
 ## Start here
 
-- **Where we are:** Phase 9 (plugins) of `nextSteps.md` is under way:
-  steps 1-32 and 34 are done (step 6, NAM in the engine, was dropped;
-  step 33, Audio Units, waits for a Mac). The last
-  few:
+- **Where we are:** Phase 10 (shipping) of `nextSteps.md` is done:
+  steps 1-32 and 34-36 are done (step 6, NAM in the engine, was dropped;
+  step 33, Audio Units, waits for a Mac). Left to build: step 37,
+  accessibility, then step 38, which waits for ASIO ("What's still
+  missing", below). The last few:
   - step 22, the mixer view (2026-11-02, `0078489`);
   - step 23, the mixer and piano roll in windows of their own
     (2026-11-02, `4b1d2c7`; the desktop's windows fixed in `612a0c2`);
@@ -135,7 +136,7 @@ committed.
   notice is declared after the MIDI handlers, and reaching it there trips
   the React Compiler lint. Not yet tried in the real desktop app: the
   user's to try (`npm run desktop`).
-- **Step 36, signed installers** (2026-11-12, commit to come; asked for,
+- **Step 36, signed installers** (2026-11-12, `f384f15`; asked for,
   with Azure Artifact Signing chosen for Windows). `scripts/signing.mjs`
   decides from the environment: all of a platform's settings sign, none
   builds unsigned, some stops the build naming what's missing; empty ones
@@ -150,24 +151,55 @@ committed.
 - **Next listed: step 37, the accessibility pass** (Part 2 #27). Wait for
   the user to say "go" before starting a step: they ask for each one
   ("Lets go with step N").
-- **What's left after that,** in order (the full list, with sizes, is in
-  `nextSteps.md`; a summary is under "The road ahead" below):
-  plugins (AU, on a Mac), an accessibility pass, and last the desktop's driver,
-  device and inputs picker, which waits for ASIO.
-- **Known loose ends:**
+- **What's still missing** (checked 2026-11-12; the same list is in
+  `nextSteps.md` and `IMPROVEMENTS.md`, and the steps, with sizes, under
+  "The road ahead" below):
+
+  **Steps still to build:**
+  - Step 37, accessibility (Part 2 #27): keyboard navigation of the
+    timeline, screen-reader labels, focus handling in dialogs, as a full
+    pass. Nothing blocks it; it's next.
+  - Step 38, the desktop's driver type, then device, then its inputs (as
+    Ableton does). Last on purpose, to be built with ASIO in it: it waits
+    for the ASIO decision.
+  - Step 33, Audio Units: waits for a Mac to build and try them on.
+
+  **Blocked on a decision:** ASIO stays off (cargo feature `asio`) until
+  the owner picks Steinberg's proprietary agreement or the GPLv3 SDK
+  ("Blocked" in `nextSteps.md`). Turning it on is small; step 38 waits on
+  it.
+
+  **Left out of finished steps:**
+  - Native recording: another track's audio ("Audio from"), and an input
+    pair recorded as one stereo take (step 29).
+  - Plugins: automating a CLAP effect's parameters, and its sidechain
+    input (step 30).
+  - Export through the engine renders only at the device's sample rate
+    (step 34).
   - With the native engine on, the loudness readout still reads the
     browser's audio, which is silent then (the track and input meters read
     the engine's).
-  - Native recording, not yet: recording another track's audio ("Audio
-    from"), and an interface's inputs in stereo (a pair as one take).
-  - `e2e/recording.spec.ts` and two piano-roll tests have failed now and
-    then under load and pass when run again. Nothing to fix so far.
-  - Autosave into a real project folder hasn't been tried end to end (the
-    tests can't pick a folder).
-  - `scripts/fix-export-segments.mjs` works around a Next export bug on
-    Windows; drop it once Next fixes it (see the item log).
+
+  **The user's to try in the desktop app:**
+  - Live input and recording through the engine on the user's own
+    interface (step 29).
+  - A real CLAP effect (step 30; only the test plugin so far).
+  - NAM's own VST3 plugin (step 31; only the test plugin so far).
+  - A real plugin instrument (step 32; only the test plugin's tone).
+  - The system's file dialogs (step 35).
+  - Autosave into a real project folder, end to end (Part 2 #28; the tests
+    can't pick a folder).
+
+  **Housekeeping:**
+  - Signing switches on once the Azure Artifact Signing and Apple
+    Developer accounts exist and their settings are in the repository
+    (step 36; docs/desktop.md, "Signing").
   - The next release's "What's new" (`src/content/whatsNew.ts`) has to be
     written: everything since section markers (`23dbe29`) is new.
+  - `scripts/fix-export-segments.mjs` works around a Next export bug on
+    Windows; drop it once Next fixes it.
+  - `e2e/recording.spec.ts` and two piano-roll tests fail now and then
+    under load and pass when run again. Nothing to fix so far.
 
 ### Each step, the routine
 
@@ -357,7 +389,7 @@ L a stage of its own).
   input and recording through the engine.
 - **Phase 9, plugins:** 30, CLAP effects (windows in #23's style, state
   saved). 31, VST3 effects (NAM's own plugin first). 32, plugin
-  instruments. 33, Audio Units.
+  instruments. 33, Audio Units, put off until a Mac is at hand.
 - **Phase 10, shipping:** 34, export through the engine. 35, native file
   dialogs. 36, signed installers. Done 2026-11-12 (switch on with the
   accounts).

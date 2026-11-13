@@ -5,7 +5,7 @@ Checked against the code and the commit history on 2026-10-29, and again on 2026
 - `[x]` is done; the commit that did it is in brackets.
 - `[ ]` is still open; "Partly" says what already exists.
 
-**Summary:** Part 1 is all done. In Part 2, items 1–26 and 28 are done; 27 is open.
+**Summary:** Part 1 is all done. In Part 2, items 1–26 and 28 are done; 27 is open. What else is missing across the project (checked 2026-11-12) is at the end, under "Still missing".
 
 ## Part 1: Code improvements
 
@@ -145,3 +145,53 @@ That is already ahead of most browser DAWs, such as BandLab or Soundtrap.
 - [x] **28. A real Preferences window** (audio device, buffer size, default count-in, autosave, theme) instead of settings scattered across popovers. (`405b1b6`)
   - Options > Preferences… in the menu bar (the header's gear before `5a380da`) or Ctrl/Cmd+, opens it (`dialogs/PreferencesWindow.tsx`). Audio: the desktop's native engine, or the browser's output device and buffer size, and delay compensation. Then Recording, Metronome, Projects (autosave into a project's folder every 1-10 minutes, the default count-in) and Appearance (item 24).
   - Autosave into a real project folder hasn't been tried end to end yet.
+
+## Still missing (checked 2026-11-12)
+
+Beyond item 27, from `nextSteps.md` (the same list is there and in `HANDOFF.md`). The step numbers are `nextSteps.md`'s.
+
+**Steps still to build:**
+- Step 37, accessibility (Part 2 #27): keyboard navigation of the
+  timeline, screen-reader labels, focus handling in dialogs, as a full
+  pass. Nothing blocks it; it's next.
+- Step 38, the desktop's driver type, then device, then its inputs (as
+  Ableton does). Last on purpose, to be built with ASIO in it: it waits
+  for the ASIO decision.
+- Step 33, Audio Units: waits for a Mac to build and try them on.
+
+**Blocked on a decision:** ASIO stays off (cargo feature `asio`) until
+the owner picks Steinberg's proprietary agreement or the GPLv3 SDK
+("Blocked" in `nextSteps.md`). Turning it on is small; step 38 waits on
+it.
+
+**Left out of finished steps:**
+- Native recording: another track's audio ("Audio from"), and an input
+  pair recorded as one stereo take (step 29).
+- Plugins: automating a CLAP effect's parameters, and its sidechain
+  input (step 30).
+- Export through the engine renders only at the device's sample rate
+  (step 34).
+- With the native engine on, the loudness readout still reads the
+  browser's audio, which is silent then (the track and input meters read
+  the engine's).
+
+**The user's to try in the desktop app:**
+- Live input and recording through the engine on the user's own
+  interface (step 29).
+- A real CLAP effect (step 30; only the test plugin so far).
+- NAM's own VST3 plugin (step 31; only the test plugin so far).
+- A real plugin instrument (step 32; only the test plugin's tone).
+- The system's file dialogs (step 35).
+- Autosave into a real project folder, end to end (Part 2 #28; the tests
+  can't pick a folder).
+
+**Housekeeping:**
+- Signing switches on once the Azure Artifact Signing and Apple
+  Developer accounts exist and their settings are in the repository
+  (step 36; docs/desktop.md, "Signing").
+- The next release's "What's new" (`src/content/whatsNew.ts`) has to be
+  written: everything since section markers (`23dbe29`) is new.
+- `scripts/fix-export-segments.mjs` works around a Next export bug on
+  Windows; drop it once Next fixes it.
+- `e2e/recording.spec.ts` and two piano-roll tests fail now and then
+  under load and pass when run again. Nothing to fix so far.
